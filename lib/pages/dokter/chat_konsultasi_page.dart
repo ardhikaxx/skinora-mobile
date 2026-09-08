@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class ChatKonsultasiPage extends StatelessWidget {
   const ChatKonsultasiPage({super.key});
@@ -17,7 +17,7 @@ class ChatKonsultasiPage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            FaIcon(FontAwesomeIcons.commentDots, size: 56, color: primaryColor),
+            Icon(LucideIcons.messageSquare, size: 56, color: primaryColor),
             SizedBox(height: 16),
             Text(
               'Chat Konsultasi',

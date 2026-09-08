@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class AdminNavBottom extends StatelessWidget {
   final int currentIndex;
@@ -17,29 +17,29 @@ class AdminNavBottom extends StatelessWidget {
   Widget build(BuildContext context) {
     final navItems = [
       const _NavItemData(
-        icon: FontAwesomeIcons.tableCellsLarge,
+        icon: LucideIcons.layoutDashboard,
         label: 'Beranda',
-        size: 19.0,
+        size: 20.0,
       ),
       const _NavItemData(
-        icon: FontAwesomeIcons.stethoscope,
+        icon: LucideIcons.stethoscope,
         label: 'Dokter',
         size: 20.0,
       ),
       const _NavItemData(
-        icon: FontAwesomeIcons.userGroup,
+        icon: LucideIcons.users,
         label: 'Pengguna',
-        size: 18.0,
+        size: 20.0,
       ),
       const _NavItemData(
-        icon: FontAwesomeIcons.bookBookmark,
+        icon: LucideIcons.bookMarked,
         label: 'Edukasi',
-        size: 19.0,
+        size: 20.0,
       ),
       const _NavItemData(
-        icon: FontAwesomeIcons.user,
+        icon: LucideIcons.user,
         label: 'Profil',
-        size: 19.0,
+        size: 20.0,
       ),
     ];
 
@@ -85,7 +85,7 @@ class AdminNavBottom extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Center(
-                        child: FaIcon(
+                        child: Icon(
                           item.icon,
                           size: item.size,
                           color: iconColor,

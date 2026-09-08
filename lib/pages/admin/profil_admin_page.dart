@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class ProfilAdminPage extends StatelessWidget {
   const ProfilAdminPage({super.key});
@@ -17,7 +17,7 @@ class ProfilAdminPage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const FaIcon(FontAwesomeIcons.user, size: 56, color: primaryColor),
+            const Icon(LucideIcons.user, size: 56, color: primaryColor),
             const SizedBox(height: 16),
             const Text(
               'Profil Admin',
@@ -36,7 +36,7 @@ class ProfilAdminPage extends StatelessWidget {
               onPressed: () {
                 Navigator.of(context).pushReplacementNamed('/login');
               },
-              icon: const FaIcon(FontAwesomeIcons.rightFromBracket, size: 16),
+              icon: const Icon(LucideIcons.logOut, size: 16),
               label: const Text('Keluar / Ganti Role'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,

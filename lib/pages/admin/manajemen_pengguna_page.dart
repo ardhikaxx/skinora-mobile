@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class ManajemenPenggunaPage extends StatelessWidget {
   const ManajemenPenggunaPage({super.key});
@@ -17,7 +17,7 @@ class ManajemenPenggunaPage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            FaIcon(FontAwesomeIcons.userGroup, size: 56, color: primaryColor),
+            Icon(LucideIcons.users, size: 56, color: primaryColor),
             SizedBox(height: 16),
             Text(
               'Manajemen Pengguna Umum',

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class DokterNavBottom extends StatelessWidget {
   final int currentIndex;
@@ -17,29 +17,29 @@ class DokterNavBottom extends StatelessWidget {
   Widget build(BuildContext context) {
     final navItems = [
       const _NavItemData(
-        icon: FontAwesomeIcons.tableCellsLarge,
+        icon: LucideIcons.layoutDashboard,
         label: 'Beranda',
-        size: 19.0,
+        size: 20.0,
       ),
       const _NavItemData(
-        icon: FontAwesomeIcons.calendarCheck,
+        icon: LucideIcons.calendarCheck,
         label: 'Jadwal',
-        size: 19.0,
+        size: 20.0,
       ),
       const _NavItemData(
-        icon: FontAwesomeIcons.commentDots,
+        icon: LucideIcons.messageSquare,
         label: 'Chat',
-        size: 19.0,
+        size: 20.0,
       ),
       const _NavItemData(
-        icon: FontAwesomeIcons.clipboardList,
+        icon: LucideIcons.clipboardList,
         label: 'Riwayat',
-        size: 19.0,
+        size: 20.0,
       ),
       const _NavItemData(
-        icon: FontAwesomeIcons.user,
+        icon: LucideIcons.user,
         label: 'Profil',
-        size: 19.0,
+        size: 20.0,
       ),
     ];
 
@@ -85,7 +85,7 @@ class DokterNavBottom extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Center(
-                        child: FaIcon(
+                        child: Icon(
                           item.icon,
                           size: item.size,
                           color: iconColor,

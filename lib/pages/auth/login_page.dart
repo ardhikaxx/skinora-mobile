@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../admin/admin_main_page.dart';
 import '../dokter/dokter_main_page.dart';
 import '../pengguna/pengguna_main_page.dart';
@@ -95,8 +95,8 @@ class _LoginPageState extends State<LoginPage> {
                       ],
                     ),
                     child: const Center(
-                      child: FaIcon(
-                        FontAwesomeIcons.droplet,
+                      child: Icon(
+                        LucideIcons.droplet,
                         color: Colors.white,
                         size: 34,
                       ),
@@ -171,8 +171,8 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             prefixIcon: Center(
                               widthFactor: 2.0,
-                              child: FaIcon(
-                                FontAwesomeIcons.envelope,
+                              child: Icon(
+                                LucideIcons.mail,
                                 color: Colors.grey.shade500,
                                 size: 16,
                               ),
@@ -228,17 +228,17 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             prefixIcon: Center(
                               widthFactor: 2.0,
-                              child: FaIcon(
-                                FontAwesomeIcons.lock,
+                              child: Icon(
+                                LucideIcons.lock,
                                 color: Colors.grey.shade500,
                                 size: 16,
                               ),
                             ),
                             suffixIcon: IconButton(
-                              icon: FaIcon(
+                              icon: Icon(
                                 _obscurePassword
-                                    ? FontAwesomeIcons.eye
-                                    : FontAwesomeIcons.eyeSlash,
+                                    ? LucideIcons.eye
+                                    : LucideIcons.eyeOff,
                                 color: Colors.grey.shade500,
                                 size: 16,
                               ),
@@ -351,7 +351,7 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
                                 ),
                                 SizedBox(width: 10),
-                                FaIcon(FontAwesomeIcons.arrowRight, size: 15),
+                                Icon(LucideIcons.arrowRight, size: 15),
                               ],
                             ),
                           ),

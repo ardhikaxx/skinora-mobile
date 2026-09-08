@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class SkincarePage extends StatelessWidget {
   const SkincarePage({super.key});
@@ -15,7 +15,7 @@ class SkincarePage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            FaIcon(FontAwesomeIcons.droplet, size: 56, color: Color(0xFFB23A48)),
+            Icon(LucideIcons.droplet, size: 56, color: Color(0xFFB23A48)),
             SizedBox(height: 16),
             Text(
               'Skincare',
