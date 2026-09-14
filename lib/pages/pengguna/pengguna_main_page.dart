@@ -16,13 +16,31 @@ class PenggunaMainPage extends StatefulWidget {
 class _PenggunaMainPageState extends State<PenggunaMainPage> {
   int _currentIndex = 0;
 
-  final List<Widget> _pages = const [
-    BerandaPenggunaPage(),
-    SkinCheckPage(),
-    SkinDailyPage(),
-    SkincarePage(),
-    ProfilPenggunaPage(),
-  ];
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = [
+      BerandaPenggunaPage(
+        onNavigateTab: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+      ),
+      SkinCheckPage(
+        onNavigateTab: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+      ),
+      const SkinDailyPage(),
+      const SkincarePage(),
+      const ProfilPenggunaPage(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
