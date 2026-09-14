@@ -16,28 +16,32 @@ class DokterMainPage extends StatefulWidget {
 class _DokterMainPageState extends State<DokterMainPage> {
   int _currentIndex = 0;
 
-  final List<Widget> _pages = const [
-    BerandaDokterPage(),
-    JadwalDokterPage(),
-    ChatKonsultasiPage(),
-    RiwayatKonsultasiPage(),
-    ProfilDokterPage(),
-  ];
+  void _changeTab(int index) {
+    if (index >= 0 && index < 5) {
+      setState(() {
+        _currentIndex = index;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final pages = [
+      BerandaDokterPage(onNavigateTab: _changeTab),
+      JadwalDokterPage(onNavigateTab: _changeTab),
+      ChatKonsultasiPage(onNavigateTab: _changeTab),
+      RiwayatKonsultasiPage(onNavigateTab: _changeTab),
+      ProfilDokterPage(onNavigateTab: _changeTab),
+    ];
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: _pages,
+        children: pages,
       ),
       bottomNavigationBar: DokterNavBottom(
         currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onTap: _changeTab,
       ),
     );
   }
