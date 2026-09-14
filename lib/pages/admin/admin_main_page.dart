@@ -16,28 +16,32 @@ class AdminMainPage extends StatefulWidget {
 class _AdminMainPageState extends State<AdminMainPage> {
   int _currentIndex = 0;
 
-  final List<Widget> _pages = const [
-    BerandaAdminPage(),
-    ManajemenDokterPage(),
-    ManajemenPenggunaPage(),
-    ManajemenEdukasiPage(),
-    ProfilAdminPage(),
-  ];
+  void _changeTab(int index) {
+    if (index >= 0 && index < 5) {
+      setState(() {
+        _currentIndex = index;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final pages = [
+      BerandaAdminPage(onNavigateTab: _changeTab),
+      const ManajemenDokterPage(),
+      const ManajemenPenggunaPage(),
+      const ManajemenEdukasiPage(),
+      const ProfilAdminPage(),
+    ];
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: _pages,
+        children: pages,
       ),
       bottomNavigationBar: AdminNavBottom(
         currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onTap: _changeTab,
       ),
     );
   }
