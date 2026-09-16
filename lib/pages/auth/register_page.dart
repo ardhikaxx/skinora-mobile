@@ -102,7 +102,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                     child: const Center(
                       child: Icon(
-                        LucideIcons.droplet,
+                        LucideIcons.droplets,
                         color: Colors.white,
                         size: 34,
                       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'pengaturan_dokter_page.dart';
+import '../../components/dialogs/logout_dialog.dart';
 
 class ProfilDokterPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
@@ -467,7 +468,7 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
         'title': 'Logout',
         'isDestructive': true,
         'onTap': () {
-          Navigator.of(context).pushReplacementNamed('/login');
+          LogoutDialog.show(context);
         },
       },
     ];
@@ -490,7 +491,7 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
       ),
       child: Column(
         children: menuItems.map((item) {
-          final isDestructive = item['isDestructive'] as bool;
+          final isDestructive = (item['isDestructive'] as bool?) ?? false;
           final icon = item['icon'] as IconData;
           final title = item['title'] as String;
           final onTap = item['onTap'] as VoidCallback?;

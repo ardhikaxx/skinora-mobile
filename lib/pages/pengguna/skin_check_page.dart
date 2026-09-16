@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import 'skin_check_question1_page.dart';
+import 'riwayat_skin_check_page.dart';
 
 class SkinCheckPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
@@ -53,25 +54,41 @@ class _SkinCheckPageState extends State<SkinCheckPage> {
                     ),
                   ),
                   InkWell(
-                    onTap: null, // Sesuai instruksi: tidak membuat dialog tanpa halaman
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Text(
-                          'Riwayat',
-                          style: TextStyle(
-                            fontSize: 14.0,
-                            fontWeight: FontWeight.bold,
-                            color: primaryMaroon,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => RiwayatSkinCheckPage(
+                            onNavigateTab: widget.onNavigateTab,
                           ),
                         ),
-                        SizedBox(width: 2),
-                        Icon(
-                          LucideIcons.chevronRight,
-                          size: 16,
-                          color: primaryMaroon,
-                        ),
-                      ],
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4.0,
+                        vertical: 2.0,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Text(
+                            'Riwayat',
+                            style: TextStyle(
+                              fontSize: 14.0,
+                              fontWeight: FontWeight.bold,
+                              color: primaryMaroon,
+                            ),
+                          ),
+                          SizedBox(width: 2),
+                          Icon(
+                            LucideIcons.chevronRight,
+                            size: 16,
+                            color: primaryMaroon,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],

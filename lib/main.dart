@@ -22,10 +22,16 @@ import 'pages/pengguna/skin_check_question5_page.dart';
 import 'pages/pengguna/skin_check_question6_page.dart';
 import 'pages/pengguna/skin_check_question7_page.dart';
 import 'pages/pengguna/skin_check_result_page.dart';
+import 'pages/pengguna/riwayat_skin_check_page.dart';
 import 'pages/pengguna/riwayat_konsultasi_page.dart';
 import 'pages/pengguna/profil_dokter_page.dart';
 import 'pages/pengguna/ruang_konsultasi_page.dart';
 import 'pages/pengguna/riwayat_ruang_konsultasi_page.dart';
+import 'pages/pengguna/profil_pengguna_page.dart';
+import 'pages/pengguna/edit_profil_pengguna_page.dart';
+import 'pages/pengguna/pengaturan_pengguna_page.dart';
+import 'pages/pengguna/tentang_pengguna_page.dart';
+import 'pages/pengguna/riwayat_aktivitas_pengguna_page.dart';
 
 void main() {
   runApp(const SkinoraApp());
@@ -88,6 +94,12 @@ class SkinoraApp extends StatelessWidget {
         '/pengguna/skin-check/pertanyaan-6': (context) => const SkinCheckQuestion6Page(age: '20', gender: 'Perempuan', conditionAfterWash: 'Terasa cukup nyaman', oilCondition: 'Sedikit berminyak, terutama di area tertentu', sensitivity: 'Kadang mengalami kemerahan atau iritasi'),
         '/pengguna/skin-check/pertanyaan-7': (context) => const SkinCheckQuestion7Page(age: '20', gender: 'Perempuan', conditionAfterWash: 'Terasa cukup nyaman', oilCondition: 'Sedikit berminyak, terutama di area tertentu', sensitivity: 'Kadang mengalami kemerahan atau iritasi', humidity: '74%'),
         '/pengguna/skin-check/hasil': (context) => const SkinCheckResultPage(),
+        '/pengguna/skin-check/riwayat': (context) => const RiwayatSkinCheckPage(),
+        '/pengguna/edit-profil': (context) => const EditProfilPenggunaPage(),
+        '/pengguna/pengaturan': (context) => const PengaturanPenggunaPage(),
+        '/pengguna/tentang': (context) => const TentangPenggunaPage(),
+        '/pengguna/riwayat-aktivitas': (context) => const RiwayatAktivitasPenggunaPage(),
+        '/pengguna/profil': (context) => const ProfilPenggunaPage(showBottomNav: true),
       },
     );
   }

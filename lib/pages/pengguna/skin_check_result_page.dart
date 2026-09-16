@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
-import 'riwayat_konsultasi_page.dart';
+import 'riwayat_skin_check_page.dart';
 
 class SkinCheckResultPage extends StatelessWidget {
   final String skinType;
@@ -143,7 +143,7 @@ class SkinCheckResultPage extends StatelessWidget {
                           context,
                           MaterialPageRoute(
                             builder: (context) =>
-                                RiwayatKonsultasiPenggunaPage(
+                                RiwayatSkinCheckPage(
                               onNavigateTab: onNavigateTab,
                             ),
                           ),

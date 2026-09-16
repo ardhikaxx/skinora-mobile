@@ -32,7 +32,7 @@ class PenggunaNavBottom extends StatelessWidget {
         size: 20.0,
       ),
       const _NavItemData(
-        icon: LucideIcons.droplet,
+        icon: LucideIcons.droplets,
         label: 'Skincare',
         size: 20.0,
       ),

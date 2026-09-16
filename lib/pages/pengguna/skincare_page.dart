@@ -15,7 +15,7 @@ class SkincarePage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(LucideIcons.droplet, size: 56, color: Color(0xFFB23A48)),
+            Icon(LucideIcons.droplets, size: 56, color: Color(0xFFB23A48)),
             SizedBox(height: 16),
             Text(
               'Skincare',

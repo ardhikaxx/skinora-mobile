@@ -16,46 +16,32 @@ class PenggunaMainPage extends StatefulWidget {
 class _PenggunaMainPageState extends State<PenggunaMainPage> {
   int _currentIndex = 0;
 
-  late final List<Widget> _pages;
-
-  @override
-  void initState() {
-    super.initState();
-    _pages = [
-      BerandaPenggunaPage(
-        onNavigateTab: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-      ),
-      SkinCheckPage(
-        onNavigateTab: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-      ),
-      const SkinDailyPage(),
-      const SkincarePage(),
-      const ProfilPenggunaPage(),
-    ];
+  void _changeTab(int index) {
+    if (index >= 0 && index < 5) {
+      setState(() {
+        _currentIndex = index;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final pages = [
+      BerandaPenggunaPage(onNavigateTab: _changeTab),
+      SkinCheckPage(onNavigateTab: _changeTab),
+      const SkinDailyPage(),
+      const SkincarePage(),
+      ProfilPenggunaPage(onNavigateTab: _changeTab),
+    ];
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: _pages,
+        children: pages,
       ),
       bottomNavigationBar: PenggunaNavBottom(
         currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onTap: _changeTab,
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'laporan_riwayat_page.dart';
+import '../../components/dialogs/logout_dialog.dart';
 
 class ProfilAdminPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
@@ -507,7 +508,7 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
       ),
       child: Column(
         children: menuItems.map((item) {
-          final isDestructive = item['isDestructive'] as bool;
+          final isDestructive = (item['isDestructive'] as bool?) ?? false;
           final icon = item['icon'] as IconData;
           final title = item['title'] as String;
           final onTap = item['onTap'] as VoidCallback?;
@@ -907,57 +908,9 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
 
   /// Dialog: Konfirmasi Logout
   void _showLogoutConfirmation() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Text(
-            'Konfirmasi Logout',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: darkText,
-            ),
-          ),
-          content: const Text(
-            'Apakah Anda yakin ingin keluar dari akun admin Skinora?',
-            style: TextStyle(fontSize: 14, color: Color(0xFF555555)),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Batal',
-                style: TextStyle(
-                  color: Color(0xFF757575),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.of(context).pushNamedAndRemoveUntil(
-                  '/login',
-                  (route) => false,
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryMaroon,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                elevation: 0,
-              ),
-              child: const Text('Logout'),
-            ),
-          ],
-        );
-      },
+    LogoutDialog.show(
+      context,
+      message: 'Apakah Anda yakin ingin keluar dari akun admin Skinora?',
     );
   }
 }

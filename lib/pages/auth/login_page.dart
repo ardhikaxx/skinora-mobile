@@ -96,7 +96,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     child: const Center(
                       child: Icon(
-                        LucideIcons.droplet,
+                        LucideIcons.droplets,
                         color: Colors.white,
                         size: 34,
                       ),
