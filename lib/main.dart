@@ -31,6 +31,11 @@ import 'pages/pengguna/profil_pengguna_page.dart';
 import 'pages/pengguna/edit_profil_pengguna_page.dart';
 import 'pages/pengguna/pengaturan_pengguna_page.dart';
 import 'pages/pengguna/tentang_pengguna_page.dart';
+import 'pages/pengguna/skin_daily_page.dart';
+import 'pages/pengguna/riwayat_skin_daily_page.dart';
+import 'pages/pengguna/insight_kulit_pengguna_page.dart';
+import 'pages/pengguna/skincare_page.dart';
+import 'pages/pengguna/riwayat_skincare_page.dart';
 import 'pages/pengguna/riwayat_aktivitas_pengguna_page.dart';
 
 void main() {
@@ -100,6 +105,11 @@ class SkinoraApp extends StatelessWidget {
         '/pengguna/tentang': (context) => const TentangPenggunaPage(),
         '/pengguna/riwayat-aktivitas': (context) => const RiwayatAktivitasPenggunaPage(),
         '/pengguna/profil': (context) => const ProfilPenggunaPage(showBottomNav: true),
+        '/pengguna/skin-daily': (context) => const SkinDailyPage(showBottomNav: true),
+        '/pengguna/skin-daily/riwayat': (context) => const RiwayatSkinDailyPage(showBottomNav: true),
+        '/pengguna/skin-daily/insight': (context) => const InsightKulitPenggunaPage(showBottomNav: true),
+        '/pengguna/skincare': (context) => const SkincarePage(showBottomNav: true),
+        '/pengguna/skincare/riwayat': (context) => const RiwayatSkincarePage(showBottomNav: true),
       },
     );
   }

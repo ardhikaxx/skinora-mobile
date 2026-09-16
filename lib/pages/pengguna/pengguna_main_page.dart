@@ -29,8 +29,8 @@ class _PenggunaMainPageState extends State<PenggunaMainPage> {
     final pages = [
       BerandaPenggunaPage(onNavigateTab: _changeTab),
       SkinCheckPage(onNavigateTab: _changeTab),
-      const SkinDailyPage(),
-      const SkincarePage(),
+      SkinDailyPage(onNavigateTab: _changeTab),
+      SkincarePage(onNavigateTab: _changeTab),
       ProfilPenggunaPage(onNavigateTab: _changeTab),
     ];
 
