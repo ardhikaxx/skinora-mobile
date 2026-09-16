@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import 'detail_edukasi_page.dart';
 
 class SkinEducationModel {
   final String id;
@@ -269,7 +270,6 @@ class _EdukasiKulitPenggunaPageState extends State<EdukasiKulitPenggunaPage> {
   Widget _buildArticleCard(SkinEducationModel item) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14.0),
-      padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
@@ -285,103 +285,123 @@ class _EdukasiKulitPenggunaPageState extends State<EdukasiKulitPenggunaPage> {
           ),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Left Book Open Outline Icon
-          Padding(
-            padding: const EdgeInsets.only(top: 2.0, right: 14.0),
-            child: const Icon(
-              LucideIcons.bookOpen,
-              color: Color(0xFF8E8E93),
-              size: 22,
-            ),
-          ),
-
-          // Right Content Column
-          Expanded(
-            child: Column(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => DetailEdukasiPenggunaPage(
+                  article: item,
+                  onNavigateTab: widget.onNavigateTab,
+                ),
+              ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Category Badge & Chevron Right
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8.0,
-                        vertical: 3.0,
+                // Left Book Open Outline Icon
+                Padding(
+                  padding: const EdgeInsets.only(top: 2.0, right: 14.0),
+                  child: const Icon(
+                    LucideIcons.bookOpen,
+                    color: Color(0xFF8E8E93),
+                    size: 22,
+                  ),
+                ),
+
+                // Right Content Column
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Category Badge & Chevron Right
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8.0,
+                              vertical: 3.0,
+                            ),
+                            decoration: BoxDecoration(
+                              color: categoryBadgeBg,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              item.category,
+                              style: const TextStyle(
+                                fontSize: 10.0,
+                                fontWeight: FontWeight.bold,
+                                color: primaryMaroon,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                          const Icon(
+                            LucideIcons.chevronRight,
+                            size: 16,
+                            color: Color(0xFF9E9E9E),
+                          ),
+                        ],
                       ),
-                      decoration: BoxDecoration(
-                        color: categoryBadgeBg,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        item.category,
+                      const SizedBox(height: 6),
+
+                      // Article Title
+                      Text(
+                        item.title,
                         style: const TextStyle(
-                          fontSize: 10.0,
+                          fontSize: 14.0,
                           fontWeight: FontWeight.bold,
-                          color: primaryMaroon,
-                          letterSpacing: 0.3,
+                          color: darkText,
+                          height: 1.25,
                         ),
                       ),
-                    ),
-                    const Icon(
-                      LucideIcons.chevronRight,
-                      size: 16,
-                      color: Color(0xFF9E9E9E),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
+                      const SizedBox(height: 4),
 
-                // Article Title
-                Text(
-                  item.title,
-                  style: const TextStyle(
-                    fontSize: 14.0,
-                    fontWeight: FontWeight.bold,
-                    color: darkText,
-                    height: 1.25,
-                  ),
-                ),
-                const SizedBox(height: 4),
-
-                // Snippet
-                Text(
-                  item.snippet,
-                  style: const TextStyle(
-                    fontSize: 12.0,
-                    color: subText,
-                    height: 1.35,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-
-                // Date with Clock Icon
-                Row(
-                  children: [
-                    const Icon(
-                      LucideIcons.clock,
-                      size: 12,
-                      color: dateText,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      item.date,
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        color: dateText,
+                      // Snippet
+                      Text(
+                        item.snippet,
+                        style: const TextStyle(
+                          fontSize: 12.0,
+                          color: subText,
+                          height: 1.35,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+
+                      // Date with Clock Icon
+                      Row(
+                        children: [
+                          const Icon(
+                            LucideIcons.clock,
+                            size: 12,
+                            color: dateText,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            item.date,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              color: dateText,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

@@ -1,46 +1,56 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
-import 'skin_check_question3_page.dart';
+import 'skin_check_question5_page.dart';
 
-class SkinCheckQuestion2Page extends StatefulWidget {
+class SkinCheckQuestion4Page extends StatefulWidget {
   final String age;
-  final String? initialGender;
+  final String gender;
+  final String conditionAfterWash;
+  final String? initialOilCondition;
   final ValueChanged<int>? onNavigateTab;
 
-  const SkinCheckQuestion2Page({
+  const SkinCheckQuestion4Page({
     super.key,
     required this.age,
-    this.initialGender,
+    required this.gender,
+    required this.conditionAfterWash,
+    this.initialOilCondition,
     this.onNavigateTab,
   });
 
   @override
-  State<SkinCheckQuestion2Page> createState() => _SkinCheckQuestion2PageState();
+  State<SkinCheckQuestion4Page> createState() => _SkinCheckQuestion4PageState();
 }
 
-class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
+class _SkinCheckQuestion4PageState extends State<SkinCheckQuestion4Page> {
   static const Color primaryMaroon = Color(0xFF8B2B38);
   static const Color darkText = Color(0xFF3F141E);
   static const Color selectedPeachBg = Color(0xFFFFD5C3);
   static const Color disabledBtnBg = Color(0xFFDDD5D4);
   static const Color disabledBtnText = Color(0xFF9E9E9E);
 
-  String? _selectedGender;
+  String? _selectedOilCondition;
+
+  final List<String> _options = const [
+    'Wajah terasa kering dan hampir tidak berminyak',
+    'Sedikit berminyak, terutama di area tertentu',
+    'Wajah terlihat mengkilap dan banyak minyak',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _selectedGender = widget.initialGender;
+    _selectedOilCondition = widget.initialOilCondition;
   }
 
   void _goBack() {
-    Navigator.pop(context, _selectedGender);
+    Navigator.pop(context, _selectedOilCondition);
   }
 
   @override
   Widget build(BuildContext context) {
-    final hasSelection = _selectedGender != null;
+    final hasSelection = _selectedOilCondition != null;
 
     return PopScope(
       canPop: false,
@@ -97,9 +107,9 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 20.0),
                   children: [
-                    // 2. Subtitle: "PERTANYAAN 2/7"
+                    // 2. Subtitle: "PERTANYAAN 4/7"
                     const Text(
-                      'PERTANYAAN 2/7',
+                      'PERTANYAAN 4/7',
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w800,
@@ -109,7 +119,7 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
                     ),
                     const SizedBox(height: 16),
 
-                    // 3. Question Card: Number "2" + "Apa jenis kelamin Anda?"
+                    // 3. Question Card: Number "4" + Question description
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(18.0),
@@ -129,8 +139,9 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
                         ],
                       ),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Number "2" Maroon Squircle
+                          // Number "4" Maroon Squircle
                           Container(
                             width: 36,
                             height: 36,
@@ -140,7 +151,7 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
                             ),
                             child: const Center(
                               child: Text(
-                                '2',
+                                '4',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
@@ -152,12 +163,15 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
                           const SizedBox(width: 14),
 
                           // Question Text
-                          const Text(
-                            'Apa jenis kelamin Anda?',
-                            style: TextStyle(
-                              fontSize: 15.0,
-                              fontWeight: FontWeight.bold,
-                              color: darkText,
+                          const Expanded(
+                            child: Text(
+                              'Bagaimana kondisi minyak pada wajah Anda beberapa jam setelah mencuci wajah?',
+                              style: TextStyle(
+                                fontSize: 15.0,
+                                fontWeight: FontWeight.bold,
+                                color: darkText,
+                                height: 1.35,
+                              ),
                             ),
                           ),
                         ],
@@ -165,15 +179,17 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
                     ),
                     const SizedBox(height: 16),
 
-                    // 4. Gender Option 1: "Laki-laki"
-                    _buildGenderOptionCard('Laki-laki'),
-                    const SizedBox(height: 14),
+                    // 4. Options List matching image copy 6.png
+                    ..._options.map((option) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 14.0),
+                        child: _buildOilOptionCard(option),
+                      );
+                    }),
 
-                    // 5. Gender Option 2: "Perempuan"
-                    _buildGenderOptionCard('Perempuan'),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 10),
 
-                    // 6. Action Buttons Row ("< Sebelumnya" & "Selanjutnya >")
+                    // 5. Action Buttons Row ("< Sebelumnya" & "Selanjutnya >")
                     Row(
                       children: [
                         // Button "Sebelumnya" (Outlined white container)
@@ -243,9 +259,13 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
                                         context,
                                         MaterialPageRoute(
                                           builder: (context) =>
-                                              SkinCheckQuestion3Page(
+                                              SkinCheckQuestion5Page(
                                             age: widget.age,
-                                            gender: _selectedGender!,
+                                            gender: widget.gender,
+                                            conditionAfterWash:
+                                                widget.conditionAfterWash,
+                                            oilCondition:
+                                                _selectedOilCondition!,
                                             onNavigateTab: widget.onNavigateTab,
                                           ),
                                         ),
@@ -260,7 +280,8 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
                                       ),
                                     ),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: const [
                                         Text(
                                           'Selanjutnya',
@@ -294,6 +315,8 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
         bottomNavigationBar: PenggunaNavBottom(
           currentIndex: 1,
           onTap: (index) {
+            Navigator.pop(context); // pop question 4
+            Navigator.pop(context); // pop question 3
             Navigator.pop(context); // pop question 2
             Navigator.pop(context); // pop question 1
             if (index != 1) {
@@ -305,8 +328,8 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
     );
   }
 
-  Widget _buildGenderOptionCard(String gender) {
-    final isSelected = _selectedGender == gender;
+  Widget _buildOilOptionCard(String option) {
+    final isSelected = _selectedOilCondition == option;
 
     return Container(
       decoration: BoxDecoration(
@@ -330,11 +353,12 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
           borderRadius: BorderRadius.circular(18),
           onTap: () {
             setState(() {
-              _selectedGender = gender;
+              _selectedOilCondition = option;
             });
           },
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
             child: Row(
               children: [
                 // Radio Circle
@@ -344,7 +368,8 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isSelected ? primaryMaroon : const Color(0xFFD0D0D0),
+                      color:
+                          isSelected ? primaryMaroon : const Color(0xFFD0D0D0),
                       width: isSelected ? 2.0 : 1.5,
                     ),
                   ),
@@ -363,13 +388,16 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
                 ),
                 const SizedBox(width: 14),
 
-                // Gender Label
-                Text(
-                  gender,
-                  style: TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                    color: darkText,
+                // Option Text Label
+                Expanded(
+                  child: Text(
+                    option,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.w500,
+                      color: darkText,
+                    ),
                   ),
                 ),
               ],

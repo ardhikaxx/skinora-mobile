@@ -1,46 +1,69 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
-import 'skin_check_question3_page.dart';
+import 'skin_check_result_page.dart';
 
-class SkinCheckQuestion2Page extends StatefulWidget {
+class SkinCheckQuestion7Page extends StatefulWidget {
   final String age;
-  final String? initialGender;
+  final String gender;
+  final String conditionAfterWash;
+  final String oilCondition;
+  final String sensitivity;
+  final String humidity;
+  final String? initialTemperature;
   final ValueChanged<int>? onNavigateTab;
 
-  const SkinCheckQuestion2Page({
+  const SkinCheckQuestion7Page({
     super.key,
     required this.age,
-    this.initialGender,
+    required this.gender,
+    required this.conditionAfterWash,
+    required this.oilCondition,
+    required this.sensitivity,
+    required this.humidity,
+    this.initialTemperature,
     this.onNavigateTab,
   });
 
   @override
-  State<SkinCheckQuestion2Page> createState() => _SkinCheckQuestion2PageState();
+  State<SkinCheckQuestion7Page> createState() => _SkinCheckQuestion7PageState();
 }
 
-class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
+class _SkinCheckQuestion7PageState extends State<SkinCheckQuestion7Page> {
   static const Color primaryMaroon = Color(0xFF8B2B38);
   static const Color darkText = Color(0xFF3F141E);
-  static const Color selectedPeachBg = Color(0xFFFFD5C3);
   static const Color disabledBtnBg = Color(0xFFDDD5D4);
   static const Color disabledBtnText = Color(0xFF9E9E9E);
+  static const Color iconColor = Color(0xFF8E8E93);
 
-  String? _selectedGender;
+  late final TextEditingController _tempController;
 
   @override
   void initState() {
     super.initState();
-    _selectedGender = widget.initialGender;
+    _tempController =
+        TextEditingController(text: widget.initialTemperature ?? '29°C');
+  }
+
+  @override
+  void dispose() {
+    _tempController.dispose();
+    super.dispose();
   }
 
   void _goBack() {
-    Navigator.pop(context, _selectedGender);
+    Navigator.pop(context, _tempController.text.trim());
+  }
+
+  void _handleCek() {
+    setState(() {
+      _tempController.text = '29°C';
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final hasSelection = _selectedGender != null;
+    final hasValue = _tempController.text.trim().isNotEmpty;
 
     return PopScope(
       canPop: false,
@@ -97,9 +120,9 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 20.0),
                   children: [
-                    // 2. Subtitle: "PERTANYAAN 2/7"
+                    // 2. Subtitle: "PERTANYAAN 7/7"
                     const Text(
-                      'PERTANYAAN 2/7',
+                      'PERTANYAAN 7/7',
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w800,
@@ -109,7 +132,7 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
                     ),
                     const SizedBox(height: 16),
 
-                    // 3. Question Card: Number "2" + "Apa jenis kelamin Anda?"
+                    // 3. Question Card: Number "7" + Question description
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(18.0),
@@ -129,8 +152,9 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
                         ],
                       ),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Number "2" Maroon Squircle
+                          // Number "7" Maroon Squircle
                           Container(
                             width: 36,
                             height: 36,
@@ -140,7 +164,7 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
                             ),
                             child: const Center(
                               child: Text(
-                                '2',
+                                '7',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
@@ -152,28 +176,102 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
                           const SizedBox(width: 14),
 
                           // Question Text
-                          const Text(
-                            'Apa jenis kelamin Anda?',
-                            style: TextStyle(
-                              fontSize: 15.0,
-                              fontWeight: FontWeight.bold,
-                              color: darkText,
+                          const Expanded(
+                            child: Text(
+                              'Berapa suhu lingkungan Anda saat melakukan pemeriksaan?',
+                              style: TextStyle(
+                                fontSize: 15.0,
+                                fontWeight: FontWeight.bold,
+                                color: darkText,
+                                height: 1.35,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-
-                    // 4. Gender Option 1: "Laki-laki"
-                    _buildGenderOptionCard('Laki-laki'),
-                    const SizedBox(height: 14),
-
-                    // 5. Gender Option 2: "Perempuan"
-                    _buildGenderOptionCard('Perempuan'),
                     const SizedBox(height: 20),
 
-                    // 6. Action Buttons Row ("< Sebelumnya" & "Selanjutnya >")
+                    // 4. Input Row with "Cek" button matching image copy 8.png
+                    Row(
+                      children: [
+                        // Temperature Input Container
+                        Expanded(
+                          child: Container(
+                            height: 48,
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: const Color(0xFFE5E5EA),
+                                width: 1.0,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  LucideIcons.thermometer,
+                                  size: 18,
+                                  color: iconColor,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _tempController,
+                                    keyboardType: TextInputType.text,
+                                    onChanged: (_) => setState(() {}),
+                                    style: const TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: darkText,
+                                    ),
+                                    decoration: const InputDecoration(
+                                      hintText: '29°C',
+                                      hintStyle: TextStyle(
+                                        color: Color(0xFF9E9E9E),
+                                        fontSize: 14.0,
+                                      ),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding: EdgeInsets.zero,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+
+                        // Button "Cek"
+                        GestureDetector(
+                          onTap: _handleCek,
+                          child: Container(
+                            height: 48,
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            decoration: BoxDecoration(
+                              color: primaryMaroon,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                'Cek',
+                                style: TextStyle(
+                                  fontSize: 14.0,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // 5. Action Buttons Row ("< Sebelumnya" & "Lihat Hasil >")
                     Row(
                       children: [
                         // Button "Sebelumnya" (Outlined white container)
@@ -215,9 +313,9 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
                         ),
                         const SizedBox(width: 14),
 
-                        // Button "Selanjutnya"
+                        // Button "Lihat Hasil"
                         Expanded(
-                          child: !hasSelection
+                          child: !hasValue
                               ? Container(
                                   height: 48,
                                   decoration: BoxDecoration(
@@ -226,7 +324,7 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
                                   ),
                                   child: const Center(
                                     child: Text(
-                                      'Selanjutnya',
+                                      'Lihat Hasil',
                                       style: TextStyle(
                                         fontSize: 14.0,
                                         fontWeight: FontWeight.bold,
@@ -243,9 +341,14 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
                                         context,
                                         MaterialPageRoute(
                                           builder: (context) =>
-                                              SkinCheckQuestion3Page(
-                                            age: widget.age,
-                                            gender: _selectedGender!,
+                                              SkinCheckResultPage(
+                                            skinType: 'Normal',
+                                            sensitivity: widget.sensitivity
+                                                    .toLowerCase()
+                                                    .contains('sering')
+                                                ? 'Sangat Sensitif'
+                                                : 'Sensitif',
+                                            acneRisk: 'Tidak Rentan',
                                             onNavigateTab: widget.onNavigateTab,
                                           ),
                                         ),
@@ -260,10 +363,11 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
                                       ),
                                     ),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: const [
                                         Text(
-                                          'Selanjutnya',
+                                          'Lihat Hasil',
                                           style: TextStyle(
                                             fontSize: 14.0,
                                             fontWeight: FontWeight.bold,
@@ -294,87 +398,17 @@ class _SkinCheckQuestion2PageState extends State<SkinCheckQuestion2Page> {
         bottomNavigationBar: PenggunaNavBottom(
           currentIndex: 1,
           onTap: (index) {
+            Navigator.pop(context); // pop question 7
+            Navigator.pop(context); // pop question 6
+            Navigator.pop(context); // pop question 5
+            Navigator.pop(context); // pop question 4
+            Navigator.pop(context); // pop question 3
             Navigator.pop(context); // pop question 2
             Navigator.pop(context); // pop question 1
             if (index != 1) {
               widget.onNavigateTab?.call(index);
             }
           },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGenderOptionCard(String gender) {
-    final isSelected = _selectedGender == gender;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isSelected ? selectedPeachBg : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isSelected ? primaryMaroon : const Color(0xFFEEEEEE),
-          width: isSelected ? 1.5 : 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: () {
-            setState(() {
-              _selectedGender = gender;
-            });
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-            child: Row(
-              children: [
-                // Radio Circle
-                Container(
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isSelected ? primaryMaroon : const Color(0xFFD0D0D0),
-                      width: isSelected ? 2.0 : 1.5,
-                    ),
-                  ),
-                  child: isSelected
-                      ? Center(
-                          child: Container(
-                            width: 10,
-                            height: 10,
-                            decoration: const BoxDecoration(
-                              color: primaryMaroon,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 14),
-
-                // Gender Label
-                Text(
-                  gender,
-                  style: TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                    color: darkText,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );

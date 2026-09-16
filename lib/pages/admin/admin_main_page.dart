@@ -31,7 +31,7 @@ class _AdminMainPageState extends State<AdminMainPage> {
       const ManajemenDokterPage(),
       const ManajemenPenggunaPage(),
       const ManajemenEdukasiPage(),
-      const ProfilAdminPage(),
+      ProfilAdminPage(onNavigateTab: _changeTab),
     ];
 
     return Scaffold(

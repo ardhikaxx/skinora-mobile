@@ -13,8 +13,19 @@ import 'pages/pengguna/pengguna_main_page.dart';
 import 'pages/pengguna/notifikasi_pengguna_page.dart';
 import 'pages/pengguna/konsultasi_dokter_page.dart';
 import 'pages/pengguna/edukasi_kulit_page.dart';
+import 'pages/pengguna/detail_edukasi_page.dart';
 import 'pages/pengguna/skin_check_question1_page.dart';
 import 'pages/pengguna/skin_check_question2_page.dart';
+import 'pages/pengguna/skin_check_question3_page.dart';
+import 'pages/pengguna/skin_check_question4_page.dart';
+import 'pages/pengguna/skin_check_question5_page.dart';
+import 'pages/pengguna/skin_check_question6_page.dart';
+import 'pages/pengguna/skin_check_question7_page.dart';
+import 'pages/pengguna/skin_check_result_page.dart';
+import 'pages/pengguna/riwayat_konsultasi_page.dart';
+import 'pages/pengguna/profil_dokter_page.dart';
+import 'pages/pengguna/ruang_konsultasi_page.dart';
+import 'pages/pengguna/riwayat_ruang_konsultasi_page.dart';
 
 void main() {
   runApp(const SkinoraApp());
@@ -63,9 +74,20 @@ class SkinoraApp extends StatelessWidget {
         '/pengguna': (context) => const PenggunaMainPage(),
         '/pengguna/notifikasi': (context) => const NotifikasiPenggunaPage(),
         '/pengguna/konsultasi': (context) => const KonsultasiDokterPenggunaPage(),
+        '/pengguna/profil-dokter': (context) => const ProfilDokterPenggunaPage(),
+        '/pengguna/ruang-konsultasi': (context) => const RuangKonsultasiPenggunaPage(),
+        '/pengguna/riwayat-ruang-konsultasi': (context) => const RiwayatRuangKonsultasiPage(),
+        '/pengguna/riwayat-konsultasi': (context) => const RiwayatKonsultasiPenggunaPage(),
         '/pengguna/edukasi': (context) => const EdukasiKulitPenggunaPage(),
+        '/pengguna/detail-edukasi': (context) => const DetailEdukasiPenggunaPage(),
         '/pengguna/skin-check/pertanyaan-1': (context) => const SkinCheckQuestion1Page(),
         '/pengguna/skin-check/pertanyaan-2': (context) => const SkinCheckQuestion2Page(age: '20'),
+        '/pengguna/skin-check/pertanyaan-3': (context) => const SkinCheckQuestion3Page(age: '20', gender: 'Perempuan'),
+        '/pengguna/skin-check/pertanyaan-4': (context) => const SkinCheckQuestion4Page(age: '20', gender: 'Perempuan', conditionAfterWash: 'Terasa cukup nyaman'),
+        '/pengguna/skin-check/pertanyaan-5': (context) => const SkinCheckQuestion5Page(age: '20', gender: 'Perempuan', conditionAfterWash: 'Terasa cukup nyaman', oilCondition: 'Sedikit berminyak, terutama di area tertentu'),
+        '/pengguna/skin-check/pertanyaan-6': (context) => const SkinCheckQuestion6Page(age: '20', gender: 'Perempuan', conditionAfterWash: 'Terasa cukup nyaman', oilCondition: 'Sedikit berminyak, terutama di area tertentu', sensitivity: 'Kadang mengalami kemerahan atau iritasi'),
+        '/pengguna/skin-check/pertanyaan-7': (context) => const SkinCheckQuestion7Page(age: '20', gender: 'Perempuan', conditionAfterWash: 'Terasa cukup nyaman', oilCondition: 'Sedikit berminyak, terutama di area tertentu', sensitivity: 'Kadang mengalami kemerahan atau iritasi', humidity: '74%'),
+        '/pengguna/skin-check/hasil': (context) => const SkinCheckResultPage(),
       },
     );
   }

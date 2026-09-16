@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import 'riwayat_konsultasi_page.dart';
+import 'profil_dokter_page.dart';
 
 class DoctorSearchModel {
   final String id;
@@ -121,25 +123,41 @@ class _KonsultasiDokterPenggunaPageState
                     ),
                   ),
                   InkWell(
-                    onTap: null, // Sesuai instruksi: tidak membuat dialog tanpa halaman
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Text(
-                          'Riwayat',
-                          style: TextStyle(
-                            fontSize: 14.0,
-                            fontWeight: FontWeight.bold,
-                            color: primaryMaroon,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => RiwayatKonsultasiPenggunaPage(
+                            onNavigateTab: widget.onNavigateTab,
                           ),
                         ),
-                        SizedBox(width: 2),
-                        Icon(
-                          LucideIcons.chevronRight,
-                          size: 16,
-                          color: primaryMaroon,
-                        ),
-                      ],
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4.0,
+                        vertical: 2.0,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Text(
+                            'Riwayat',
+                            style: TextStyle(
+                              fontSize: 14.0,
+                              fontWeight: FontWeight.bold,
+                              color: primaryMaroon,
+                            ),
+                          ),
+                          SizedBox(width: 2),
+                          Icon(
+                            LucideIcons.chevronRight,
+                            size: 16,
+                            color: primaryMaroon,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -265,7 +283,6 @@ class _KonsultasiDokterPenggunaPageState
   Widget _buildDoctorCard(DoctorSearchModel doctor) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14.0),
-      padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
@@ -281,91 +298,113 @@ class _KonsultasiDokterPenggunaPageState
           ),
         ],
       ),
-      child: Row(
-        children: [
-          // Soft Peach Avatar Container with lowercase "d"
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: peachAvatarBg,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Center(
-              child: Text(
-                'd',
-                style: TextStyle(
-                  color: primaryMaroon,
-                  fontSize: 19,
-                  fontWeight: FontWeight.bold,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ProfilDokterPenggunaPage(
+                  doctorId: doctor.id,
+                  doctorName: doctor.name,
+                  specialization: doctor.specialization,
+                  onNavigateTab: widget.onNavigateTab,
                 ),
               ),
-            ),
-          ),
-          const SizedBox(width: 14),
-
-          // Doctor Information
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
               children: [
-                // Doctor Name + Terverifikasi Badge + Right Arrow
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        doctor.name,
-                        style: const TextStyle(
-                          fontSize: 14.0,
-                          fontWeight: FontWeight.bold,
-                          color: darkText,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                // Soft Peach Avatar Container with lowercase "d"
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: peachAvatarBg,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'd',
+                      style: TextStyle(
+                        color: primaryMaroon,
+                        fontSize: 19,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8.0,
-                        vertical: 3.0,
+                  ),
+                ),
+                const SizedBox(width: 14),
+
+                // Doctor Information
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Doctor Name + Terverifikasi Badge + Right Arrow
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              doctor.name,
+                              style: const TextStyle(
+                                fontSize: 14.0,
+                                fontWeight: FontWeight.bold,
+                                color: darkText,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8.0,
+                              vertical: 3.0,
+                            ),
+                            decoration: BoxDecoration(
+                              color: verifiedBadgeBg,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Terverifikasi',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: primaryMaroon,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Icon(
+                            LucideIcons.chevronRight,
+                            size: 16,
+                            color: Color(0xFF9E9E9E),
+                          ),
+                        ],
                       ),
-                      decoration: BoxDecoration(
-                        color: verifiedBadgeBg,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text(
-                        'Terverifikasi',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.bold,
+                      const SizedBox(height: 5),
+
+                      // Specialization
+                      Text(
+                        doctor.specialization,
+                        style: const TextStyle(
+                          fontSize: 12.0,
+                          fontWeight: FontWeight.w600,
                           color: primaryMaroon,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Icon(
-                      LucideIcons.chevronRight,
-                      size: 16,
-                      color: Color(0xFF9E9E9E),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 5),
-
-                // Specialization
-                Text(
-                  doctor.specialization,
-                  style: const TextStyle(
-                    fontSize: 12.0,
-                    fontWeight: FontWeight.w600,
-                    color: primaryMaroon,
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
