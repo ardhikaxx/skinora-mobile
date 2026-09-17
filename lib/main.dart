@@ -4,7 +4,26 @@ import 'pages/auth/register_page.dart';
 import 'pages/admin/admin_main_page.dart';
 import 'pages/admin/notifikasi_admin_page.dart';
 import 'pages/admin/master_spesialisasi_page.dart';
+import 'pages/admin/tambah_spesialisasi_page.dart';
+import 'pages/admin/edit_spesialisasi_page.dart';
+import 'pages/admin/manajemen_dokter_page.dart';
+import 'pages/admin/tambah_dokter_page.dart';
+import 'pages/admin/detail_dokter_page.dart';
+import 'pages/admin/manajemen_pengguna_page.dart';
+import 'pages/admin/tambah_pengguna_page.dart';
+import 'pages/admin/detail_pengguna_page.dart';
+import 'pages/admin/profil_admin_page.dart';
+import 'pages/admin/edit_profil_admin_page.dart';
+import 'pages/admin/pengaturan_admin_page.dart';
+import 'pages/admin/tentang_admin_page.dart';
+import 'pages/admin/riwayat_aktivitas_admin_page.dart';
+import 'pages/admin/manajemen_edukasi_page.dart';
+import 'pages/admin/tambah_artikel_page.dart';
+import 'pages/admin/edit_artikel_page.dart';
 import 'pages/admin/laporan_riwayat_page.dart';
+import 'models/admin_article_model.dart';
+import 'models/admin_doctor_model.dart';
+import 'models/admin_user_model.dart';
 import 'pages/dokter/dokter_main_page.dart';
 import 'pages/dokter/patient_insight_page.dart';
 import 'pages/dokter/notifikasi_dokter_page.dart';
@@ -77,6 +96,56 @@ class SkinoraApp extends StatelessWidget {
         '/admin': (context) => const AdminMainPage(),
         '/admin/notifikasi': (context) => const NotifikasiAdminPage(),
         '/admin/spesialisasi': (context) => const MasterSpesialisasiPage(),
+        '/admin/spesialisasi/tambah': (context) => const TambahSpesialisasiPage(),
+        '/admin/spesialisasi/edit': (context) => const EditSpesialisasiPage(initialName: 'Jerawat'),
+        '/admin/dokter': (context) => const ManajemenDokterPage(showBottomNav: true),
+        '/admin/dokter/tambah': (context) => const TambahDokterPage(),
+        '/admin/dokter/detail': (context) => DetailDokterPage(
+              doctor: AdminDoctorModel(
+                id: '1',
+                name: 'dr. Anita Dewi, Sp.KK',
+                email: 'anita@demo.com',
+                phone: '081234567800',
+                specialization: 'Estetika Kulit',
+                experience: '8 tahun',
+                str: 'STR-2018-12345',
+                bio:
+                    'Dokter spesialis kulit dan kelamin dengan pengalaman 8 tahun di bidang estetika kulit. Lulusan Fakultas Kedokteran Universitas Indonesia.',
+                status: DoctorStatus.terverifikasi,
+              ),
+            ),
+        '/admin/pengguna': (context) => const ManajemenPenggunaPage(showBottomNav: true),
+        '/admin/pengguna/tambah': (context) => const TambahPenggunaPage(),
+        '/admin/pengguna/detail': (context) => DetailPenggunaPage(
+              user: AdminUserModel(
+                id: '1',
+                name: 'Leonita Yulyta Agustin',
+                email: 'leonita@demo.com',
+                phone: '081234567890',
+                address: 'Jl. Sudirman No. 123, Jakarta',
+                birthDate: '1995-06-15',
+                gender: 'Perempuan',
+                status: UserStatus.aktif,
+              ),
+            ),
+        '/admin/profil': (context) => const ProfilAdminPage(),
+        '/admin/edit-profil': (context) => const EditProfilAdminPage(),
+        '/admin/pengaturan': (context) => const PengaturanAdminPage(),
+        '/admin/tentang': (context) => const TentangAdminPage(),
+        '/admin/riwayat-aktivitas': (context) => const RiwayatAktivitasAdminPage(),
+        '/admin/edukasi': (context) => const ManajemenEdukasiPage(showBottomNav: true),
+        '/admin/edukasi/tambah': (context) => const TambahArtikelPage(),
+        '/admin/edukasi/edit': (context) => EditArtikelPage(
+              article: AdminArticleModel(
+                id: '1',
+                title: 'Mengenal Tipe Kulit Wajah Anda',
+                category: 'Kulit Dasar',
+                date: '2026-08-01',
+                content:
+                    'Pelajari cara mengenali tipe kulit wajah Anda untuk perawatan yang lebih tepat.',
+                status: ArticleStatus.diterbitkan,
+              ),
+            ),
         '/admin/laporan': (context) => const LaporanRiwayatPage(),
         '/dokter': (context) => const DokterMainPage(),
         '/dokter/patient-insight': (context) => const PatientInsightPage(),

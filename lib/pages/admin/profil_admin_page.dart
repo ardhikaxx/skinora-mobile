@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'laporan_riwayat_page.dart';
+import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/dialogs/logout_dialog.dart';
+import 'edit_profil_admin_page.dart';
+import 'laporan_riwayat_page.dart';
+import 'pengaturan_admin_page.dart';
+import 'riwayat_aktivitas_admin_page.dart';
+import 'tentang_admin_page.dart';
 
 class ProfilAdminPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
@@ -25,10 +30,10 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
 
   // Profile data
   String _nama = 'Admin Skinora';
-  String _email = 'admin@demo.com';
+  final String _email = 'admin@demo.com';
   String _telepon = '081234567899';
   String _alamat = 'Jl. Teknologi No. 1, Jakarta';
-  String _tanggalLahir = '1985-01-01';
+  final String _tanggalLahir = '1985-01-01';
 
   // Helper to extract initials (e.g., Admin Skinora -> AS)
   String get _initials {
@@ -202,7 +207,7 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
           Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: _showEditProfileDialog,
+              onTap: _navigateToEditProfile,
               borderRadius: BorderRadius.circular(8),
               child: const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
@@ -459,13 +464,31 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
         'icon': LucideIcons.settings,
         'title': 'Pengaturan',
         'isDestructive': false,
-        'onTap': _showPengaturanDialog,
+        'onTap': () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PengaturanAdminPage(
+                onNavigateTab: widget.onNavigateTab,
+              ),
+            ),
+          );
+        },
       },
       {
         'icon': LucideIcons.info,
         'title': 'Tentang Aplikasi',
         'isDestructive': false,
-        'onTap': _showTentangAplikasiDialog,
+        'onTap': () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TentangAdminPage(
+                onNavigateTab: widget.onNavigateTab,
+              ),
+            ),
+          );
+        },
       },
       {
         'icon': LucideIcons.clock,
@@ -475,7 +498,7 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => LaporanRiwayatPage(
+              builder: (context) => RiwayatAktivitasAdminPage(
                 onNavigateTab: widget.onNavigateTab,
               ),
             ),
@@ -556,361 +579,37 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
     );
   }
 
-  /// Dialog: Edit Profil Admin
-  void _showEditProfileDialog() {
-    final nameController = TextEditingController(text: _nama);
-    final emailController = TextEditingController(text: _email);
-    final phoneController = TextEditingController(text: _telepon);
-    final addressController = TextEditingController(text: _alamat);
-    final birthDateController = TextEditingController(text: _tanggalLahir);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-          ),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Edit Profil Admin',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: darkText,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _buildTextField('Nama Lengkap', nameController),
-                const SizedBox(height: 12),
-                _buildTextField('Email', emailController),
-                const SizedBox(height: 12),
-                _buildTextField('Nomor Telepon', phoneController),
-                const SizedBox(height: 12),
-                _buildTextField('Alamat', addressController),
-                const SizedBox(height: 12),
-                _buildTextField('Tanggal Lahir (YYYY-MM-DD)', birthDateController),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF757575),
-                          side: const BorderSide(color: Color(0xFFE0E0E0)),
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text('Batal'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            _nama = nameController.text.trim().isEmpty
-                                ? _nama
-                                : nameController.text.trim();
-                            _email = emailController.text.trim().isEmpty
-                                ? _email
-                                : emailController.text.trim();
-                            _telepon = phoneController.text.trim().isEmpty
-                                ? _telepon
-                                : phoneController.text.trim();
-                            _alamat = addressController.text.trim().isEmpty
-                                ? _alamat
-                                : addressController.text.trim();
-                            _tanggalLahir = birthDateController.text.trim().isEmpty
-                                ? _tanggalLahir
-                                : birthDateController.text.trim();
-                          });
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Profil admin berhasil diperbarui'),
-                              backgroundColor: primaryMaroon,
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryMaroon,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: const Text('Simpan'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildTextField(String label, TextEditingController controller) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF757575),
-          ),
+  Future<void> _navigateToEditProfile() async {
+    final result = await Navigator.push<Map<String, String>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditProfilAdminPage(
+          initialNama: _nama,
+          initialTelepon: _telepon,
+          initialAlamat: _alamat,
+          onNavigateTab: widget.onNavigateTab,
         ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 12,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: primaryMaroon, width: 1.5),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Bottom Sheet: Pengaturan
-  void _showPengaturanDialog() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) {
-        bool notifSistem = true;
-        bool modeGelap = false;
-        bool twoFactor = true;
-
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Pengaturan Admin',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: darkText,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Notifikasi Sistem'),
-                    subtitle: const Text('Terima pembaruan penting platform'),
-                    activeColor: primaryMaroon,
-                    value: notifSistem,
-                    onChanged: (val) {
-                      setModalState(() => notifSistem = val);
-                    },
-                  ),
-                  SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Mode Gelap'),
-                    subtitle: const Text('Aktifkan tema gelap pada antarmuka'),
-                    activeColor: primaryMaroon,
-                    value: modeGelap,
-                    onChanged: (val) {
-                      setModalState(() => modeGelap = val);
-                    },
-                  ),
-                  SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Autentikasi 2 Langkah'),
-                    subtitle: const Text('Tingkatkan keamanan akun administrator'),
-                    activeColor: primaryMaroon,
-                    value: twoFactor,
-                    onChanged: (val) {
-                      setModalState(() => twoFactor = val);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryMaroon,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Text('Tutup'),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
     );
-  }
 
-  /// Bottom Sheet: Tentang Aplikasi
-  void _showTentangAplikasiDialog() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: badgeBg,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: const Center(
-                  child: Icon(
-                    LucideIcons.sparkles,
-                    color: primaryMaroon,
-                    size: 32,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'Skinora Mobile App',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: darkText,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Versi 1.0.0 (Build 1)',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: subText,
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'Skinora adalah platform layanan kesehatan dan konsultasi dokter spesialis kulit terpercaya. Membantu menghubungkan pengguna dengan dokter profesional.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF555555),
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryMaroon,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text('Tutup'),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+    if (result != null && mounted) {
+      setState(() {
+        _nama = result['nama'] ?? _nama;
+        _telepon = result['telepon'] ?? _telepon;
+        _alamat = result['alamat'] ?? _alamat;
+      });
+      AdminSuccessDialog.show(
+        context,
+        message: 'Profil admin berhasil diperbarui',
+      );
+    }
   }
 
   /// Dialog: Konfirmasi Logout
   void _showLogoutConfirmation() {
     LogoutDialog.show(
       context,
-      message: 'Apakah Anda yakin ingin keluar dari akun admin Skinora?',
+      message: 'Apakah Anda yakin ingin keluar?',
     );
   }
 }

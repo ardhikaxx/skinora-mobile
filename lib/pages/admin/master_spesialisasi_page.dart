@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/navbottom/admin_navbottom.dart';
+import 'edit_spesialisasi_page.dart';
+import 'tambah_spesialisasi_page.dart';
 
 class SpesialisasiModel {
   final String id;
@@ -162,7 +165,7 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
       width: double.infinity,
       height: 48,
       child: ElevatedButton(
-        onPressed: _showAddDialog,
+        onPressed: _onAddSpecialization,
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryMaroon,
           foregroundColor: Colors.white,
@@ -250,7 +253,7 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
                   label: 'Edit',
                   bgColor: editBtnBg,
                   textColor: const Color(0xFF9E2A3B),
-                  onTap: () => _showEditDialog(item),
+                  onTap: () => _onEditSpecialization(item),
                 ),
               ),
               const SizedBox(width: 8),
@@ -262,19 +265,7 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
                   label: item.isActive ? 'Nonaktifkan' : 'Aktifkan',
                   bgColor: item.isActive ? toggleBtnBg : activateBtnBg,
                   textColor: const Color(0xFF8B2B38),
-                  onTap: () {
-                    setState(() {
-                      item.isActive = !item.isActive;
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          '${item.name} berhasil di${item.isActive ? "aktifkan" : "nonaktifkan"}',
-                        ),
-                        duration: const Duration(seconds: 1),
-                      ),
-                    );
-                  },
+                  onTap: () => _onToggleSpecialization(item),
                 ),
               ),
               const SizedBox(width: 8),
@@ -286,7 +277,7 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
                   label: 'Hapus',
                   bgColor: deleteBtnBg,
                   textColor: const Color(0xFFE55757),
-                  onTap: () => _showDeleteDialog(item),
+                  onTap: () => _onDeleteSpecialization(item),
                 ),
               ),
             ],
@@ -328,189 +319,108 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
     );
   }
 
-  // --- Dialogs ---
+  // --- Actions & Navigation ---
 
-  void _showAddDialog() {
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          title: const Text(
-            'Tambah Spesialisasi',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: darkText,
-            ),
-          ),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: 'Nama Spesialisasi',
-              filled: true,
-              fillColor: const Color(0xFFF7F7F8),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE5E5EA)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE5E5EA)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: primaryMaroon, width: 1.5),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Batal', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final text = controller.text.trim();
-                if (text.isNotEmpty) {
-                  setState(() {
-                    _specializations.add(
-                      SpesialisasiModel(
-                        id: DateTime.now().millisecondsSinceEpoch.toString(),
-                        name: text,
-                        isActive: true,
-                      ),
-                    );
-                  });
-                  Navigator.pop(context);
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryMaroon,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: const Text('Simpan'),
-            ),
-          ],
-        );
-      },
+  Future<void> _onAddSpecialization() async {
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TambahSpesialisasiPage(
+          onNavigateTab: widget.onNavigateTab,
+        ),
+      ),
     );
+    if (result != null && result.isNotEmpty && mounted) {
+      setState(() {
+        _specializations.add(
+          SpesialisasiModel(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            name: result,
+            isActive: true,
+          ),
+        );
+      });
+      AdminSuccessDialog.show(
+        context,
+        message: 'Spesialisasi baru berhasil ditambahkan',
+      );
+    }
   }
 
-  void _showEditDialog(SpesialisasiModel item) {
-    final controller = TextEditingController(text: item.name);
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          title: const Text(
-            'Edit Spesialisasi',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: darkText,
-            ),
-          ),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: 'Nama Spesialisasi',
-              filled: true,
-              fillColor: const Color(0xFFF7F7F8),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE5E5EA)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE5E5EA)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: primaryMaroon, width: 1.5),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Batal', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final text = controller.text.trim();
-                if (text.isNotEmpty) {
-                  setState(() {
-                    item.name = text;
-                  });
-                  Navigator.pop(context);
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryMaroon,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: const Text('Simpan'),
-            ),
-          ],
-        );
-      },
+  Future<void> _onEditSpecialization(SpesialisasiModel item) async {
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditSpesialisasiPage(
+          initialName: item.name,
+          onNavigateTab: widget.onNavigateTab,
+        ),
+      ),
     );
+    if (result != null && result.isNotEmpty && mounted) {
+      setState(() {
+        item.name = result;
+      });
+      AdminSuccessDialog.show(
+        context,
+        message: 'Spesialisasi berhasil diperbarui',
+      );
+    }
   }
 
-  void _showDeleteDialog(SpesialisasiModel item) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          title: const Text(
-            'Hapus Spesialisasi',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: darkText,
-            ),
-          ),
-          content: Text('Apakah Anda yakin ingin menghapus "${item.name}"?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Batal', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _specializations.removeWhere((el) => el.id == item.id);
-                });
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE55757),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: const Text('Hapus'),
-            ),
-          ],
+  void _onToggleSpecialization(SpesialisasiModel item) {
+    if (item.isActive) {
+      AdminConfirmDialog.show(
+        context,
+        title: 'Nonaktifkan Spesialisasi',
+        message: 'Nonaktifkan "${item.name}"?',
+        confirmLabel: 'Nonaktifkan',
+        confirmColor: const Color(0xFFEF4444),
+        onConfirm: () {
+          setState(() {
+            item.isActive = false;
+          });
+          AdminSuccessDialog.show(
+            context,
+            message: 'Status spesialisasi diubah ke inactive',
+          );
+        },
+      );
+    } else {
+      AdminConfirmDialog.show(
+        context,
+        title: 'Aktifkan Spesialisasi',
+        message: 'Aktifkan "${item.name}"?',
+        confirmLabel: 'Aktifkan',
+        confirmColor: primaryMaroon,
+        onConfirm: () {
+          setState(() {
+            item.isActive = true;
+          });
+          AdminSuccessDialog.show(
+            context,
+            message: 'Status spesialisasi diubah ke active',
+          );
+        },
+      );
+    }
+  }
+
+  void _onDeleteSpecialization(SpesialisasiModel item) {
+    AdminConfirmDialog.show(
+      context,
+      title: 'Hapus Spesialisasi',
+      message: 'Hapus "${item.name}" secara permanen?',
+      confirmLabel: 'Hapus',
+      confirmColor: const Color(0xFFEF4444),
+      onConfirm: () {
+        final name = item.name;
+        setState(() {
+          _specializations.removeWhere((el) => el.id == item.id);
+        });
+        AdminSuccessDialog.show(
+          context,
+          message: 'Spesialisasi "$name" berhasil dihapus',
         );
       },
     );

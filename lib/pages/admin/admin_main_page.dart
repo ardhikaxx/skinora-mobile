@@ -28,9 +28,9 @@ class _AdminMainPageState extends State<AdminMainPage> {
   Widget build(BuildContext context) {
     final pages = [
       BerandaAdminPage(onNavigateTab: _changeTab),
-      const ManajemenDokterPage(),
-      const ManajemenPenggunaPage(),
-      const ManajemenEdukasiPage(),
+      ManajemenDokterPage(onNavigateTab: _changeTab),
+      ManajemenPenggunaPage(onNavigateTab: _changeTab),
+      ManajemenEdukasiPage(onNavigateTab: _changeTab),
       ProfilAdminPage(onNavigateTab: _changeTab),
     ];
 

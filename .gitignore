@@ -45,3 +45,6 @@ app.*.map.json
 /android/app/release
 /android/build/
 .gradle/
+
+# Reference images
+image*.png
