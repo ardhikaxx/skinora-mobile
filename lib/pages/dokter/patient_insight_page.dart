@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
+import 'detail_patient_insight_page.dart';
 
 class PatientInsightModel {
   final String id;
@@ -200,11 +201,26 @@ class _PatientInsightPageState extends State<PatientInsightPage> {
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 16.0,
-          vertical: 14.0,
-        ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => DetailPatientInsightPage(
+                  patient: patient,
+                  onNavigateTab: widget.onNavigateTab,
+                ),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 14.0,
+            ),
             child: Row(
               children: [
                 // Avatar container in soft coral/peach with maroon user icon
@@ -259,6 +275,8 @@ class _PatientInsightPageState extends State<PatientInsightPage> {
               ],
             ),
           ),
-        );
+        ),
+      ),
+    );
   }
 }

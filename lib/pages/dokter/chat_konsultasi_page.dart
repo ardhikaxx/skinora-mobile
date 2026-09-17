@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/navbottom/dokter_navbottom.dart';
+import 'ruang_chat_dokter_page.dart';
+import 'riwayat_konsultasi_page.dart';
+
 
 class ConsultationItemModel {
   final String id;
@@ -17,10 +21,12 @@ class ConsultationItemModel {
 
 class ChatKonsultasiPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
+  final bool showBottomNav;
 
   const ChatKonsultasiPage({
     super.key,
     this.onNavigateTab,
+    this.showBottomNav = false,
   });
 
   @override
@@ -28,19 +34,21 @@ class ChatKonsultasiPage extends StatefulWidget {
 }
 
 class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
-  static const Color primaryMaroon = Color(0xFF8B2B38);
-  static const Color darkText = Color(0xFF3F141E);
-  static const Color subText = Color(0xFF8E8E93);
-  static const Color avatarBg = Color(0xFFFFB2A6);
-  static const Color scheduledBadgeBg = Color(0xFFFFD5C8);
+  static const Color primaryMaroon = Color(0xFFA83244);
+  static const Color darkText = Color(0xFF1E1E1E);
+  static const Color subText = Color(0xFF757575);
+  static const Color avatarBg = Color(0xFFFFCDD2);
+  static const Color scheduledBadgeBg = Color(0xFFFFCDD2);
+  static const Color scheduledBadgeText = Color(0xFFA83244);
   static const Color ongoingBadgeBg = Color(0xFFDCFCE7);
-  static const Color ongoingBadgeText = Color(0xFF059669);
+  static const Color ongoingBadgeText = Color(0xFF16A34A);
 
   late List<ConsultationItemModel> _consultations;
 
   @override
   void initState() {
     super.initState();
+    // Exactly matches Screen 1 of image copy 2.png
     _consultations = [
       ConsultationItemModel(
         id: '1',
@@ -56,7 +64,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
       ),
       ConsultationItemModel(
         id: '3',
-        patientName: 'Nur Alisa Qiroati Sholeha',
+        patientName: 'Annida Tri Aulia',
         dateTime: '2026-08-29 • 09:00 - 09:30',
         status: 'Terjadwal',
       ),
@@ -75,6 +83,164 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
     ];
   }
 
+  Future<void> _handleConsultationAction(ConsultationItemModel item) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RuangChatDokterPage(
+          patientName: item.patientName,
+          consultationId: item.id,
+          dateTime: item.dateTime,
+          onNavigateTab: widget.onNavigateTab,
+          showBottomNav: true,
+        ),
+      ),
+    );
+
+    // If finished via Screen 3 "Ya, Selesai"
+    if (result == true) {
+      setState(() {
+        _consultations.removeWhere((c) => c.id == item.id);
+      });
+      // Masukkan ke riwayat konsultasi dokter
+      DoctorConsultationStore().addCompletedConsultation(
+        patientName: item.patientName,
+        dateTime: item.dateTime,
+        diagnosis: 'Hiperpigmentasi Pasca-Inflamasi (PIH)',
+        notes:
+            'Rekomendasi serum Vitamin C pagi hari dan retinol ringan malam hari. Evaluasi dalam 4-6 minggu.',
+      );
+      if (mounted) {
+        _showSuccessDialog();
+      }
+    }
+  }
+
+  void _navigateToRiwayat() {
+    if (widget.onNavigateTab != null) {
+      widget.onNavigateTab!(3); // Pindah ke Tab 3 (Riwayat Konsultasi)
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => RiwayatKonsultasiPage(
+            onNavigateTab: widget.onNavigateTab,
+            showBottomNav: true,
+          ),
+        ),
+      );
+    }
+  }
+
+  /// Screen 4: Dialog "Berhasil" (Konsultasi telah diselesaikan)
+  void _showSuccessDialog() {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          elevation: 4,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24.0),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.0),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header: Checkmark Icon + Title + Close Button
+                Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFFD5C8),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          LucideIcons.check,
+                          color: Color(0xFFE65100),
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Berhasil',
+                      style: TextStyle(
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E293B),
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(dialogContext);
+                        _navigateToRiwayat();
+                      },
+                      child: const Icon(
+                        LucideIcons.x,
+                        size: 18,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Body text
+                const Text(
+                  'Konsultasi telah diselesaikan',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: Color(0xFF4B5563),
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // OK Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(dialogContext);
+                      _navigateToRiwayat();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryMaroon,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'OK',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -84,14 +250,14 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 1. Header: Title "Konsultasi"
-            Padding(
-              padding: const EdgeInsets.only(
+            const Padding(
+              padding: EdgeInsets.only(
                 left: 20.0,
                 right: 20.0,
                 top: 16.0,
                 bottom: 8.0,
               ),
-              child: const Text(
+              child: Text(
                 'Konsultasi',
                 style: TextStyle(
                   fontFamily: 'serif',
@@ -112,19 +278,55 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
 
             // Main scrollable list of consultations
             Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                itemCount: _consultations.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 14),
-                itemBuilder: (context, index) {
-                  final item = _consultations[index];
-                  return _buildConsultationCard(item);
-                },
-              ),
+              child: _consultations.isEmpty
+                  ? _buildEmptyState()
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                      itemCount: _consultations.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 14),
+                      itemBuilder: (context, index) {
+                        final item = _consultations[index];
+                        return _buildConsultationCard(item);
+                      },
+                    ),
             ),
           ],
         ),
+      ),
+      bottomNavigationBar: widget.showBottomNav
+          ? DokterNavBottom(
+              currentIndex: 2,
+              onTap: (index) {
+                if (index != 2) {
+                  widget.onNavigateTab?.call(index);
+                }
+              },
+            )
+          : null,
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(
+            LucideIcons.messageSquare,
+            size: 48,
+            color: Color(0xFFD1D5DB),
+          ),
+          SizedBox(height: 12),
+          Text(
+            'Tidak ada konsultasi aktif',
+            style: TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -156,7 +358,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Avatar (soft peach with maroon user icon)
+              // Avatar (soft peach/pink with maroon user icon)
               Container(
                 width: 44,
                 height: 44,
@@ -182,7 +384,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
                     Text(
                       item.patientName,
                       style: const TextStyle(
-                        fontSize: 14.5,
+                        fontSize: 15.0,
                         fontWeight: FontWeight.bold,
                         color: darkText,
                       ),
@@ -197,12 +399,12 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
                           size: 13,
                           color: subText,
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 5),
                         Expanded(
                           child: Text(
                             item.dateTime,
                             style: const TextStyle(
-                              fontSize: 11.5,
+                              fontSize: 12.0,
                               color: subText,
                             ),
                             maxLines: 1,
@@ -231,7 +433,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
                   style: TextStyle(
                     fontSize: 11.0,
                     fontWeight: FontWeight.bold,
-                    color: isOngoing ? ongoingBadgeText : const Color(0xFF9E2A3B),
+                    color: isOngoing ? ongoingBadgeText : scheduledBadgeText,
                   ),
                 ),
               ),
@@ -244,13 +446,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
             width: double.infinity,
             height: 42,
             child: ElevatedButton(
-              onPressed: () {
-                if (!isOngoing) {
-                  setState(() {
-                    item.status = 'Berlangsung';
-                  });
-                }
-              },
+              onPressed: () => _handleConsultationAction(item),
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryMaroon,
                 foregroundColor: Colors.white,
@@ -263,9 +459,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    isOngoing
-                        ? LucideIcons.messageSquare
-                        : LucideIcons.stethoscope,
+                    isOngoing ? LucideIcons.messageSquare : LucideIcons.phone,
                     size: 16,
                     color: Colors.white,
                   ),
@@ -273,8 +467,9 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
                   Text(
                     isOngoing ? 'Masuk Ruang Chat' : 'Mulai Konsultasi',
                     style: const TextStyle(
-                      fontSize: 13.0,
+                      fontSize: 13.5,
                       fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
                 ],

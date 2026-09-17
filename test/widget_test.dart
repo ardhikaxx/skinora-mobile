@@ -34,6 +34,23 @@ import 'package:skinora_app/pages/admin/tambah_pengguna_page.dart';
 import 'package:skinora_app/pages/admin/detail_pengguna_page.dart';
 import 'package:skinora_app/models/admin_user_model.dart';
 import 'package:skinora_app/pages/dokter/profil_dokter_page.dart' as dokter;
+import 'package:skinora_app/pages/dokter/patient_insight_page.dart';
+import 'package:skinora_app/pages/dokter/detail_patient_insight_page.dart';
+import 'package:skinora_app/pages/dokter/jadwal_page.dart';
+import 'package:skinora_app/pages/dokter/chat_konsultasi_page.dart';
+import 'package:skinora_app/pages/dokter/ruang_chat_dokter_page.dart';
+import 'package:skinora_app/pages/dokter/riwayat_konsultasi_page.dart';
+import 'package:skinora_app/pages/dokter/detail_riwayat_konsultasi_page.dart';
+import 'package:skinora_app/pages/dokter/edit_profil_dokter_page.dart';
+import 'package:skinora_app/pages/dokter/tentang_dokter_page.dart';
+import 'package:skinora_app/pages/dokter/riwayat_aktivitas_dokter_page.dart';
+import 'package:skinora_app/pages/dokter/pengaturan_dokter_page.dart' as dokter_settings;
+import 'package:skinora_app/pages/dokter/dokter_main_page.dart';
+
+
+
+
+
 
 void main() {
   testWidgets('Test ProfilPenggunaPage directly', (tester) async {
@@ -145,6 +162,15 @@ void main() {
       ),
     );
     expect(find.text('Profil Dokter'), findsOneWidget);
+  });
+
+  testWidgets('Test Dokter RiwayatKonsultasiPage directly', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: RiwayatKonsultasiPage(showBottomNav: true),
+      ),
+    );
+    expect(find.text('Riwayat Konsultasi'), findsOneWidget);
   });
 
   testWidgets('Test SkinDailyPage and interactions', (tester) async {
@@ -1268,4 +1294,610 @@ void main() {
 
     expect(find.text('Artikel Baru Diedit'), findsOneWidget);
   });
+
+  testWidgets('Test DetailPatientInsightPage UI and switch patient', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: DetailPatientInsightPage(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Patient Insight'), findsOneWidget);
+    expect(find.text('Leonita Yulyta Agustin'), findsOneWidget);
+    expect(find.text('3 konsultasi'), findsOneWidget);
+    expect(find.text('Ganti'), findsOneWidget);
+
+    // Section 1: Ringkasan Insight
+    expect(find.text('RINGKASAN INSIGHT'), findsOneWidget);
+    expect(find.text('KONDISI KULIT TERATAS'), findsOneWidget);
+    expect(find.text('Berminyak'), findsWidgets);
+    expect(find.text('6.6'), findsWidgets);
+    expect(find.text('Gelas/Hari'), findsOneWidget);
+    expect(find.text('57%'), findsWidgets);
+    expect(find.text('Skincare'), findsWidgets);
+    expect(find.text('INSIGHT'), findsOneWidget);
+
+    // Section 2: Skin Check
+    expect(find.text('SKIN CHECK'), findsOneWidget);
+    expect(find.text('2026-08-28'), findsWidgets);
+    expect(find.text('Kombinasi'), findsOneWidget);
+    expect(find.text('Sensitif'), findsOneWidget);
+
+    // Section 3: Skin Daily
+    expect(find.text('SKIN DAILY'), findsOneWidget);
+    expect(find.text('Letak Gejala: Hidung, Dahi'), findsOneWidget);
+    expect(find.text('Pagi ✓'), findsWidgets);
+
+    // Section 4: Skincare Routine
+    expect(find.text('SKINCARE ROUTINE'), findsOneWidget);
+    expect(find.text('PAGI'), findsWidgets);
+    expect(find.text('MALAM'), findsWidgets);
+
+    // Tap "Ganti" button
+    await tester.tap(find.text('Ganti'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pilih Pasien'), findsOneWidget);
+    expect(find.text('Annida Tri Aulia'), findsOneWidget);
+
+    // Select Annida
+    await tester.tap(find.text('Annida Tri Aulia'));
+    await tester.pumpAndSettle();
+
+    // Now header shows Annida
+    expect(find.text('Annida Tri Aulia'), findsOneWidget);
+  });
+
+  testWidgets('Test PatientInsightPage navigation to DetailPatientInsightPage', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: PatientInsightPage(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('PILIH PASIEN'), findsOneWidget);
+    expect(find.text('Leonita Yulyta Agustin'), findsOneWidget);
+
+    // Tap on Leonita Yulyta Agustin
+    await tester.tap(find.text('Leonita Yulyta Agustin'));
+    await tester.pumpAndSettle();
+
+    // Navigated to DetailPatientInsightPage
+    expect(find.text('RINGKASAN INSIGHT'), findsOneWidget);
+    expect(find.text('KONDISI KULIT TERATAS'), findsOneWidget);
+    expect(find.text('Ganti'), findsOneWidget);
+
+    // Back to PatientInsightPage
+    await tester.tap(find.byIcon(LucideIcons.chevronLeft));
+    await tester.pumpAndSettle();
+
+    expect(find.text('PILIH PASIEN'), findsOneWidget);
+  });
+
+  testWidgets('Test JadwalDokterPage availability toggle, form add slot, and delete confirmation dialog', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: JadwalDokterPage(showBottomNav: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 1. Initial State
+    expect(find.text('Jadwal'), findsWidgets);
+    expect(find.text('Status Ketersediaan'), findsOneWidget);
+    expect(find.text('Sibuk'), findsOneWidget);
+    expect(find.text('Tambah Slot Baru'), findsOneWidget);
+    expect(find.text('Slot Baru'), findsNothing);
+
+    // 2. Toggle availability: Sibuk -> Siap
+    await tester.tap(find.text('Sibuk'));
+    await tester.pumpAndSettle();
+    expect(find.text('Siap'), findsOneWidget);
+    expect(find.text('Sibuk'), findsNothing);
+
+    // Toggle back: Siap -> Sibuk
+    await tester.tap(find.text('Siap'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sibuk'), findsOneWidget);
+    expect(find.text('Siap'), findsNothing);
+
+    // 3. Open Form: "Tambah Slot Baru" -> "Tutup Form"
+    await tester.tap(find.text('Tambah Slot Baru'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tutup Form'), findsOneWidget);
+    expect(find.text('Slot Baru'), findsOneWidget);
+    expect(find.text('TANGGAL'), findsOneWidget);
+    expect(find.text('JAM MULAI'), findsOneWidget);
+    expect(find.text('JAM SELESAI'), findsOneWidget);
+    expect(find.text('Simpan Slot'), findsOneWidget);
+
+    // Close form again using Tutup Form
+    await tester.tap(find.text('Tutup Form'));
+    await tester.pumpAndSettle();
+    expect(find.text('Slot Baru'), findsNothing);
+    expect(find.text('Tambah Slot Baru'), findsOneWidget);
+
+    // Open form again to add slot
+    await tester.tap(find.text('Tambah Slot Baru'));
+    await tester.pumpAndSettle();
+
+    // Enter start and end time
+    final startField = find.widgetWithText(TextField, '09:00');
+    final endField = find.widgetWithText(TextField, '09:30');
+    await tester.enterText(startField, '15:30');
+    await tester.enterText(endField, '16:00');
+    await tester.pumpAndSettle();
+
+    // Tap "Simpan Slot"
+    await tester.tap(find.text('Simpan Slot'));
+    await tester.pumpAndSettle();
+
+    // Form is closed and new slot appears
+    expect(find.text('Slot Baru'), findsNothing);
+    expect(find.text('15:30 - 16:00'), findsOneWidget);
+
+    // 4. Delete slot with confirmation dialog: First test "Batal"
+    final newSlotContainer = find.ancestor(
+      of: find.text('15:30 - 16:00'),
+      matching: find.byWidgetPredicate(
+        (widget) => widget is Container && widget.child is Row,
+      ),
+    );
+    final hapusButton = find.descendant(
+      of: newSlotContainer,
+      matching: find.text('Hapus'),
+    );
+    expect(hapusButton, findsOneWidget);
+    await tester.tap(hapusButton);
+    await tester.pumpAndSettle();
+
+    // Confirmation dialog appears
+    expect(find.text('Hapus Slot?'), findsOneWidget);
+    expect(find.text('Slot ini akan dihapus dari jadwal Anda.'), findsOneWidget);
+    expect(find.text('Batal'), findsOneWidget);
+    expect(find.text('Ya, Hapus'), findsOneWidget);
+
+    // Tap Batal
+    await tester.tap(find.text('Batal'));
+    await tester.pumpAndSettle();
+
+    // Dialog dismissed and slot still exists
+    expect(find.text('Hapus Slot?'), findsNothing);
+    expect(find.text('15:30 - 16:00'), findsOneWidget);
+
+    // Tap Hapus again and confirm with "Ya, Hapus"
+    await tester.tap(hapusButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hapus Slot?'), findsOneWidget);
+    await tester.tap(find.text('Ya, Hapus'));
+    await tester.pumpAndSettle();
+
+    // Success dialog appears
+    expect(find.text('Berhasil'), findsOneWidget);
+    expect(find.text('Slot berhasil dihapus'), findsOneWidget);
+    expect(find.text('OK'), findsOneWidget);
+
+    // Tap OK
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    // Dialog dismissed and slot removed
+    expect(find.text('Berhasil'), findsNothing);
+    expect(find.text('15:30 - 16:00'), findsNothing);
+  });
+
+  testWidgets('Test RuangChatDokterPage UI, message sending, and finish confirmation cancel', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: RuangChatDokterPage(
+          patientName: 'Leonita Yulyta Agustin',
+          showBottomNav: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Leonita Yulyta Agustin'), findsOneWidget);
+    expect(find.text('Selesai'), findsOneWidget);
+    expect(find.text('Selamat pagi, Leonita. Ada yang bisa saya bantu hari ini?'), findsOneWidget);
+    expect(find.text('Baik Dok, terima kasih banyak atas penjelasannya!'), findsOneWidget);
+
+    // Send a message
+    final inputField = find.widgetWithText(TextField, 'Ketik pesan...');
+    await tester.enterText(inputField, 'Semoga lekas sembuh dan pulih ya!');
+    await tester.pumpAndSettle();
+
+    // Tap send button
+    final sendBtn = find.byIcon(LucideIcons.send);
+    await tester.tap(sendBtn);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Semoga lekas sembuh dan pulih ya!'), findsOneWidget);
+
+    // Tap "Selesai" button
+    await tester.tap(find.text('Selesai'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Selesaikan Konsultasi?'), findsOneWidget);
+    expect(find.text('Konsultasi akan ditandai selesai.'), findsOneWidget);
+    expect(find.text('Batal'), findsOneWidget);
+    expect(find.text('Ya, Selesai'), findsOneWidget);
+
+    // Tap "Batal"
+    await tester.tap(find.text('Batal'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Selesaikan Konsultasi?'), findsNothing);
+    expect(find.text('Leonita Yulyta Agustin'), findsOneWidget);
+  });
+
+  testWidgets('Test ChatKonsultasiPage flow to RuangChatDokterPage, complete consultation, and show Berhasil dialog', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: ChatKonsultasiPage(showBottomNav: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Konsultasi'), findsOneWidget);
+    expect(find.text('Leonita Yulyta Agustin'), findsWidgets);
+    expect(find.text('Mulai Konsultasi'), findsWidgets);
+    expect(find.text('Masuk Ruang Chat'), findsOneWidget);
+
+    // Tap "Mulai Konsultasi" on the first card (Leonita)
+    await tester.tap(find.text('Mulai Konsultasi').first);
+    await tester.pumpAndSettle();
+
+    // Now in RuangChatDokterPage
+    expect(find.text('Leonita Yulyta Agustin'), findsOneWidget);
+    expect(find.text('Selesai'), findsOneWidget);
+
+    // Tap "Selesai"
+    await tester.tap(find.text('Selesai'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Selesaikan Konsultasi?'), findsOneWidget);
+
+    // Confirm with "Ya, Selesai"
+    await tester.tap(find.text('Ya, Selesai'));
+    await tester.pumpAndSettle();
+
+    // Popped back to ChatKonsultasiPage and Success Dialog appears (Screen 4)
+    expect(find.text('Berhasil'), findsOneWidget);
+    expect(find.text('Konsultasi telah diselesaikan'), findsOneWidget);
+    expect(find.text('OK'), findsOneWidget);
+
+    // Tap "OK" -> Automatically navigates to RiwayatKonsultasiPage!
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Berhasil'), findsNothing);
+
+    // Now on RiwayatKonsultasiPage
+    expect(find.text('Riwayat Konsultasi'), findsOneWidget);
+    // Leonita 09:00 - 09:30 is now present in Riwayat Konsultasi!
+    expect(find.text('2026-08-28 • 09:00 - 09:30'), findsOneWidget);
+
+    // Pop back to ChatKonsultasiPage
+    await tester.tap(find.byIcon(LucideIcons.chevronLeft));
+    await tester.pumpAndSettle();
+
+    // Back on ChatKonsultasiPage: Leonita 09:00 - 09:30 has been removed from active list!
+    expect(find.text('Konsultasi'), findsOneWidget);
+    expect(find.text('2026-08-28 • 09:00 - 09:30'), findsNothing);
+    // Annida 09:30 - 10:00 is now at the top
+    expect(find.text('2026-08-28 • 09:30 - 10:00'), findsOneWidget);
+  });
+
+  testWidgets('Test DokterMainPage consultation completion switches to Riwayat tab automatically', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: DokterMainPage(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Tap on Chat tab (index 2)
+    final chatTab = find.text('Chat');
+    expect(chatTab, findsWidgets);
+    await tester.tap(chatTab.first);
+    await tester.pumpAndSettle();
+
+    // Now on ChatKonsultasiPage
+    expect(find.text('Konsultasi'), findsOneWidget);
+
+    // Tap on "Masuk Ruang Chat" or "Mulai Konsultasi"
+    final actionBtn = find.text('Masuk Ruang Chat');
+    expect(actionBtn, findsOneWidget);
+    await tester.tap(actionBtn);
+    await tester.pumpAndSettle();
+
+    // Now in RuangChatDokterPage
+    expect(find.text('Selesai'), findsOneWidget);
+    await tester.tap(find.text('Selesai'));
+    await tester.pumpAndSettle();
+
+    // Tap "Ya, Selesai"
+    await tester.tap(find.text('Ya, Selesai'));
+    await tester.pumpAndSettle();
+
+    // Success dialog shown
+    expect(find.text('Berhasil'), findsOneWidget);
+    expect(find.text('Konsultasi telah diselesaikan'), findsOneWidget);
+
+    // Tap "OK" -> Switches to Riwayat tab
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    // Now on Riwayat tab!
+    expect(find.text('Riwayat Konsultasi'), findsOneWidget);
+  });
+
+  testWidgets('Test DetailRiwayatKonsultasiPage UI and chat history directly', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: DetailRiwayatKonsultasiPage(showBottomNav: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Detail Riwayat'), findsOneWidget);
+    expect(find.text('Leonita Yulyta Agustin'), findsOneWidget);
+    expect(find.text('2026-08-15 • 09:00 - 09:30'), findsOneWidget);
+    expect(find.text('STATUS'), findsOneWidget);
+    expect(find.text('Selesai'), findsOneWidget);
+    expect(find.text('RIWAYAT CHAT'), findsOneWidget);
+    expect(find.text('Dok, saya mau tanya soal perawatan kulit setelah operasi kecil'), findsOneWidget);
+    expect(find.text('Tentu, operasi apa yang sudah dilakukan?'), findsOneWidget);
+    expect(find.text('Operasi kecil untuk angkat tahi lalat di pipi kanan'), findsOneWidget);
+    expect(find.text('Baik, hindari paparan matahari langsung selama 2 minggu. Gunakan krim antibiotik yang sudah saya resepkan.'), findsOneWidget);
+  });
+
+  testWidgets('Test RiwayatKonsultasiPage tap card navigates to DetailRiwayatKonsultasiPage', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: RiwayatKonsultasiPage(showBottomNav: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Riwayat Konsultasi'), findsOneWidget);
+    expect(find.text('2026-08-15 • 09:00 - 09:30'), findsOneWidget);
+
+    // Tap on Leonita Yulyta Agustin card
+    await tester.tap(find.text('2026-08-15 • 09:00 - 09:30'));
+    await tester.pumpAndSettle();
+
+    // Now on DetailRiwayatKonsultasiPage
+    expect(find.text('Detail Riwayat'), findsOneWidget);
+    expect(find.text('STATUS'), findsOneWidget);
+    expect(find.text('RIWAYAT CHAT'), findsOneWidget);
+
+    // Tap back button
+    await tester.tap(find.byIcon(LucideIcons.chevronLeft));
+    await tester.pumpAndSettle();
+
+    // Returned to RiwayatKonsultasiPage
+    expect(find.text('Riwayat Konsultasi'), findsOneWidget);
+  });
+
+  testWidgets('Test EditProfilDokterPage UI and update', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: EditProfilDokterPage(showBottomNav: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit Profil'), findsOneWidget);
+    expect(find.text('DA'), findsOneWidget);
+    expect(find.text('NAMA'), findsOneWidget);
+    expect(find.text('SPESIALISASI'), findsOneWidget);
+    expect(find.text('PENGALAMAN'), findsOneWidget);
+    expect(find.text('TELEPON'), findsOneWidget);
+    expect(find.text('ALAMAT'), findsOneWidget);
+    expect(find.text('BIO'), findsOneWidget);
+
+    final nameField = find.byType(TextField).first;
+    await tester.enterText(nameField, 'dr. Budi Santoso, Sp.KK');
+    await tester.pumpAndSettle();
+
+    // Initials should update to DB
+    expect(find.text('DB'), findsOneWidget);
+
+    // Revert back
+    await tester.enterText(nameField, 'dr. Anita Dewi, Sp.KK');
+    await tester.pumpAndSettle();
+    expect(find.text('DA'), findsOneWidget);
+
+    await tester.tap(find.text('Simpan Perubahan'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('Test Dokter PengaturanDokterPage UI, toggle and save', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: dokter_settings.PengaturanDokterPage(showBottomNav: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pengaturan'), findsOneWidget);
+    expect(find.text('NOTIFIKASI'), findsOneWidget);
+    expect(find.text('Aktifkan Notifikasi'), findsOneWidget);
+
+    await tester.tap(find.text('Simpan Pengaturan'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Berhasil'), findsOneWidget);
+    expect(find.text('Pengaturan dokter berhasil disimpan'), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('Test TentangDokterPage UI', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: TentangDokterPage(showBottomNav: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tentang'), findsOneWidget);
+    expect(find.text('Skinora'), findsOneWidget);
+    expect(find.text('VERSI 1.0.0'), findsOneWidget);
+    expect(find.text('Dikembangkan oleh Tim Skinora'), findsOneWidget);
+    expect(find.text('© 2026 Skinora'), findsOneWidget);
+  });
+
+  testWidgets('Test RiwayatAktivitasDokterPage UI', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: RiwayatAktivitasDokterPage(showBottomNav: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Riwayat Aktivitas'), findsOneWidget);
+    expect(find.text('Konsultasi selesai dengan Annida Tri Aulia'), findsOneWidget);
+    expect(find.text('2026-08-29 10:30'), findsOneWidget);
+    expect(find.text('Login berhasil'), findsOneWidget);
+    expect(find.text('2026-08-29 08:00'), findsOneWidget);
+  });
+
+  testWidgets('Test ProfilDokterPage full navigation and logout dialog', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: dokter.ProfilDokterPage(showBottomNav: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Profil Dokter'), findsOneWidget);
+    expect(find.text('dr. Anita Dewi, Sp.KK'), findsOneWidget);
+    expect(find.text('DA'), findsOneWidget);
+    expect(find.text('RINGKASAN PRAKTIK'), findsOneWidget);
+    expect(find.text('Konsultasi'), findsOneWidget);
+    expect(find.text('Pasien'), findsOneWidget);
+    expect(find.text('Selesai'), findsOneWidget);
+    expect(find.text('INFORMASI'), findsOneWidget);
+    expect(find.text('081234567800'), findsOneWidget);
+
+    // 1. Test Logout Dialog
+    await tester.tap(find.text('Logout'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Apakah Anda yakin ingin keluar?'), findsOneWidget);
+    expect(find.text('Batal'), findsOneWidget);
+    await tester.tap(find.text('Batal'));
+    await tester.pumpAndSettle();
+    expect(find.text('Apakah Anda yakin ingin keluar?'), findsNothing);
+
+    // 2. Test navigate to Edit Profil
+    await tester.tap(find.text('Edit Profil'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit Profil'), findsOneWidget);
+    // Back
+    await tester.tap(find.byIcon(LucideIcons.chevronLeft));
+    await tester.pumpAndSettle();
+
+    // 3. Test navigate to Pengaturan
+    await tester.tap(find.text('Pengaturan'));
+    await tester.pumpAndSettle();
+    expect(find.text('Aktifkan Notifikasi'), findsOneWidget);
+    // Back
+    await tester.tap(find.byIcon(LucideIcons.chevronLeft));
+    await tester.pumpAndSettle();
+
+    // 4. Test navigate to Tentang Aplikasi
+    await tester.tap(find.text('Tentang Aplikasi'));
+    await tester.pumpAndSettle();
+    expect(find.text('VERSI 1.0.0'), findsOneWidget);
+    // Back
+    await tester.tap(find.byIcon(LucideIcons.chevronLeft));
+    await tester.pumpAndSettle();
+
+    // 5. Test navigate to Riwayat Aktivitas
+    await tester.tap(find.text('Riwayat Aktivitas'));
+    await tester.pumpAndSettle();
+    expect(find.text('Konsultasi selesai dengan Annida Tri Aulia'), findsOneWidget);
+    // Back
+    await tester.tap(find.byIcon(LucideIcons.chevronLeft));
+    await tester.pumpAndSettle();
+  });
 }
+
+
+
+
+
+

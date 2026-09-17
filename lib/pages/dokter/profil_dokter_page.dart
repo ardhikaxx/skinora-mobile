@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/navbottom/dokter_navbottom.dart';
 import 'pengaturan_dokter_page.dart';
+import 'edit_profil_dokter_page.dart';
+import 'tentang_dokter_page.dart';
+import 'riwayat_aktivitas_dokter_page.dart';
 import '../../components/dialogs/logout_dialog.dart';
 
 class ProfilDokterPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
+  final bool showBottomNav;
 
   const ProfilDokterPage({
     super.key,
     this.onNavigateTab,
+    this.showBottomNav = false,
   });
 
   @override
@@ -16,11 +22,130 @@ class ProfilDokterPage extends StatefulWidget {
 }
 
 class _ProfilDokterPageState extends State<ProfilDokterPage> {
-  static const Color primaryMaroon = Color(0xFF8B2B38);
-  static const Color darkText = Color(0xFF3F141E);
-  static const Color subText = Color(0xFF8E8E93);
-  static const Color statSectionBg = Color(0xFFFFD5C3);
+  static const Color primaryMaroon = Color(0xFFA83244);
+  static const Color darkText = Color(0xFF1E1E1E);
+  static const Color subText = Color(0xFF757575);
+  static const Color statSectionBg = Color(0xFFFFD5C8);
   static const Color badgeBg = Color(0xFFFFD5C8);
+
+  void _showSuccessDialog(String message) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          elevation: 4,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24.0),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.0),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header: Checkmark Icon + Title + Close Button
+                Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFFD5C8),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          LucideIcons.check,
+                          color: Color(0xFFE65100),
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Berhasil',
+                      style: TextStyle(
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E293B),
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(dialogContext),
+                      child: const Icon(
+                        LucideIcons.x,
+                        size: 18,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Body text
+                Text(
+                  message,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    color: Color(0xFF4B5563),
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // OK Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryMaroon,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'OK',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleEditProfile() async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditProfilDokterPage(
+          onNavigateTab: widget.onNavigateTab,
+          showBottomNav: true,
+        ),
+      ),
+    );
+
+    if (updated == true && mounted) {
+      setState(() {});
+      _showSuccessDialog('Profil dokter berhasil diperbarui');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,14 +156,14 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 1. Header: Title "Profil Dokter"
-            Padding(
-              padding: const EdgeInsets.only(
+            const Padding(
+              padding: EdgeInsets.only(
                 left: 20.0,
                 right: 20.0,
                 top: 16.0,
                 bottom: 8.0,
               ),
-              child: const Text(
+              child: Text(
                 'Profil Dokter',
                 style: TextStyle(
                   fontFamily: 'serif',
@@ -83,11 +208,23 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
           ],
         ),
       ),
+      bottomNavigationBar: widget.showBottomNav
+          ? DokterNavBottom(
+              currentIndex: 4,
+              onTap: (index) {
+                if (index != 4) {
+                  widget.onNavigateTab?.call(index);
+                }
+              },
+            )
+          : null,
     );
   }
 
-  /// 2. Doctor Info Card (Avatar "DA", Name, Email, Badges)
+  /// 2. Doctor Info Card (Avatar Initials, Name, Email, Badges)
   Widget _buildDoctorInfoCard() {
+    final store = DoctorProfileStore();
+
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
@@ -107,7 +244,7 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
       ),
       child: Row(
         children: [
-          // Avatar "DA"
+          // Avatar (Initials e.g. "DA")
           Container(
             width: 56,
             height: 56,
@@ -122,10 +259,10 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
                 ),
               ],
             ),
-            child: const Center(
+            child: Center(
               child: Text(
-                'DA',
-                style: TextStyle(
+                store.initials,
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -141,18 +278,20 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'dr. Anita Dewi, Sp.KK',
-                  style: TextStyle(
+                Text(
+                  store.name,
+                  style: const TextStyle(
                     fontSize: 16.0,
                     fontWeight: FontWeight.bold,
                     color: darkText,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 3),
-                const Text(
-                  'anita@demo.com',
-                  style: TextStyle(
+                Text(
+                  store.email,
+                  style: const TextStyle(
                     fontSize: 12.5,
                     color: subText,
                   ),
@@ -161,7 +300,7 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
                 Row(
                   children: [
                     // Badge 1: Estetika Kulit
-                    _buildPillBadge('Estetika Kulit'),
+                    _buildPillBadge(store.specialization),
                     const SizedBox(width: 6),
                     // Badge 2: Terverifikasi
                     _buildPillBadge('Terverifikasi'),
@@ -208,10 +347,10 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
           const Text(
             'RINGKASAN PRAKTIK',
             style: TextStyle(
-              fontSize: 12.0,
+              fontSize: 11.5,
               fontWeight: FontWeight.w800,
-              letterSpacing: 1.0,
-              color: darkText,
+              letterSpacing: 0.8,
+              color: Color(0xFF1E1E1E),
             ),
           ),
           const SizedBox(height: 14),
@@ -227,17 +366,17 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
               ),
               const SizedBox(width: 10),
 
-              // Pasien: 5
+              // Pasien: 4 (Matching image copy 4.png)
               Expanded(
                 child: _buildPraktikStatCard(
                   icon: LucideIcons.user,
-                  count: '5',
+                  count: '4',
                   label: 'Pasien',
                 ),
               ),
               const SizedBox(width: 10),
 
-              // Selesai: 4
+              // Selesai: 4 (Matching image copy 4.png)
               Expanded(
                 child: _buildPraktikStatCard(
                   icon: LucideIcons.calendarCheck,
@@ -313,6 +452,8 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
 
   /// 4. Informasi Section (Telepon, Alamat, Spesialisasi, Pengalaman, STR)
   Widget _buildInformasiSection() {
+    final store = DoctorProfileStore();
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18.0),
@@ -337,9 +478,9 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
           const Text(
             'INFORMASI',
             style: TextStyle(
-              fontSize: 12.0,
+              fontSize: 11.0,
               fontWeight: FontWeight.w700,
-              letterSpacing: 1.0,
+              letterSpacing: 0.5,
               color: Color(0xFF757575),
             ),
           ),
@@ -349,7 +490,7 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
           _buildInfoRow(
             icon: LucideIcons.phone,
             label: 'TELEPON',
-            value: '081234567800',
+            value: store.phone,
           ),
           const SizedBox(height: 18),
 
@@ -357,7 +498,7 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
           _buildInfoRow(
             icon: LucideIcons.mapPin,
             label: 'ALAMAT',
-            value: 'Jl. Melati No. 10, Jakarta',
+            value: store.address,
           ),
           const SizedBox(height: 18),
 
@@ -365,7 +506,7 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
           _buildInfoRow(
             icon: LucideIcons.stethoscope,
             label: 'SPESIALISASI',
-            value: 'Estetika Kulit',
+            value: store.specialization,
           ),
           const SizedBox(height: 18),
 
@@ -373,7 +514,7 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
           _buildInfoRow(
             icon: LucideIcons.briefcase,
             label: 'PENGALAMAN',
-            value: '8 tahun',
+            value: store.experience,
           ),
           const SizedBox(height: 18),
 
@@ -381,7 +522,7 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
           _buildInfoRow(
             icon: LucideIcons.fileText,
             label: 'STR',
-            value: 'STR-2018-12345',
+            value: store.str,
           ),
         ],
       ),
@@ -434,7 +575,7 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
         'icon': LucideIcons.user,
         'title': 'Edit Profil',
         'isDestructive': false,
-        'onTap': null,
+        'onTap': _handleEditProfile,
       },
       {
         'icon': LucideIcons.settings,
@@ -446,6 +587,7 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
             MaterialPageRoute(
               builder: (context) => PengaturanDokterPage(
                 onNavigateTab: widget.onNavigateTab,
+                showBottomNav: true,
               ),
             ),
           );
@@ -455,13 +597,33 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
         'icon': LucideIcons.info,
         'title': 'Tentang Aplikasi',
         'isDestructive': false,
-        'onTap': null,
+        'onTap': () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TentangDokterPage(
+                onNavigateTab: widget.onNavigateTab,
+                showBottomNav: true,
+              ),
+            ),
+          );
+        },
       },
       {
         'icon': LucideIcons.clock,
         'title': 'Riwayat Aktivitas',
         'isDestructive': false,
-        'onTap': null,
+        'onTap': () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RiwayatAktivitasDokterPage(
+                onNavigateTab: widget.onNavigateTab,
+                showBottomNav: true,
+              ),
+            ),
+          );
+        },
       },
       {
         'icon': LucideIcons.logOut,

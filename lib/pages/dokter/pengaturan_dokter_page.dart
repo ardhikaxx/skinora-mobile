@@ -5,10 +5,12 @@ import '../../components/navbottom/dokter_navbottom.dart';
 
 class PengaturanDokterPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
+  final bool showBottomNav;
 
   const PengaturanDokterPage({
     super.key,
     this.onNavigateTab,
+    this.showBottomNav = true,
   });
 
   @override
@@ -16,11 +18,115 @@ class PengaturanDokterPage extends StatefulWidget {
 }
 
 class _PengaturanDokterPageState extends State<PengaturanDokterPage> {
-  static const Color primaryMaroon = Color(0xFF8B2B38);
-  static const Color darkText = Color(0xFF3F141E);
-  static const Color subText = Color(0xFF757575);
+  static const Color primaryMaroon = Color(0xFFA83244);
+  static const Color darkText = Color(0xFF1E1E1E);
 
   bool _isNotificationActive = true;
+
+  void _showSuccessDialog() {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          elevation: 4,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24.0),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.0),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header: Checkmark Icon + Title + Close Button
+                Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFFD5C8),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          LucideIcons.check,
+                          color: Color(0xFFE65100),
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Berhasil',
+                      style: TextStyle(
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E293B),
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(dialogContext),
+                      child: const Icon(
+                        LucideIcons.x,
+                        size: 18,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Body text
+                const Text(
+                  'Pengaturan dokter berhasil disimpan',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: Color(0xFF4B5563),
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // OK Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(dialogContext);
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryMaroon,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'OK',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +135,7 @@ class _PengaturanDokterPageState extends State<PengaturanDokterPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar with back button and centered title
+            // Top Bar with back button and title
             Padding(
               padding: const EdgeInsets.only(
                 left: 16.0,
@@ -46,7 +152,10 @@ class _PengaturanDokterPageState extends State<PengaturanDokterPage> {
                       size: 22,
                     ),
                     onPressed: () => Navigator.pop(context),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
+                  const SizedBox(width: 10),
                   const Text(
                     'Pengaturan',
                     style: TextStyle(
@@ -98,10 +207,10 @@ class _PengaturanDokterPageState extends State<PengaturanDokterPage> {
                         const Text(
                           'NOTIFIKASI',
                           style: TextStyle(
-                            fontSize: 12.0,
+                            fontSize: 11.0,
                             fontWeight: FontWeight.w700,
-                            letterSpacing: 1.0,
-                            color: subText,
+                            letterSpacing: 0.5,
+                            color: Color(0xFF6B7280),
                           ),
                         ),
                         const SizedBox(height: 14),
@@ -116,7 +225,7 @@ class _PengaturanDokterPageState extends State<PengaturanDokterPage> {
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: const Color(0xFFE8E8E8),
+                              color: const Color(0xFFE5E7EB),
                               width: 1.0,
                             ),
                           ),
@@ -158,43 +267,29 @@ class _PengaturanDokterPageState extends State<PengaturanDokterPage> {
                   // Button: "Simpan Pengaturan"
                   SizedBox(
                     width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Pengaturan berhasil disimpan'),
-                            duration: Duration(seconds: 1),
-                          ),
-                        );
-                        Navigator.pop(context);
-                      },
+                    height: 46,
+                    child: ElevatedButton.icon(
+                      onPressed: _showSuccessDialog,
+                      icon: const Icon(
+                        LucideIcons.save,
+                        size: 18,
+                        color: Colors.white,
+                      ),
+                      label: const Text(
+                        'Simpan Pengaturan',
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryMaroon,
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(
-                            LucideIcons.save,
-                            size: 18,
-                            color: Colors.white,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'Simpan Pengaturan',
-                            style: TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                        ],
                       ),
                     ),
                   ),
@@ -204,15 +299,17 @@ class _PengaturanDokterPageState extends State<PengaturanDokterPage> {
           ],
         ),
       ),
-      bottomNavigationBar: DokterNavBottom(
-        currentIndex: 4,
-        onTap: (index) {
-          Navigator.pop(context);
-          if (index != 4) {
-            widget.onNavigateTab?.call(index);
-          }
-        },
-      ),
+      bottomNavigationBar: widget.showBottomNav
+          ? DokterNavBottom(
+              currentIndex: 4,
+              onTap: (index) {
+                Navigator.pop(context);
+                if (index != 4) {
+                  widget.onNavigateTab?.call(index);
+                }
+              },
+            )
+          : null,
     );
   }
 }

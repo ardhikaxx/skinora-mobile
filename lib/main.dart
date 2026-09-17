@@ -26,8 +26,20 @@ import 'models/admin_doctor_model.dart';
 import 'models/admin_user_model.dart';
 import 'pages/dokter/dokter_main_page.dart';
 import 'pages/dokter/patient_insight_page.dart';
+import 'pages/dokter/detail_patient_insight_page.dart';
 import 'pages/dokter/notifikasi_dokter_page.dart';
 import 'pages/dokter/pengaturan_dokter_page.dart';
+import 'pages/dokter/chat_konsultasi_page.dart';
+import 'pages/dokter/ruang_chat_dokter_page.dart';
+import 'pages/dokter/riwayat_konsultasi_page.dart';
+import 'pages/dokter/detail_riwayat_konsultasi_page.dart';
+import 'pages/dokter/profil_dokter_page.dart';
+import 'pages/dokter/edit_profil_dokter_page.dart';
+import 'pages/dokter/tentang_dokter_page.dart';
+import 'pages/dokter/riwayat_aktivitas_dokter_page.dart';
+
+
+
 import 'pages/pengguna/pengguna_main_page.dart';
 import 'pages/pengguna/notifikasi_pengguna_page.dart';
 import 'pages/pengguna/konsultasi_dokter_page.dart';
@@ -149,8 +161,20 @@ class SkinoraApp extends StatelessWidget {
         '/admin/laporan': (context) => const LaporanRiwayatPage(),
         '/dokter': (context) => const DokterMainPage(),
         '/dokter/patient-insight': (context) => const PatientInsightPage(),
+        '/dokter/patient-insight/detail': (context) => const DetailPatientInsightPage(),
         '/dokter/notifikasi': (context) => const NotifikasiDokterPage(),
         '/dokter/pengaturan': (context) => const PengaturanDokterPage(),
+        '/dokter/chat': (context) => const ChatKonsultasiPage(showBottomNav: true),
+        '/dokter/chat/ruang': (context) => const RuangChatDokterPage(),
+        '/dokter/riwayat': (context) => const RiwayatKonsultasiPage(showBottomNav: true),
+        '/dokter/riwayat/detail': (context) => const DetailRiwayatKonsultasiPage(),
+        '/dokter/profil': (context) => const ProfilDokterPage(showBottomNav: true),
+        '/dokter/profil/edit': (context) => const EditProfilDokterPage(),
+        '/dokter/tentang': (context) => const TentangDokterPage(),
+        '/dokter/riwayat-aktivitas': (context) => const RiwayatAktivitasDokterPage(),
+
+
+
         '/pengguna': (context) => const PenggunaMainPage(),
         '/pengguna/notifikasi': (context) => const NotifikasiPenggunaPage(),
         '/pengguna/konsultasi': (context) => const KonsultasiDokterPenggunaPage(),
