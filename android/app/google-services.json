@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "116765998544",
-    "project_id": "skinora-d6255",
-    "storage_bucket": "skinora-d6255.firebasestorage.app"
+    "project_number": "1018258328928",
+    "project_id": "skinora-app",
+    "storage_bucket": "skinora-app.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:116765998544:android:cf4b44be7c9761e8330dd5",
+        "mobilesdk_app_id": "1:1018258328928:android:b1121084f71880cc5d6205",
         "android_client_info": {
           "package_name": "com.example.skinora_app"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyA1wri32ALovKnD7GjbZjPmR4nvnNeeJxo"
+          "current_key": "AIzaSyCJ9n6wWrcZmqh-6a5EBCPbEtUZeDHNouI"
         }
       ],
       "services": {
