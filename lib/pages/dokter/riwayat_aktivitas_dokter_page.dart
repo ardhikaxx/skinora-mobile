@@ -1,6 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
+import '../../services/activity_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../utils/app_dates.dart';
 
 class DoctorActivityItem {
   final String title;
@@ -12,7 +17,7 @@ class DoctorActivityItem {
   });
 }
 
-class RiwayatAktivitasDokterPage extends StatelessWidget {
+class RiwayatAktivitasDokterPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
   final bool showBottomNav;
 
@@ -22,13 +27,20 @@ class RiwayatAktivitasDokterPage extends StatelessWidget {
     this.showBottomNav = true,
   });
 
+  @override
+  State<RiwayatAktivitasDokterPage> createState() =>
+      _RiwayatAktivitasDokterPageState();
+}
+
+class _RiwayatAktivitasDokterPageState
+    extends State<RiwayatAktivitasDokterPage> {
   static const Color primaryMaroon = Color(0xFFA83244);
   static const Color darkText = Color(0xFF1E1E1E);
   static const Color subText = Color(0xFF757575);
   static const Color clockBg = Color(0xFFFFD5C8);
   static const Color clockColor = Color(0xFFE65100);
 
-  final List<DoctorActivityItem> activities = const [
+  List<DoctorActivityItem> activities = const [
     DoctorActivityItem(
       title: 'Konsultasi selesai dengan Annida Tri Aulia',
       timestamp: '2026-08-29 10:30',
@@ -42,6 +54,40 @@ class RiwayatAktivitasDokterPage extends StatelessWidget {
       timestamp: '2026-08-28 14:00',
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  String _fmtTime(Object? ts) {
+    if (ts is Timestamp) return AppDates.dateTime(ts.toDate());
+    return ts?.toString() ?? '';
+  }
+
+  /// Riwayat aktivitas milik dokter dari Firestore. Tanpa Firebase, seed
+  /// demo tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final items = await ActivityService.listMine(uid);
+      if (!mounted) return;
+      setState(() {
+        if (items.isEmpty) return;
+        activities = items
+            .map((m) => DoctorActivityItem(
+                  title: (m['title'] as String?) ?? '',
+                  timestamp: _fmtTime(m['createdAt']),
+                ))
+            .toList();
+      });
+    } catch (_) {
+      // biarkan seed demo bila query gagal
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -175,13 +221,13 @@ class RiwayatAktivitasDokterPage extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: showBottomNav
+      bottomNavigationBar: widget.showBottomNav
           ? DokterNavBottom(
               currentIndex: 4,
               onTap: (index) {
                 Navigator.pop(context);
                 if (index != 4) {
-                  onNavigateTab?.call(index);
+                  widget.onNavigateTab?.call(index);
                 }
               },
             )
