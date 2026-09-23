@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../services/article_service.dart';
+import '../../services/backend.dart';
+import '../../utils/app_dates.dart';
 import 'detail_edukasi_page.dart';
 
 class SkinEducationModel {
@@ -9,6 +12,7 @@ class SkinEducationModel {
   final String title;
   final String snippet;
   final String date;
+  final String content;
 
   const SkinEducationModel({
     required this.id,
@@ -16,6 +20,7 @@ class SkinEducationModel {
     required this.title,
     required this.snippet,
     required this.date,
+    this.content = '',
   });
 }
 
@@ -51,7 +56,7 @@ class _EdukasiKulitPenggunaPageState extends State<EdukasiKulitPenggunaPage> {
     'Tips & Trik',
   ];
 
-  final List<SkinEducationModel> _allArticles = const [
+  List<SkinEducationModel> _allArticles = const [
     SkinEducationModel(
       id: '1',
       category: 'KULIT DASAR',
@@ -103,9 +108,45 @@ class _EdukasiKulitPenggunaPageState extends State<EdukasiKulitPenggunaPage> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Artikel terbit dari Firestore. Tanpa Firebase, seed demo tetap dipakai
+  /// agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    try {
+      final articles = await ArticleService.listPublished();
+      if (articles.isEmpty || !mounted) return;
+      setState(() {
+        _allArticles = articles
+            .map((a) => SkinEducationModel(
+                  id: a.backendId,
+                  category: a.category.toUpperCase(),
+                  title: a.title,
+                  snippet: a.content.isEmpty
+                      ? a.title
+                      : (a.content.length > 140
+                          ? '${a.content.substring(0, 140)}…'
+                          : a.content),
+                  date: a.date.isNotEmpty
+                      ? a.date
+                      : AppDates.short(DateTime.now()),
+                  content: a.content,
+                ))
+            .toList();
+      });
+    } catch (_) {
+      // daftar artikel tetap memakai seed demo bila query gagal
+    }
   }
 
   List<SkinEducationModel> get _filteredArticles {
