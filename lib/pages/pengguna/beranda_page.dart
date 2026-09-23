@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/notification_service.dart';
+import '../../services/user_service.dart';
 import 'notifikasi_pengguna_page.dart';
 import 'konsultasi_dokter_page.dart';
 import 'edukasi_kulit_page.dart';
@@ -21,6 +25,49 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
   static const Color darkText = Color(0xFF3F141E);
   static const Color subText = Color(0xFF757575);
   static const Color peachCardBg = Color(0xFFFFD5C3);
+
+  String _userName = 'Leonita Yulyta Agustin';
+  int _unreadNotif = 2;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  /// Profil + unread notifikasi dari Firestore. Tanpa Firebase, seed demo
+  /// tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final results = await Future.wait<Object?>([
+        UserService.loadByUid(uid),
+        NotificationService.countUnread(NotificationService.userAudience(uid)),
+      ]);
+      final profile = results[0] as dynamic;
+      final unread = results[1] as int?;
+      if (!mounted) return;
+      setState(() {
+        final name = (profile?.name as String?) ?? '';
+        if (name.isNotEmpty) _userName = name;
+        if (unread != null) _unreadNotif = unread;
+      });
+    } catch (_) {
+      // dashboard tetap menampilkan data demo bila query gagal
+    }
+  }
+
+  String _initials(String name) {
+    final parts =
+        name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return 'L';
+    if (parts.length == 1) {
+      return parts.first.substring(0, 1).toUpperCase();
+    }
+    return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +102,7 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
   Widget _buildHeader() {
     return Row(
       children: [
-        // Avatar Initial "L"
+        // Avatar Initial (dynamic)
         Container(
           width: 50,
           height: 50,
@@ -70,10 +117,10 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
               ),
             ],
           ),
-          child: const Center(
+          child: Center(
             child: Text(
-              'L',
-              style: TextStyle(
+              _initials(_userName),
+              style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
@@ -87,18 +134,20 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
+            children: [
+              const Text(
                 'Selamat pagi,',
                 style: TextStyle(
                   fontSize: 13.0,
                   color: subText,
                 ),
               ),
-              SizedBox(height: 3),
+              const SizedBox(height: 3),
               Text(
-                'Leonita Yulyta Agustin',
-                style: TextStyle(
+                _userName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
                   fontSize: 17.0,
                   fontWeight: FontWeight.bold,
                   color: darkText,
@@ -161,10 +210,10 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2),
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Text(
-                      '2',
-                      style: TextStyle(
+                      '$_unreadNotif',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 9.5,
                         fontWeight: FontWeight.bold,
