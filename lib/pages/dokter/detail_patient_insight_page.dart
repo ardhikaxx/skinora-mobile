@@ -1,6 +1,13 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/consultation_service.dart';
+import '../../services/skin_service.dart';
+import '../../services/user_service.dart';
+import '../../utils/app_dates.dart';
 import 'patient_insight_page.dart';
 
 class DetailPatientInsightPage extends StatefulWidget {
@@ -25,6 +32,94 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
   static const Color cardBorder = Color(0xFFEEEEEE);
 
   late PatientInsightModel _currentPatient;
+
+  // Data kesehatan pasien dari Firestore (fallback seed bila kosong).
+  List<Map<String, dynamic>> _skinChecks = const [];
+  List<Map<String, dynamic>> _skinDailies = const [];
+  List<Map<String, dynamic>> _skincareLogs = const [];
+
+  // Ringkasan insight — default seed, diganti bila data Firestore ada.
+  List<Map<String, String>> _topConditions = [
+    {'name': 'Berminyak', 'count': '2x'},
+    {'name': 'Jerawat', 'count': '2x'},
+    {'name': 'Kemerahan', 'count': '2x'},
+  ];
+  String _avgWater = '6.6';
+  String _avgSleep = '0';
+  String _skincarePct = '57%';
+  String _insightSkincare =
+      'Pasien memiliki kepatuhan skincare 57% dalam 7 hari terakhir';
+  String _insightWater = 'Rata-rata konsumsi air: 6.6 gelas per hari';
+  String _insightSleep = 'Rata-rata tidur: 0 jam per malam';
+
+  /// Hitung ulang ringkasan dari `_skinDailies` / `_skincareLogs` bila ada data.
+  void _refreshInsightFromData() {
+    if (_skinDailies.isEmpty) return;
+    final recent = _skinDailies.take(7).toList();
+    final symptomCount = <String, int>{};
+    double waterTotal = 0;
+    int waterCount = 0;
+    double sleepTotal = 0;
+    int sleepCount = 0;
+    int fullRoutine = 0;
+    for (final d in recent) {
+      final symptoms =
+          (d['symptoms'] as List?)?.cast<String>() ?? const <String>[];
+      for (final s in symptoms) {
+        symptomCount[s] = (symptomCount[s] ?? 0) + 1;
+      }
+      final airRaw = ((d['air'] as String?) ?? '')
+          .replaceAll(RegExp('[^0-9.,]'), '')
+          .replaceAll(',', '.');
+      final air = double.tryParse(airRaw);
+      if (air != null) {
+        waterTotal += air;
+        waterCount++;
+      }
+      final jamRaw = ((d['jamTidur'] as String?) ?? '')
+          .replaceAll(RegExp('[^0-9:]'), '');
+      final parts = jamRaw.split(':');
+      if (parts.length >= 2) {
+        final h = int.tryParse(parts[0]);
+        final m = int.tryParse(parts[1]);
+        if (h != null && m != null) {
+          var hours = h + (m / 60.0);
+          if (hours < 12) hours += 24; // lewat tengah malam
+          if (hours > 0 && hours <= 24) {
+            sleepTotal += hours;
+            sleepCount++;
+          }
+        }
+      }
+      if ((d['skincarePagi'] as bool? ?? false) &&
+          (d['skincareMalam'] as bool? ?? false)) {
+        fullRoutine++;
+      }
+    }
+    final sorted = symptomCount.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    if (sorted.isNotEmpty) {
+      _topConditions = sorted.take(3).map((e) {
+        return {'name': e.key, 'count': '${e.value}x'};
+      }).toList();
+    }
+    final avgWater =
+        waterCount == 0 ? 0.0 : double.parse((waterTotal / waterCount)
+            .toStringAsFixed(1));
+    final avgSleep =
+        sleepCount == 0 ? 0.0 : double.parse((sleepTotal / sleepCount)
+            .toStringAsFixed(1));
+    final pct = recent.isEmpty
+        ? 0
+        : ((fullRoutine / recent.length) * 100).round();
+    _avgWater = avgWater.toStringAsFixed(1);
+    _avgSleep = avgSleep.toStringAsFixed(1);
+    _skincarePct = '$pct%';
+    _insightSkincare =
+        'Pasien memiliki kepatuhan skincare $_skincarePct dalam 7 hari terakhir';
+    _insightWater = 'Rata-rata konsumsi air: $_avgWater gelas per hari';
+    _insightSleep = 'Rata-rata tidur: $_avgSleep jam per malam';
+  }
 
   final List<PatientInsightModel> _allPatients = [
     PatientInsightModel(
@@ -77,6 +172,100 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
           (p) => p.name == 'Leonita Yulyta Agustin',
           orElse: () => _allPatients[1],
         );
+    _loadFromBackend();
+  }
+
+  /// Muat daftar pasien konsultasi + data skin subcollection. Tanpa Firebase,
+  /// seed demo tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final consults = await ConsultationService.listForDoctor(
+        uid,
+        includeFinished: true,
+      );
+      final counts = <String, int>{};
+      final lastSeen = <String, String>{};
+      for (final c in consults) {
+        final pid = (c['patientId'] as String?) ?? '';
+        if (pid.isEmpty) continue;
+        counts[pid] = (counts[pid] ?? 0) + 1;
+        if (!lastSeen.containsKey(pid)) {
+          final date = (c['dateIso'] as String?) ?? '';
+          if (date.isNotEmpty) {
+            final parsed = AppDates.tryParseIso(date);
+            if (parsed != null) lastSeen[pid] = AppDates.short(parsed);
+          }
+        }
+      }
+
+      final loaded = <PatientInsightModel>[];
+      for (final e in counts.entries) {
+        final profile = await UserService.loadByUid(e.key);
+        if (profile == null || profile.name.isEmpty) continue;
+        var skinType = '-';
+        var primaryConcern = '-';
+        try {
+          final checks = await SkinService.listSkinChecks(e.key, limit: 1);
+          if (checks.isNotEmpty) {
+            final m = checks.first;
+            final st = (m['resultSkinType'] as String?) ?? '';
+            if (st.isNotEmpty) skinType = st;
+            final locs = (m['locations'] as List?)?.cast<String>() ??
+                const <String>[];
+            if (locs.isNotEmpty) primaryConcern = locs.join(', ');
+          }
+        } catch (_) {
+          // skin check kosong/gagal → biarkan '-'
+        }
+        loaded.add(PatientInsightModel(
+          id: e.key,
+          name: profile.name,
+          consultationCount: '${e.value} konsultasi',
+          skinType: skinType,
+          primaryConcern: primaryConcern,
+          lastConsultation: lastSeen[e.key] ?? '-',
+        ));
+      }
+
+      if (!mounted) return;
+      setState(() {
+        if (loaded.isNotEmpty) {
+          _allPatients
+            ..clear()
+            ..addAll(loaded);
+          final match = _allPatients.where((p) => p.id == _currentPatient.id);
+          if (match.isNotEmpty) _currentPatient = match.first;
+        }
+      });
+      await _loadPatientHealth(_currentPatient.id);
+    } catch (_) {
+      // biarkan seed demo bila query gagal
+    }
+  }
+
+  Future<void> _loadPatientHealth(String patientId) async {
+    if (!Backend.useFirebase || patientId.isEmpty) return;
+    final isSeedId = int.tryParse(patientId) != null;
+    if (isSeedId) return; // id seed demo bukan uid Firestore
+    try {
+      final results = await Future.wait<Object?>([
+        SkinService.listSkinChecks(patientId, limit: 5),
+        SkinService.listSkinDailies(patientId),
+        SkinService.listSkincare(patientId),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _skinChecks = (results[0] as List<Map<String, dynamic>>?) ?? const [];
+        _skinDailies = (results[1] as List<Map<String, dynamic>>?) ?? const [];
+        _skincareLogs = (results[2] as List<Map<String, dynamic>>?) ?? const [];
+        _refreshInsightFromData();
+      });
+    } catch (_) {
+      // fallback ke seed UI
+    }
   }
 
   void _showGantiPasienModal() {
@@ -173,6 +362,7 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
                             _currentPatient = p;
                           });
                           Navigator.pop(modalContext);
+                          _loadPatientHealth(p.id);
                         },
                       );
                     },
@@ -418,11 +608,7 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
 
   /// 2. Kondisi Kulit Teratas Card
   Widget _buildKondisiKulitTeratasCard() {
-    final conditions = [
-      {'name': 'Berminyak', 'count': '2x'},
-      {'name': 'Jerawat', 'count': '2x'},
-      {'name': 'Kemerahan', 'count': '2x'},
-    ];
+    final conditions = _topConditions;
 
     return Container(
       padding: const EdgeInsets.all(16.0),
@@ -493,7 +679,7 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
         Expanded(
           child: _buildMaroonStatCard(
             icon: LucideIcons.droplets,
-            value: '6.6',
+            value: _avgWater,
             label: 'Gelas/Hari',
           ),
         ),
@@ -503,7 +689,7 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
         Expanded(
           child: _buildMaroonStatCard(
             icon: LucideIcons.moon,
-            value: '0',
+            value: _avgSleep,
             label: 'Jam Tidur',
           ),
         ),
@@ -513,7 +699,7 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
         Expanded(
           child: _buildMaroonStatCard(
             icon: LucideIcons.sparkles,
-            value: '57%',
+            value: _skincarePct,
             label: 'Skincare',
           ),
         ),
@@ -617,8 +803,7 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
           _buildInsightBullet(
             icon: LucideIcons.circleAlert,
             iconColor: const Color(0xFFE53935),
-            text:
-                'Pasien memiliki kepatuhan skincare 57% dalam 7 hari terakhir',
+            text: _insightSkincare,
           ),
           const SizedBox(height: 12),
 
@@ -626,7 +811,7 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
           _buildInsightBullet(
             icon: LucideIcons.droplets,
             iconColor: const Color(0xFF757575),
-            text: 'Rata-rata konsumsi air: 6.6 gelas per hari',
+            text: _insightWater,
           ),
           const SizedBox(height: 12),
 
@@ -634,7 +819,7 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
           _buildInsightBullet(
             icon: LucideIcons.moon,
             iconColor: const Color(0xFF757575),
-            text: 'Rata-rata tidur: 0 jam per malam',
+            text: _insightSleep,
           ),
         ],
       ),
@@ -671,6 +856,26 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
 
   /// 3. SKIN CHECK Section
   Widget _buildSkinCheckSection() {
+    if (_skinChecks.isNotEmpty) {
+      return Column(
+        children: _skinChecks.map((m) {
+          var date = (m['dateIso'] as String?) ?? '';
+          if (date.isEmpty) {
+            final ts = m['createdAt'];
+            if (ts is Timestamp) date = AppDates.iso(ts.toDate());
+          }
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12.0),
+            child: _buildSkinCheckCard(
+              date: date.isEmpty ? '-' : date,
+              tipeKulit: (m['resultSkinType'] as String?) ?? '-',
+              sensitivitas: (m['resultSensitivity'] as String?) ?? '-',
+              jerawat: (m['resultAcneRisk'] as String?) ?? '-',
+            ),
+          );
+        }).toList(),
+      );
+    }
     return Column(
       children: [
         // Check 1: 2026-08-28 (Kombinasi, Sensitif, Rentan)
@@ -788,6 +993,152 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
 
   /// 4. SKIN DAILY Section
   Widget _buildSkinDailySection() {
+    if (_skinDailies.isNotEmpty) {
+      return Column(
+        children: _skinDailies.map((m) {
+          final badge = (m['status'] as String?) ?? 'Baik';
+          Color badgeBg;
+          Color badgeColor;
+          switch (badge) {
+            case 'Buruk':
+              badgeBg = const Color(0xFFFFCDD2);
+              badgeColor = const Color(0xFFD32F2F);
+            case 'Sedang':
+              badgeBg = const Color(0xFFFFE0B2);
+              badgeColor = const Color(0xFFE65100);
+            default:
+              badgeBg = const Color(0xFFFFD5C8);
+              badgeColor = const Color(0xFFC2410C);
+          }
+          final locations =
+              (m['locations'] as List?)?.cast<String>() ?? const <String>[];
+          final symptoms =
+              (m['symptoms'] as List?)?.cast<String>() ?? const <String>[];
+          var date = (m['dateIso'] as String?) ?? '';
+          if (date.isEmpty) date = (m['dateDisplay'] as String?) ?? '-';
+          final pagiOk = m['skincarePagi'] as bool? ?? false;
+          final malamOk = m['skincareMalam'] as bool? ?? false;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12.0),
+            padding: const EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: cardBorder, width: 1.0),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      date,
+                      style: const TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E1E1E),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10.0,
+                        vertical: 3.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: badgeBg,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        badge,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: badgeColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                if (locations.isNotEmpty || symptoms.isNotEmpty) ...[
+                  Text(
+                    [
+                      if (locations.isNotEmpty)
+                        'Letak Gejala: ${locations.join(', ')}',
+                      if (symptoms.isNotEmpty)
+                        'Kondisi: ${symptoms.join(', ')}',
+                    ].join('\n'),
+                    style: const TextStyle(
+                      fontSize: 13.0,
+                      color: Color(0xFF555555),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                if (((m['jamTidur'] as String?) ?? '').isNotEmpty ||
+                    ((m['air'] as String?) ?? '').isNotEmpty)
+                  Row(
+                    children: [
+                      const Icon(LucideIcons.moon,
+                          size: 13, color: Color(0xFF757575)),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Tidur: ${m['jamTidur'] ?? '-'}',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: Color(0xFF757575),
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 6.0),
+                        child: Text('•',
+                            style: TextStyle(
+                                fontSize: 12.5, color: Color(0xFF757575))),
+                      ),
+                      const Icon(LucideIcons.droplets,
+                          size: 13, color: Color(0xFF757575)),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Air: ${m['air'] ?? '-'}',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: Color(0xFF757575),
+                        ),
+                      ),
+                    ],
+                  ),
+                if (((m['makanan'] as String?) ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Makan: ${m['makanan']}',
+                    style: const TextStyle(
+                      fontSize: 13.0,
+                      color: Color(0xFF555555),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    _buildRoutinePill(isMorning: true, isDone: pagiOk),
+                    const SizedBox(width: 8),
+                    _buildRoutinePill(isMorning: false, isDone: malamOk),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      );
+    }
     final entries = [
       {
         'date': '2026-08-28',
@@ -1060,6 +1411,30 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
 
   /// 5. SKINCARE ROUTINE Section
   Widget _buildSkincareRoutineSection() {
+    if (_skincareLogs.isNotEmpty) {
+      return Column(
+        children: _skincareLogs.map((log) {
+          final morning =
+              (log['morningSteps'] as List?)?.cast<String>() ?? const <String>[];
+          final night =
+              (log['nightSteps'] as List?)?.cast<String>() ?? const <String>[];
+          var date = (log['dateDisplay'] as String?) ?? '';
+          if (date.isEmpty) date = (log['dateIso'] as String?) ?? '-';
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12.0),
+            child: _buildSkincareRoutineCard(
+              date: date,
+              morningItems: morning.isEmpty
+                  ? ['Cleanser', 'Toner', 'Serum', 'Moisturizer', 'Sunscreen']
+                  : morning,
+              nightItems: night.isEmpty
+                  ? ['Cleanser', 'Toner', 'Serum', 'Moisturizer', 'Night Cream']
+                  : night,
+            ),
+          );
+        }).toList(),
+      );
+    }
     return Column(
       children: [
         // Routine 1: 2026-08-28
