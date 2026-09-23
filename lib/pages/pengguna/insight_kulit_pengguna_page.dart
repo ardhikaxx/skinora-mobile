@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/skin_service.dart';
 
 class DailyInsightHistoryItem {
   final String date;
@@ -38,7 +41,7 @@ class _InsightKulitPenggunaPageState extends State<InsightKulitPenggunaPage> {
   static const Color pinkBurukBg = Color(0xFFFFCCD2);
   static const Color redBurukText = Color(0xFFD32F2F);
 
-  final List<DailyInsightHistoryItem> _history7Hari = const [
+  List<DailyInsightHistoryItem> _history7Hari = const [
     DailyInsightHistoryItem(
       date: '2026-08-28',
       symptoms: 'Berminyak, Komedo',
@@ -75,6 +78,61 @@ class _InsightKulitPenggunaPageState extends State<InsightKulitPenggunaPage> {
       status: 'Baik',
     ),
   ];
+
+  int _baikCount = 4;
+  int _sedangCount = 2;
+  int _burukCount = 1;
+  String _topSymptom = 'Berminyak';
+  int _topSymptomCount = 2;
+  int _avgWater = 7;
+  int _fullRoutineDays = 4;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  /// Insight 7 hari dari skin daily pengguna. Tanpa Firebase, seed demo
+  /// tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final items = await SkinService.listSkinDailies(uid);
+      if (items.isEmpty || !mounted) return;
+      final agg = SkinService.aggregateDailies(items);
+      final recent = (agg['recent'] as List).cast<Map<String, dynamic>>();
+      setState(() {
+        _baikCount = agg['baik'] as int;
+        _sedangCount = agg['sedang'] as int;
+        _burukCount = agg['buruk'] as int;
+        _avgWater = (agg['avgWater'] as double).round();
+        _fullRoutineDays = agg['fullRoutineDays'] as int;
+        final topSymptom = agg['topSymptom'] as String;
+        _topSymptom = topSymptom.split(' (').first;
+        final countMatch =
+            RegExp(r'\((\d+)x').firstMatch(topSymptom);
+        _topSymptomCount =
+            countMatch == null ? 0 : int.tryParse(countMatch.group(1)!) ?? 0;
+        final window = agg['window'] as int;
+        _history7Hari = recent.take(window).map((d) {
+          final symptoms =
+              (d['symptoms'] as List?)?.cast<String>() ?? const <String>[];
+          return DailyInsightHistoryItem(
+            date: (d['dateIso'] as String?) ??
+                (d['dateDisplay'] as String?) ??
+                '',
+            symptoms: symptoms.isEmpty ? '-' : symptoms.join(', '),
+            status: (d['status'] as String?) ?? 'Baik',
+          );
+        }).toList();
+      });
+    } catch (_) {
+      // insight tetap menampilkan seed demo bila query gagal
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -204,13 +262,13 @@ class _InsightKulitPenggunaPageState extends State<InsightKulitPenggunaPage> {
           ),
           const SizedBox(height: 16),
 
-          // 3 Stat Blocks: 4 Baik, 2 Sedang, 1 Buruk
+          // 3 Stat Blocks: Baik / Sedang / Buruk
           Row(
             children: [
               // Baik
               Expanded(
                 child: _buildConditionBox(
-                  count: '4',
+                  count: '$_baikCount',
                   label: 'Baik',
                   bgColor: peachBg,
                   textColor: primaryMaroon,
@@ -221,7 +279,7 @@ class _InsightKulitPenggunaPageState extends State<InsightKulitPenggunaPage> {
               // Sedang
               Expanded(
                 child: _buildConditionBox(
-                  count: '2',
+                  count: '$_sedangCount',
                   label: 'Sedang',
                   bgColor: peachBg,
                   textColor: primaryMaroon,
@@ -232,7 +290,7 @@ class _InsightKulitPenggunaPageState extends State<InsightKulitPenggunaPage> {
               // Buruk
               Expanded(
                 child: _buildConditionBox(
-                  count: '1',
+                  count: '$_burukCount',
                   label: 'Buruk',
                   bgColor: pinkBurukBg,
                   textColor: redBurukText,
@@ -242,24 +300,24 @@ class _InsightKulitPenggunaPageState extends State<InsightKulitPenggunaPage> {
           ),
           const SizedBox(height: 16),
 
-          // Subtitle: "Kondisi kulit paling sering: Berminyak (2x dari 7 hari)"
+          // Subtitle: "Kondisi kulit paling sering: ..."
           RichText(
-            text: const TextSpan(
-              style: TextStyle(
+            text: TextSpan(
+              style: const TextStyle(
                 fontSize: 13.0,
                 color: Color(0xFF4A4A4A),
                 height: 1.35,
               ),
               children: [
-                TextSpan(text: 'Kondisi kulit paling sering: '),
+                const TextSpan(text: 'Kondisi kulit paling sering: '),
                 TextSpan(
-                  text: 'Berminyak',
-                  style: TextStyle(
+                  text: _topSymptom,
+                  style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     color: darkText,
                   ),
                 ),
-                TextSpan(text: ' (2x dari 7 hari)'),
+                TextSpan(text: ' (${_topSymptomCount}x dari 7 hari)'),
               ],
             ),
           ),
@@ -371,17 +429,17 @@ class _InsightKulitPenggunaPageState extends State<InsightKulitPenggunaPage> {
                       ),
                       const SizedBox(height: 8),
                       RichText(
-                        text: const TextSpan(
+                        text: TextSpan(
                           children: [
                             TextSpan(
-                              text: '7 ',
-                              style: TextStyle(
+                              text: '$_avgWater ',
+                              style: const TextStyle(
                                 fontSize: 20.0,
                                 fontWeight: FontWeight.w900,
                                 color: darkText,
                               ),
                             ),
-                            TextSpan(
+                            const TextSpan(
                               text: 'gelas',
                               style: TextStyle(
                                 fontSize: 13.5,
@@ -419,17 +477,17 @@ class _InsightKulitPenggunaPageState extends State<InsightKulitPenggunaPage> {
                       ),
                       const SizedBox(height: 8),
                       RichText(
-                        text: const TextSpan(
+                        text: TextSpan(
                           children: [
                             TextSpan(
-                              text: '4 ',
-                              style: TextStyle(
+                              text: '$_fullRoutineDays ',
+                              style: const TextStyle(
                                 fontSize: 20.0,
                                 fontWeight: FontWeight.w900,
                                 color: darkText,
                               ),
                             ),
-                            TextSpan(
+                            const TextSpan(
                               text: 'dari 7 hari',
                               style: TextStyle(
                                 fontSize: 13.5,
