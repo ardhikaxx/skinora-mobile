@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/user_service.dart';
 
 class EditProfilPenggunaPage extends StatefulWidget {
   final String initialName;
@@ -49,10 +52,30 @@ class _EditProfilPenggunaPageState extends State<EditProfilPenggunaPage> {
     super.dispose();
   }
 
-  void _saveProfile() {
+  Future<void> _saveProfile() async {
     final updatedName = _nameController.text.trim();
     final updatedPhone = _phoneController.text.trim();
     final updatedAddress = _addressController.text.trim();
+
+    if (Backend.useFirebase && AuthService.uid != null) {
+      try {
+        await UserService.updateOwnProfile(
+          AuthService.uid!,
+          fields: {
+            if (updatedName.isNotEmpty) 'name': updatedName,
+            if (updatedPhone.isNotEmpty) 'phone': updatedPhone,
+            'address': updatedAddress,
+          },
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menyimpan profil: $e')),
+        );
+        return;
+      }
+    }
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
