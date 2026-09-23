@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Diperlukan Firebase Auth & Cloud Firestore (bawaan tidak aktif di release). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="skinora_app"
         android:name="${applicationName}"
