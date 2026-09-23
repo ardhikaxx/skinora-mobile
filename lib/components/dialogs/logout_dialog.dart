@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../services/auth_service.dart';
 
 class LogoutDialog extends StatelessWidget {
   final String title;
@@ -12,6 +13,25 @@ class LogoutDialog extends StatelessWidget {
     this.message = 'Apakah Anda yakin ingin keluar?',
     this.onConfirm,
   });
+
+  /// Keluar dari sesi Firebase Auth (bila aktif) lalu kembali ke halaman
+  /// login — kontrak navigasi UI dipertahankan.
+  static Future<void> _defaultLogout(
+    BuildContext outerContext,
+    BuildContext dialogContext,
+  ) async {
+    Navigator.pop(dialogContext);
+    try {
+      await AuthService.signOut();
+    } catch (_) {
+      // biarkan navigasi tetap berjalan walau signOut gagal
+    }
+    if (!outerContext.mounted) return;
+    Navigator.of(outerContext).pushNamedAndRemoveUntil(
+      '/login',
+      (route) => false,
+    );
+  }
 
   /// Static helper to display the logout dialog
   static Future<void> show(
@@ -26,14 +46,7 @@ class LogoutDialog extends StatelessWidget {
       builder: (dialogContext) => LogoutDialog(
         title: title,
         message: message,
-        onConfirm: onConfirm ??
-            () {
-              Navigator.pop(dialogContext);
-              Navigator.of(context).pushNamedAndRemoveUntil(
-                '/login',
-                (route) => false,
-              );
-            },
+        onConfirm: onConfirm ?? () => _defaultLogout(context, dialogContext),
       ),
     );
   }
@@ -159,13 +172,7 @@ class LogoutDialog extends StatelessWidget {
                     height: 44,
                     child: ElevatedButton(
                       onPressed: onConfirm ??
-                          () {
-                            Navigator.pop(context);
-                            Navigator.of(context).pushNamedAndRemoveUntil(
-                              '/login',
-                              (route) => false,
-                            );
-                          },
+                          () => _defaultLogout(context, context),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFEF4444),
                         foregroundColor: Colors.white,
