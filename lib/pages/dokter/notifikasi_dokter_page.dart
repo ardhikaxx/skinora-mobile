@@ -1,6 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/notification_service.dart';
+import '../../utils/app_dates.dart';
 
 class DoctorNotificationModel {
   final String id;
@@ -57,6 +62,59 @@ class _NotifikasiDokterPageState extends State<NotifikasiDokterPage> {
       isUnread: false,
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  String _fmtTime(Object? ts) {
+    if (ts is Timestamp) return AppDates.dateTime(ts.toDate());
+    return ts?.toString() ?? '';
+  }
+
+  IconData _iconFor(String title, String type) {
+    if (type == 'booking' || title.contains('Booking')) {
+      return LucideIcons.calendar;
+    }
+    if (title.contains('Jadwal') || title.contains('Konsultasi')) {
+      return LucideIcons.messageSquare;
+    }
+    return LucideIcons.bell;
+  }
+
+  /// Notifikasi audience dokter dari Firestore. Tanpa Firebase, seed demo
+  /// tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final items = await NotificationService.listAudience(
+        NotificationService.userAudience(uid),
+      );
+      if (!mounted) return;
+      setState(() {
+        if (items.isEmpty) return;
+        _notifications
+          ..clear()
+          ..addAll(items.map((m) {
+            final title = (m['title'] as String?) ?? '';
+            return DoctorNotificationModel(
+              id: (m['id'] as String?) ?? '',
+              title: title,
+              description: (m['description'] as String?) ?? '',
+              time: _fmtTime(m['createdAt']),
+              icon: _iconFor(title, (m['type'] as String?) ?? ''),
+              isUnread: m['isUnread'] == true,
+            );
+          }));
+      });
+    } catch (_) {
+      // biarkan seed demo bila query gagal
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -187,6 +245,9 @@ class _NotifikasiDokterPageState extends State<NotifikasiDokterPage> {
             setState(() {
               item.isUnread = false;
             });
+            if (Backend.useFirebase && !item.id.contains(RegExp(r'^\d+$'))) {
+              NotificationService.markRead(item.id).catchError((_) {});
+            }
             _handleNotificationAction(item);
           },
           borderRadius: BorderRadius.circular(18),
