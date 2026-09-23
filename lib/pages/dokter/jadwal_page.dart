@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/schedule_service.dart';
+import '../../services/user_service.dart';
 
 class ScheduleSlotModel {
   final String id;
@@ -55,6 +59,10 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
   final TextEditingController _endTimeController = TextEditingController();
 
   late List<DayScheduleModel> _scheduleDays;
+
+  // Slot asli dari Firestore (id dokumen) untuk persist hapus/availability.
+  final Map<String, String> _slotDocIds = {}; // 'dayIndex-slotIndex' -> fsId
+  bool _backendLoaded = false;
 
   @override
   void initState() {
@@ -141,6 +149,51 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
         ],
       ),
     ];
+    _loadFromBackend();
+  }
+
+  /// Muat slot + status ketersediaan dari Firestore. Tanpa Firebase, seed
+  /// demo tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final results = await Future.wait<Object?>([
+        ScheduleService.listSlots(uid),
+        UserService.loadByUid(uid),
+      ]);
+      final slots = results[0] as List<SlotRecord>?;
+      final profile = results[1] as dynamic;
+      if (!mounted) return;
+      setState(() {
+        final available = profile == null ? null : (profile.isAvailable as bool?);
+        if (available != null) _isReady = available;
+        if (slots == null || slots.isEmpty) return;
+        _backendLoaded = true;
+        _slotDocIds.clear();
+        final grouped = <String, List<ScheduleSlotModel>>{};
+        for (final s in slots) {
+          final day = grouped.putIfAbsent(s.date, () => []);
+          day.add(ScheduleSlotModel(
+            id: s.id,
+            time: s.time,
+            patientName: s.patientName,
+            isBooked: s.isBooked,
+          ));
+        }
+        _scheduleDays = grouped.entries
+            .map((e) => DayScheduleModel(date: e.key, slots: e.value))
+            .toList();
+        for (var d = 0; d < _scheduleDays.length; d++) {
+          for (var s = 0; s < _scheduleDays[d].slots.length; s++) {
+            _slotDocIds['$d-$s'] = _scheduleDays[d].slots[s].id;
+          }
+        }
+      });
+    } catch (_) {
+      // biarkan seed demo bila query gagal
+    }
   }
 
   @override
@@ -155,9 +208,15 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
     setState(() {
       _isReady = !_isReady;
     });
+    if (Backend.useFirebase) {
+      final uid = AuthService.uid;
+      if (uid != null) {
+        ScheduleService.setAvailability(uid, _isReady).catchError((_) {});
+      }
+    }
   }
 
-  void _handleSaveNewSlot() {
+  Future<void> _handleSaveNewSlot() async {
     final date = _dateController.text.trim();
     final start = _startTimeController.text.trim();
     final end = _endTimeController.text.trim();
@@ -182,6 +241,27 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
       return;
     }
 
+    if (Backend.useFirebase) {
+      final uid = AuthService.uid;
+      if (uid != null) {
+        try {
+          await ScheduleService.addSlot(
+            doctorUid: uid,
+            date: date,
+            time: '$start - $end',
+            timeStart: start,
+            timeEnd: end,
+          );
+        } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Gagal menyimpan slot: $e')),
+          );
+          return;
+        }
+      }
+    }
+
     final newSlot = ScheduleSlotModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       time: '$start - $end',
@@ -204,6 +284,7 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
       _endTimeController.clear();
     });
 
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Slot jadwal berhasil disimpan'),
@@ -318,10 +399,30 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
                       child: SizedBox(
                         height: 42,
                         child: ElevatedButton(
-                          onPressed: () {
+                          onPressed: () async {
                             Navigator.pop(dialogContext);
+                            if (Backend.useFirebase) {
+                              final uid = AuthService.uid;
+                              if (uid != null && _backendLoaded) {
+                                try {
+                                  await ScheduleService.deleteSlot(
+                                      uid, slot.id);
+                                } catch (e) {
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content:
+                                          Text('Gagal menghapus slot: $e'),
+                                    ),
+                                  );
+                                  return;
+                                }
+                              }
+                            }
+                            if (!mounted) return;
                             setState(() {
-                              dayGroup.slots.removeWhere((s) => s.id == slot.id);
+                              dayGroup.slots
+                                  .removeWhere((s) => s.id == slot.id);
                             });
                             _showDeleteSuccessDialog();
                           },
