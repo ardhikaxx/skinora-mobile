@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/skin_service.dart';
+import '../../utils/app_dates.dart';
 import 'riwayat_skincare_page.dart';
 
 class SkincarePage extends StatefulWidget {
@@ -84,24 +88,75 @@ class _SkincarePageState extends State<SkincarePage> {
     }
   }
 
-  void _saveMorningRoutine() {
+  Future<void> _saveRoutine({required bool isMorning}) async {
+    if (Backend.useFirebase && AuthService.uid != null) {
+      final uid = AuthService.uid!;
+      try {
+        final profile = await AuthService.loadProfile();
+        await SkinService.saveSkincare(
+          uid: uid,
+          name: (profile?.name.isNotEmpty ?? false) ? profile!.name : uid,
+          dateDisplay: _formatIndonesianDate(_selectedDate),
+          dateIso: AppDates.iso(_selectedDate),
+          morningSteps: isMorning ? _selectedMorning.toList() : null,
+          nightSteps: isMorning ? null : _selectedNight.toList(),
+          isMorning: isMorning,
+        );
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gagal menyimpan rutinitas skincare'),
+          duration: Duration(seconds: 2),
+        ),
+        );
+        return;
+      }
+    }
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Morning Routine berhasil disimpan'),
+      SnackBar(
+        content: Text(
+          isMorning
+              ? 'Morning Routine berhasil disimpan'
+              : 'Night Routine berhasil disimpan',
+        ),
         backgroundColor: primaryMaroon,
-        duration: Duration(seconds: 2),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
 
-  void _saveNightRoutine() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Night Routine berhasil disimpan'),
-        backgroundColor: primaryMaroon,
-        duration: Duration(seconds: 2),
-      ),
-    );
+  Future<void> _saveMorningRoutine() => _saveRoutine(isMorning: true);
+
+  Future<void> _saveNightRoutine() => _saveRoutine(isMorning: false);
+
+  String _formatIndonesianDate(DateTime date) {
+    const days = [
+      'Senin',
+      'Selasa',
+      'Rabu',
+      'Kamis',
+      'Jumat',
+      'Sabtu',
+      'Minggu',
+    ];
+    const months = [
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
+    ];
+    return '${days[date.weekday - 1]}, ${date.day} '
+        '${months[date.month - 1]} ${date.year}';
   }
 
   @override
