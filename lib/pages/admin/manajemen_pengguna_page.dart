@@ -3,6 +3,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../models/admin_user_model.dart';
+import '../../services/backend.dart';
+import '../../services/user_service.dart';
 import 'detail_pengguna_page.dart';
 import 'tambah_pengguna_page.dart';
 
@@ -80,6 +82,27 @@ class _ManajemenPenggunaPageState extends State<ManajemenPenggunaPage> {
       status: UserStatus.aktif,
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  /// Ambil data pengguna dari Firestore (admin). Tanpa Firebase, daftar demo
+  /// yang sudah ada tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    try {
+      final users = await UserService.listPengguna();
+      if (users.isEmpty || !mounted) return;
+      setState(() => _users
+        ..clear()
+        ..addAll(users));
+    } catch (_) {
+      // daftar tetap menampilkan seed demo bila query gagal
+    }
+  }
 
   @override
   void dispose() {
