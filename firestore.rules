@@ -1,0 +1,185 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isDoctor() {
+      return signedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'dokter';
+    }
+
+    function isParticipant(patientId, doctorId) {
+      return signedIn()
+        && (request.auth.uid == patientId || request.auth.uid == doctorId);
+    }
+
+    function hasCareLink(patientId, doctorId) {
+      return exists(/databases/$(database)/documents/care_links/$(patientId + '_' + doctorId));
+    }
+
+    match /users/{uid} {
+      allow read: if isAdmin() || isOwner(uid) || (signedIn() && resource.data.role == 'dokter');
+      // Client tidak boleh membuat role admin (admin di-seed / Admin SDK).
+      allow create: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.role in ['pengguna', 'dokter'];
+      allow update: if isAdmin()
+        || (isOwner(uid)
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.email == resource.data.email);
+      allow delete: if isAdmin();
+
+      match /skin_checks/{doc} {
+        allow read: if isAdmin() || isOwner(uid) || (isDoctor() && hasCareLink(uid, request.auth.uid));
+        allow create: if isOwner(uid) && request.resource.data.createdBy == uid;
+        allow update, delete: if false;
+      }
+
+      match /skin_dailies/{doc} {
+        allow read: if isAdmin() || isOwner(uid) || (isDoctor() && hasCareLink(uid, request.auth.uid));
+        allow create: if isOwner(uid) && request.resource.data.createdBy == uid;
+        allow update, delete: if isOwner(uid);
+      }
+
+      match /skincare_logs/{doc} {
+        allow read: if isAdmin() || isOwner(uid) || (isDoctor() && hasCareLink(uid, request.auth.uid));
+        allow create: if isOwner(uid) && request.resource.data.createdBy == uid;
+        allow update: if isOwner(uid);
+        allow delete: if false;
+      }
+
+      match /slots/{doc} {
+        allow read: if signedIn();
+        // Dokter: hanya slot miliknya; jangan hapus slot yang sudah dibooking.
+        allow create: if isOwner(uid) && request.resource.data.createdBy == uid;
+        allow delete: if isOwner(uid) && resource.data.isBooked != true;
+        // Dokter ubah slot sendiri; pasien hanya booking (isBooked false→true).
+        allow update: if (isOwner(uid)
+            && request.resource.data.createdBy == resource.data.createdBy)
+          || (signedIn()
+            && resource.data.isBooked == false
+            && request.resource.data.isBooked == true
+            && request.resource.data.patientId == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['isBooked', 'patientId', 'patientName', 'updatedAt']));
+      }
+    }
+
+    match /provisioned_accounts/{doc} {
+      // Read: admin semua; pendaftar hanya provision email miliknya yang belum dipakai.
+      // (resource.data — bukan request.resource — untuk operasi read.)
+      allow read: if isAdmin()
+        || (signedIn()
+          && resource.data.email == request.auth.token.email
+          && resource.data.consumedByUid == null);
+      allow create, delete: if isAdmin();
+      // Admin ubah bebas; pendaftar hanya menandai consumedByUid miliknya.
+      allow update: if isAdmin()
+        || (signedIn()
+          && resource.data.email == request.auth.token.email
+          && resource.data.consumedByUid == null
+          && request.resource.data.consumedByUid == request.auth.uid
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.role == resource.data.role);
+    }
+
+    match /specializations/{doc} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /articles/{doc} {
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.status == 'diterbitkan');
+      allow write: if isAdmin();
+    }
+
+    match /activities/{doc} {
+      allow read: if isAdmin() || (signedIn() && resource.data.actorUid == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    match /notifications/{doc} {
+      allow read: if isAdmin()
+        || (signedIn() && (
+          resource.data.audience == 'user:' + request.auth.uid
+          || (resource.data.audience == 'role:admin' && isAdmin())
+        ));
+      allow create: if signedIn() && request.resource.data.createdBy == request.auth.uid;
+      // Penerima: hanya boleh ubah isUnread. Admin: bebas.
+      allow update: if isAdmin()
+        || (signedIn()
+          && (
+            resource.data.audience == 'user:' + request.auth.uid
+            || (resource.data.audience == 'role:admin' && isAdmin())
+          )
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isUnread']));
+      allow delete: if isAdmin();
+    }
+
+    match /care_links/{doc} {
+      allow read: if isAdmin()
+        || (signedIn() && (
+          resource.data.patientId == request.auth.uid
+          || resource.data.doctorId == request.auth.uid
+        ));
+      allow create: if signedIn()
+        && request.resource.data.patientId == request.auth.uid
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.doctorId is string;
+      allow update, delete: if isAdmin();
+    }
+
+    match /consultations/{id} {
+      allow read: if isAdmin()
+        || (signedIn() && (
+          resource.data.patientId == request.auth.uid
+          || resource.data.doctorId == request.auth.uid
+        ));
+      allow create: if signedIn()
+        && request.resource.data.patientId == request.auth.uid
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isAdmin()
+        || (signedIn() && (
+          resource.data.patientId == request.auth.uid
+          || resource.data.doctorId == request.auth.uid
+        ));
+      allow delete: if isAdmin();
+
+      match /messages/{msg} {
+        allow read: if isAdmin()
+          || (signedIn() && isParticipant(
+            get(/databases/$(database)/documents/consultations/$(id)).data.patientId,
+            get(/databases/$(database)/documents/consultations/$(id)).data.doctorId
+          ));
+        allow create: if signedIn()
+          && request.resource.data.senderId == request.auth.uid
+          && isParticipant(
+            get(/databases/$(database)/documents/consultations/$(id)).data.patientId,
+            get(/databases/$(database)/documents/consultations/$(id)).data.doctorId
+          );
+        allow update, delete: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
