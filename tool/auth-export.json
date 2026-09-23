@@ -1,0 +1,41 @@
+{"users": [
+{
+  "localId": "7hMnLtll1ST5r3kORzrW17u5xNn2",
+  "email": "admin@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "KjSeXurj5a79w5aQKehW+pf6y5KkN0VLhx1TVVoFlv/tQUDnVflt9EcRdqfyeHKp1UVrAuqa4H1xhq8s1AAlBA==",
+  "salt": "7dcJZ39q1xrg9Q==",
+  "lastSignedInAt": "1790202537171",
+  "createdAt": "1790202537171",
+  "providerUserInfo": []
+},
+{
+  "localId": "Rd5wrFzp2JgIUIqhkVqXFv7IUac2",
+  "email": "sari.wulandari@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "BIecf7KMIPEWi5HBB9Pvl5+vql6hcacoBxaeKT08jxgiDxmcbLr4usWc9c00eUbi59oKe1vIJcxHccObP/yEkg==",
+  "salt": "uzp/I8v6dmp4Tw==",
+  "lastSignedInAt": "1790202653852",
+  "createdAt": "1790202653852",
+  "providerUserInfo": []
+},
+{
+  "localId": "YPSNDsvDdfPNqUyV756GDlQCep12",
+  "email": "anita.dewi@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "HnuD5sT7MWYO0uLkAvQgtGullREielw8DxtOb5hBG9+uO023x1pu2zQAYbSrDWC0lxYm7BzcGFag2w2pPmJsSw==",
+  "salt": "5loa6iqtQnBW5w==",
+  "lastSignedInAt": "1790202651168",
+  "createdAt": "1790202651168",
+  "providerUserInfo": []
+},
+{
+  "localId": "mqufgRcEHnM3owKzIf9viIPechX2",
+  "email": "andi.pratama@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "WpX/Xd5kJupP2pfGGPJCKEyvhrUOW5cmk8AenJC55RMGxgTpxgo345YZBfz2XThiHtCWD2SwZ0OVnRedQHolrg==",
+  "salt": "6CQtPltKzJ4hYg==",
+  "lastSignedInAt": "1790202652592",
+  "createdAt": "1790202652592",
+  "providerUserInfo": []
+}]}
