@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/skin_service.dart';
+import '../../utils/app_dates.dart';
 import 'riwayat_skin_daily_page.dart';
 import 'insight_kulit_pengguna_page.dart';
 
@@ -140,7 +144,43 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
     }
   }
 
-  void _saveDailyJournal() {
+  Future<void> _saveDailyJournal() async {
+    final dateDisplay = _formatIndonesianDate(_selectedDate);
+    final dateIso = AppDates.iso(_selectedDate);
+    final locations = _selectedLocations.toList();
+    final symptoms = _selectedSymptoms.toList();
+
+    if (Backend.useFirebase && AuthService.uid != null) {
+      final uid = AuthService.uid!;
+      try {
+        final profile = await AuthService.loadProfile();
+        await SkinService.saveSkinDaily(
+          uid: uid,
+          name: (profile?.name.isNotEmpty ?? false) ? profile!.name : uid,
+          dateDisplay: dateDisplay,
+          dateIso: dateIso,
+          locations: locations,
+          symptoms: symptoms,
+          kebiasaan: _kebiasaanController.text.trim(),
+          jamTidur: _jamTidurController.text.trim(),
+          air: _airController.text.trim(),
+          makanan: _makananController.text.trim(),
+          aktivitas: _aktivitasController.text.trim(),
+          skincarePagi: _isSkincarePagi,
+          skincareMalam: _isSkincareMalam,
+        );
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gagal menyimpan jurnal harian'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+    }
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Jurnal harian berhasil disimpan'),
