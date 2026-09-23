@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/skin_service.dart';
 
 class DailyHistoryEntry {
   final String date;
@@ -57,7 +60,7 @@ class _RiwayatSkinDailyPageState extends State<RiwayatSkinDailyPage> {
   // Track expanded cards
   final Set<int> _expandedIndices = {0};
 
-  final List<DailyHistoryEntry> _entries = const [
+  List<DailyHistoryEntry> _entries = const [
     DailyHistoryEntry(
       date: 'Jumat, 28 Agustus 2026',
       status: 'Baik',
@@ -150,6 +153,52 @@ class _RiwayatSkinDailyPageState extends State<RiwayatSkinDailyPage> {
       routineMalam: true,
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  /// Riwayat skin daily milik pengguna dari Firestore. Tanpa Firebase, seed
+  /// demo tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final items = await SkinService.listSkinDailies(uid);
+      if (items.isEmpty || !mounted) return;
+      setState(() {
+        _entries = items.map((m) {
+          final symptoms =
+              (m['symptoms'] as List?)?.cast<String>() ?? const <String>[];
+          final locations =
+              (m['locations'] as List?)?.cast<String>() ?? const <String>[];
+          final status = (m['status'] as String?) ?? 'Baik';
+          final preview =
+              symptoms.isEmpty ? status : symptoms.join('  ');
+          return DailyHistoryEntry(
+            date: (m['dateDisplay'] as String?) ?? '',
+            status: status,
+            previewText: preview,
+            locations: locations,
+            symptoms: symptoms,
+            sleepTime: (m['jamTidur'] as String?) ?? '-',
+            waterGlasses: '${(m['air'] as String?) ?? '0'} gelas',
+            food: (m['makanan'] as String?) ?? '-',
+            activity: (m['aktivitas'] as String?) ?? '-',
+            routinePagi: m['skincarePagi'] as bool? ?? false,
+            routineMalam: m['skincareMalam'] as bool? ?? false,
+          );
+        }).toList();
+        _expandedIndices.clear();
+        if (_entries.isNotEmpty) _expandedIndices.add(0);
+      });
+    } catch (_) {
+      // riwayat tetap menampilkan seed demo bila query gagal
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
