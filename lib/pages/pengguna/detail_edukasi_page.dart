@@ -256,6 +256,7 @@ class DetailEdukasiPenggunaPage extends StatelessWidget {
     }
 
     // Default card for other articles
+    final body = article.content.isNotEmpty ? article.content : article.snippet;
     return Container(
       padding: const EdgeInsets.all(18.0),
       decoration: BoxDecoration(
@@ -277,7 +278,7 @@ class DetailEdukasiPenggunaPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            article.snippet,
+            body,
             style: const TextStyle(
               fontSize: 13.5,
               color: bodyTextColor,
