@@ -3,6 +3,10 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../models/admin_user_model.dart';
+import '../../services/activity_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/user_service.dart';
 
 class DetailPenggunaPage extends StatefulWidget {
   final AdminUserModel user;
@@ -31,6 +35,19 @@ class _DetailPenggunaPageState extends State<DetailPenggunaPage> {
     _user = widget.user;
   }
 
+  Future<void> _persistStatus(AdminUserModel updated) async {
+    if (!Backend.useFirebase) return;
+    await UserService.updatePenggunaStatus(updated);
+    await ActivityService.log(
+      title: updated.status == UserStatus.ditangguhkan
+          ? 'Menangguhkan pengguna ${updated.name}'
+          : 'Mengaktifkan kembali pengguna ${updated.name}',
+      tag: 'Verifikasi',
+      actor: 'Admin',
+      actorUid: AuthService.uid ?? 'admin',
+    );
+  }
+
   void _onTangguhkan() {
     AdminConfirmDialog.show(
       context,
@@ -38,15 +55,35 @@ class _DetailPenggunaPageState extends State<DetailPenggunaPage> {
       message: 'Apakah Anda yakin ingin menangguhkan pengguna ini?',
       confirmLabel: 'Tangguhkan',
       confirmColor: const Color(0xFFEF4444),
-      onConfirm: () {
+      onConfirm: () async {
         final updatedUser = _user.copyWith(status: UserStatus.ditangguhkan);
+        try {
+          await _persistStatus(updatedUser);
+        } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Gagal memperbarui status: $e')),
+          );
+          return;
+        }
+        if (!mounted) return;
         Navigator.pop(context, updatedUser);
       },
     );
   }
 
-  void _onAktifkanKembali() {
+  Future<void> _onAktifkanKembali() async {
     final updatedUser = _user.copyWith(status: UserStatus.aktif);
+    try {
+      await _persistStatus(updatedUser);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memperbarui status: $e')),
+      );
+      return;
+    }
+    if (!mounted) return;
     Navigator.pop(context, updatedUser);
   }
 
