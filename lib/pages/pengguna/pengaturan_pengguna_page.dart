@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/user_service.dart';
 
 class PengaturanPenggunaPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
@@ -30,6 +33,30 @@ class _PengaturanPenggunaPageState extends State<PengaturanPenggunaPage> {
     super.initState();
     _morningReminderController = TextEditingController();
     _eveningReminderController = TextEditingController();
+    _loadFromBackend();
+  }
+
+  /// Pengaturan milik pengguna dari Firestore. Tanpa Firebase, seed demo
+  /// tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final profile = await UserService.loadByUid(uid);
+      if (profile == null || !mounted) return;
+      setState(() {
+        _notificationsEnabled = profile.notificationsEnabled;
+        if (profile.morningReminder.isNotEmpty) {
+          _morningReminderController.text = profile.morningReminder;
+        }
+        if (profile.eveningReminder.isNotEmpty) {
+          _eveningReminderController.text = profile.eveningReminder;
+        }
+      });
+    } catch (_) {
+      // pengaturan tetap memakai nilai default bila query gagal
+    }
   }
 
   @override
@@ -67,7 +94,24 @@ class _PengaturanPenggunaPageState extends State<PengaturanPenggunaPage> {
     }
   }
 
-  void _saveSettings() {
+  Future<void> _saveSettings() async {
+    if (Backend.useFirebase && AuthService.uid != null) {
+      try {
+        await UserService.updateSettings(
+          AuthService.uid!,
+          notificationsEnabled: _notificationsEnabled,
+          morningReminder: _morningReminderController.text.trim(),
+          eveningReminder: _eveningReminderController.text.trim(),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menyimpan pengaturan: $e')),
+        );
+        return;
+      }
+    }
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Pengaturan berhasil disimpan'),
