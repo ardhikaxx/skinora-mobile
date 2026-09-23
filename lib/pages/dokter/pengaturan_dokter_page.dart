@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/user_service.dart';
 
 class PengaturanDokterPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
@@ -22,6 +25,50 @@ class _PengaturanDokterPageState extends State<PengaturanDokterPage> {
   static const Color darkText = Color(0xFF1E1E1E);
 
   bool _isNotificationActive = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  /// Muat settings dari Firestore. Tanpa Firebase, default UI tetap dipakai.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final profile = await UserService.loadByUid(uid);
+      if (profile == null || !mounted) return;
+      setState(() {
+        _isNotificationActive = profile.notificationsEnabled;
+      });
+    } catch (_) {
+      // biarkan default bila query gagal
+    }
+  }
+
+  Future<void> _handleSave() async {
+    if (Backend.useFirebase) {
+      final uid = AuthService.uid;
+      if (uid != null) {
+        try {
+          await UserService.updateSettings(
+            uid,
+            notificationsEnabled: _isNotificationActive,
+          );
+        } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Gagal menyimpan pengaturan: $e')),
+          );
+          return;
+        }
+      }
+    }
+    if (!mounted) return;
+    _showSuccessDialog();
+  }
 
   void _showSuccessDialog() {
     showDialog<void>(
@@ -269,7 +316,7 @@ class _PengaturanDokterPageState extends State<PengaturanDokterPage> {
                     width: double.infinity,
                     height: 46,
                     child: ElevatedButton.icon(
-                      onPressed: _showSuccessDialog,
+                      onPressed: _handleSave,
                       icon: const Icon(
                         LucideIcons.save,
                         size: 18,
