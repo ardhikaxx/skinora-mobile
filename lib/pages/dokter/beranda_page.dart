@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/consultation_service.dart';
+import '../../services/notification_service.dart';
+import '../../services/schedule_service.dart';
+import '../../services/user_service.dart';
+import '../../utils/app_dates.dart';
 import 'patient_insight_page.dart';
 import 'notifikasi_dokter_page.dart';
 
-class BerandaDokterPage extends StatelessWidget {
+class BerandaDokterPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
 
   const BerandaDokterPage({
@@ -11,11 +18,100 @@ class BerandaDokterPage extends StatelessWidget {
     this.onNavigateTab,
   });
 
+  @override
+  State<BerandaDokterPage> createState() => _BerandaDokterPageState();
+}
+
+class _BerandaDokterPageState extends State<BerandaDokterPage> {
   static const Color primaryMaroon = Color(0xFF8B2B38);
   static const Color darkText = Color(0xFF3F141E);
   static const Color subText = Color(0xFF8E8E93);
   static const Color statSectionBg = Color(0xFFFFD5C3);
   static const Color bookedSlotBg = Color(0xFFFFBCAE);
+
+  String _greetingName = 'dr. Anita Dewi, Sp.KK';
+  String _specialization = 'Estetika Kulit';
+  int _unreadNotif = 1;
+
+  String _statHariIni = '2';
+  String _statMenunggu = '1';
+  String _statSelesai = '1';
+
+  List<Map<String, String>> _todaySlots = const [
+    {'time': '09:00 - 09:30', 'status': 'Tersedia', 'badge': 'Kosong', 'booked': 'false'},
+    {'time': '09:30 - 10:00', 'status': 'Terjadwal', 'badge': 'Terjadwal', 'booked': 'true', 'bookedBy': 'Dibooking oleh user-4'},
+    {'time': '10:00 - 10:30', 'status': 'Terjadwal', 'badge': 'Terjadwal', 'booked': 'true', 'bookedBy': 'Dibooking oleh user-3'},
+  ];
+
+  ValueChanged<int>? get onNavigateTab => widget.onNavigateTab;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final results = await Future.wait<Object?>([
+        UserService.loadByUid(uid),
+        ConsultationService.listForDoctor(uid),
+        ScheduleService.listSlots(uid),
+        NotificationService.countUnread(NotificationService.userAudience(uid)),
+      ]);
+      final profile = results[0] as dynamic;
+      final consults = results[1] as List<Map<String, dynamic>>?;
+      final slots = results[2] as List<SlotRecord>?;
+      final unread = results[3] as int?;
+
+      if (!mounted) return;
+      setState(() {
+        if (profile != null) {
+          final name = (profile.name as String?) ?? '';
+          if (name.isNotEmpty) _greetingName = name;
+          final spec = (profile.specialization as String?) ?? '';
+          if (spec.isNotEmpty) _specialization = spec;
+        }
+        if (unread != null && unread > 0) _unreadNotif = unread;
+        if (consults != null) {
+          final todayIso = AppDates.todayIso();
+          final todayCount = consults
+              .where((c) => ((c['dateIso'] as String?) ?? '') == todayIso)
+              .length;
+          final menunggu = consults
+              .where((c) => ((c['status'] as String?) ?? '') == 'terjadwal')
+              .length;
+          final selesai = consults
+              .where((c) => ((c['status'] as String?) ?? '') == 'selesai')
+              .length;
+          if (todayCount > 0) _statHariIni = '$todayCount';
+          if (menunggu > 0) _statMenunggu = '$menunggu';
+          if (selesai > 0) _statSelesai = '$selesai';
+        }
+        if (slots != null && slots.isNotEmpty) {
+          final todayIso = AppDates.todayIso();
+          final today = slots
+              .where((s) => s.dateIso == todayIso)
+              .take(3)
+              .map((s) => {
+                    'time': s.time,
+                    'status': s.isBooked ? 'Terjadwal' : 'Tersedia',
+                    'badge': s.isBooked ? 'Terjadwal' : 'Kosong',
+                    'booked': s.isBooked.toString(),
+                    if (s.isBooked && s.patientName != null)
+                      'bookedBy': 'Dibooking oleh ${s.patientName}',
+                  })
+              .toList();
+          if (today.isNotEmpty) _todaySlots = today;
+        }
+      });
+    } catch (_) {
+      // dashboard tetap menampilkan data demo bila query gagal
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,8 +153,8 @@ class BerandaDokterPage extends StatelessWidget {
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text(
+          children: [
+            const Text(
               'Selamat siang,',
               style: TextStyle(
                 fontSize: 13.5,
@@ -66,10 +162,10 @@ class BerandaDokterPage extends StatelessWidget {
                 fontWeight: FontWeight.w400,
               ),
             ),
-            SizedBox(height: 3),
+            const SizedBox(height: 3),
             Text(
-              'dr. Anita Dewi, Sp.KK',
-              style: TextStyle(
+              _greetingName,
+              style: const TextStyle(
                 fontFamily: 'serif',
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
@@ -77,10 +173,10 @@ class BerandaDokterPage extends StatelessWidget {
                 letterSpacing: -0.3,
               ),
             ),
-            SizedBox(height: 3),
+            const SizedBox(height: 3),
             Text(
-              'Estetika Kulit',
-              style: TextStyle(
+              _specialization,
+              style: const TextStyle(
                 fontSize: 13.0,
                 color: subText,
                 fontWeight: FontWeight.w400,
@@ -132,7 +228,7 @@ class BerandaDokterPage extends StatelessWidget {
                 ),
               ),
             ),
-            // Red badge with count "1"
+            // Red badge with unread count
             Positioned(
               top: -3,
               right: -3,
@@ -146,10 +242,10 @@ class BerandaDokterPage extends StatelessWidget {
                   minWidth: 18,
                   minHeight: 18,
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
-                    '1',
-                    style: TextStyle(
+                    '$_unreadNotif',
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
@@ -192,7 +288,7 @@ class BerandaDokterPage extends StatelessWidget {
               Expanded(
                 child: _buildStatCard(
                   icon: LucideIcons.messageSquare,
-                  count: '2',
+                  count: _statHariIni,
                   label: 'Hari Ini',
                 ),
               ),
@@ -200,7 +296,7 @@ class BerandaDokterPage extends StatelessWidget {
               Expanded(
                 child: _buildStatCard(
                   icon: LucideIcons.clock,
-                  count: '1',
+                  count: _statMenunggu,
                   label: 'Menunggu',
                 ),
               ),
@@ -208,7 +304,7 @@ class BerandaDokterPage extends StatelessWidget {
               Expanded(
                 child: _buildStatCard(
                   icon: LucideIcons.circleCheck,
-                  count: '1',
+                  count: _statSelesai,
                   label: 'Selesai',
                 ),
               ),
@@ -429,30 +525,30 @@ class BerandaDokterPage extends StatelessWidget {
           ),
           const SizedBox(height: 14),
 
-          // Slot 1: 09:00 - 09:30 (Tersedia / Kosong)
-          _buildAvailableSlotCard(
-            time: '09:00 - 09:30',
-            status: 'Tersedia',
-            badgeText: 'Kosong',
-          ),
-          const SizedBox(height: 12),
-
-          // Slot 2: 09:30 - 10:00 (Dibooking oleh user-4 / Terjadwal)
-          _buildBookedSlotCard(
-            time: '09:30 - 10:00',
-            bookedBy: 'Dibooking oleh user-4',
-            status: 'Terjadwal',
-            onTap: () => onNavigateTab?.call(2),
-          ),
-          const SizedBox(height: 12),
-
-          // Slot 3: 10:00 - 10:30 (Dibooking oleh user-3 / Terjadwal)
-          _buildBookedSlotCard(
-            time: '10:00 - 10:30',
-            bookedBy: 'Dibooking oleh user-3',
-            status: 'Terjadwal',
-            onTap: () => onNavigateTab?.call(2),
-          ),
+          // Dynamic slots for today (demo seed when backend empty)
+          ..._todaySlots.asMap().entries.map((entry) {
+            final slot = entry.value;
+            final isBooked = slot['booked'] == 'true';
+            if (isBooked) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: _buildBookedSlotCard(
+                  time: slot['time'] ?? '',
+                  bookedBy: slot['bookedBy'] ?? 'Dibooking oleh pasien',
+                  status: slot['status'] ?? 'Terjadwal',
+                  onTap: () => onNavigateTab?.call(2),
+                ),
+              );
+            }
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: _buildAvailableSlotCard(
+                time: slot['time'] ?? '',
+                status: slot['status'] ?? 'Tersedia',
+                badgeText: slot['badge'] ?? 'Kosong',
+              ),
+            );
+          }),
         ],
       ),
     );
