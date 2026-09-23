@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/consultation_service.dart';
 import 'riwayat_ruang_konsultasi_page.dart';
 
 enum ConsultationStatus {
@@ -53,7 +56,7 @@ class _RiwayatKonsultasiPenggunaPageState
   static const Color badgeSelesaiText = Color(0xFF6B5E5E);
   static const Color badgeSelesaiBorder = Color(0xFFE5E5EA);
 
-  final List<UserConsultationHistoryModel> _historyList = const [
+  List<UserConsultationHistoryModel> _historyList = const [
     UserConsultationHistoryModel(
       id: '1',
       doctorName: 'dr. Anita Dewi, Sp.KK',
@@ -112,6 +115,49 @@ class _RiwayatKonsultasiPenggunaPageState
           'Sesi konsultasi tindak lanjut persiapan perawatan rutin bulanan.',
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  /// Riwayat konsultasi milik pasien dari Firestore. Tanpa Firebase, seed
+  /// demo tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final items = await ConsultationService.listForPatient(uid);
+      if (items.isEmpty || !mounted) return;
+      setState(() {
+        _historyList = items.map((m) {
+          final rawDate = (m['scheduleDate'] as String?) ?? '';
+          final rawTime = (m['scheduleTime'] as String?) ?? '';
+          final dateIso = (m['dateIso'] as String?) ?? '';
+          final datePart =
+              rawDate.isNotEmpty ? rawDate : (dateIso.isNotEmpty ? dateIso : '-');
+          final status = ((m['status'] as String?) ?? '') == 'selesai'
+              ? ConsultationStatus.selesai
+              : ConsultationStatus.terjadwal;
+          return UserConsultationHistoryModel(
+            id: (m['id'] as String?) ?? '',
+            doctorName: (m['doctorName'] as String?) ?? '',
+            specialization: (m['specialization'] as String?) ?? '',
+            dateTime: rawTime.isEmpty
+                ? datePart
+                : '$datePart - $rawTime',
+            status: status,
+            diagnosis: m['diagnosis'] as String?,
+            notes: m['notes'] as String?,
+          );
+        }).toList();
+      });
+    } catch (_) {
+      // riwayat tetap menampilkan seed demo bila query gagal
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -226,6 +272,7 @@ class _RiwayatKonsultasiPenggunaPageState
                   status: item.status == ConsultationStatus.terjadwal
                       ? 'Terjadwal'
                       : 'Selesai',
+                  consultationId: item.id,
                   onNavigateTab: widget.onNavigateTab,
                 ),
               ),
