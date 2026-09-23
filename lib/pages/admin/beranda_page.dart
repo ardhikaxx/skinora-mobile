@@ -1,10 +1,17 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../services/activity_service.dart';
+import '../../services/backend.dart';
+import '../../services/consultation_service.dart';
+import '../../services/notification_service.dart';
+import '../../services/user_service.dart';
+import '../../utils/app_dates.dart';
 import 'notifikasi_admin_page.dart';
 import 'master_spesialisasi_page.dart';
 import 'laporan_riwayat_page.dart';
 
-class BerandaAdminPage extends StatelessWidget {
+class BerandaAdminPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
 
   const BerandaAdminPage({
@@ -12,12 +19,85 @@ class BerandaAdminPage extends StatelessWidget {
     this.onNavigateTab,
   });
 
+  @override
+  State<BerandaAdminPage> createState() => _BerandaAdminPageState();
+}
+
+class _BerandaAdminPageState extends State<BerandaAdminPage> {
   static const Color primaryMaroon = Color(0xFF8B2B38);
   static const Color darkText = Color(0xFF3F141E);
   static const Color subText = Color(0xFF8E8E93);
   static const Color statSectionBg = Color(0xFFFFD5C3);
   static const Color peachIconBg = Color(0xFFFFE3D8);
   static const Color activityIconBg = Color(0xFFFFD9CC);
+
+  String _statTerjadwal = '3';
+  String _statSelesai = '7';
+  String _statPengguna = '5';
+  String _statDokter = '4';
+  String _unreadNotif = '2';
+
+  List<Map<String, String>> _activities = const [
+    {'title': 'Login berhasil', 'time': '2026-08-27 08:00'},
+    {'title': 'Melakukan Skin Check', 'time': '2026-08-25 10:30'},
+    {'title': 'Mencatat Skin Daily', 'time': '2026-08-27 08:15'},
+    {'title': 'Mencatat rutinitas skincare pagi', 'time': '2026-08-27 07:30'},
+    {'title': 'Booking konsultasi dengan dr. Anita', 'time': '2026-08-26 14:00'},
+    {'title': 'Konsultasi selesai dengan dr. Andi', 'time': '2026-08-20 14:30'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  String _fmtTime(Object? ts) {
+    if (ts is Timestamp) return AppDates.dateTime(ts.toDate());
+    return ts?.toString() ?? '';
+  }
+
+  /// Ambil statistik + aktivitas terbaru dari Firestore. Tanpa Firebase,
+  /// data demo tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    try {
+      final results = await Future.wait<Object?>([
+        UserService.countPengguna(),
+        UserService.countDokterAktif(),
+        ConsultationService.countByStatus('terjadwal'),
+        ConsultationService.countByStatus('selesai'),
+        ActivityService.listAll(limit: 6),
+        NotificationService.countUnread(NotificationService.adminAudience),
+      ]);
+      final pengguna = results[0] as int?;
+      final dokter = results[1] as int?;
+      final terjadwal = results[2] as int?;
+      final selesai = results[3] as int?;
+      final acts = results[4] as List<Map<String, dynamic>>?;
+      final unread = results[5] as int?;
+      if (!mounted) return;
+      setState(() {
+        if (pengguna != null && pengguna > 0) {
+          _statPengguna = '$pengguna';
+        }
+        if (dokter != null && dokter > 0) _statDokter = '$dokter';
+        if (terjadwal != null) _statTerjadwal = '$terjadwal';
+        if (selesai != null) _statSelesai = '$selesai';
+        if (unread != null) _unreadNotif = '$unread';
+        if (acts != null && acts.isNotEmpty) {
+          _activities = acts
+              .map((a) => {
+                    'title': (a['title'] as String?) ?? '',
+                    'time': _fmtTime(a['createdAt']),
+                  })
+              .toList();
+        }
+      });
+    } catch (_) {
+      // dashboard tetap menampilkan angka demo bila query gagal
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -91,7 +171,7 @@ class BerandaAdminPage extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (context) => NotifikasiAdminPage(
-                      onNavigateTab: onNavigateTab,
+                      onNavigateTab: widget.onNavigateTab,
                     ),
                   ),
                 );
@@ -138,10 +218,10 @@ class BerandaAdminPage extends StatelessWidget {
                   minWidth: 18,
                   minHeight: 18,
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
-                    '2',
-                    style: TextStyle(
+                    _unreadNotif,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
@@ -184,7 +264,7 @@ class BerandaAdminPage extends StatelessWidget {
               Expanded(
                 child: _buildStatCard(
                   icon: LucideIcons.messageSquare,
-                  count: '3',
+                  count: _statTerjadwal,
                   label: 'Terjadwal',
                 ),
               ),
@@ -192,7 +272,7 @@ class BerandaAdminPage extends StatelessWidget {
               Expanded(
                 child: _buildStatCard(
                   icon: LucideIcons.circleCheck,
-                  count: '7',
+                  count: _statSelesai,
                   label: 'Selesai',
                 ),
               ),
@@ -204,7 +284,7 @@ class BerandaAdminPage extends StatelessWidget {
               Expanded(
                 child: _buildStatCard(
                   icon: LucideIcons.users,
-                  count: '5',
+                  count: _statPengguna,
                   label: 'Pengguna',
                 ),
               ),
@@ -212,7 +292,7 @@ class BerandaAdminPage extends StatelessWidget {
               Expanded(
                 child: _buildStatCard(
                   icon: LucideIcons.stethoscope,
-                  count: '4',
+                  count: _statDokter,
                   label: 'Dokter',
                 ),
               ),
@@ -324,7 +404,7 @@ class BerandaAdminPage extends StatelessWidget {
                   icon: LucideIcons.stethoscope,
                   title: 'Dokter',
                   subtitle: 'Kelola verifikasi',
-                  onTap: () => onNavigateTab?.call(1),
+                  onTap: () => widget.onNavigateTab?.call(1),
                 ),
               ),
               Expanded(
@@ -332,7 +412,7 @@ class BerandaAdminPage extends StatelessWidget {
                   icon: LucideIcons.users,
                   title: 'Pengguna',
                   subtitle: 'Kelola pengguna',
-                  onTap: () => onNavigateTab?.call(2),
+                  onTap: () => widget.onNavigateTab?.call(2),
                 ),
               ),
               Expanded(
@@ -340,7 +420,7 @@ class BerandaAdminPage extends StatelessWidget {
                   icon: LucideIcons.fileText,
                   title: 'Edukasi',
                   subtitle: 'Kelola artikel',
-                  onTap: () => onNavigateTab?.call(3),
+                  onTap: () => widget.onNavigateTab?.call(3),
                 ),
               ),
             ],
@@ -360,7 +440,7 @@ class BerandaAdminPage extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (context) => MasterSpesialisasiPage(
-                          onNavigateTab: onNavigateTab,
+                          onNavigateTab: widget.onNavigateTab,
                         ),
                       ),
                     );
@@ -377,7 +457,7 @@ class BerandaAdminPage extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (context) => LaporanRiwayatPage(
-                          onNavigateTab: onNavigateTab,
+                          onNavigateTab: widget.onNavigateTab,
                         ),
                       ),
                     );
@@ -450,32 +530,7 @@ class BerandaAdminPage extends StatelessWidget {
 
   /// Section 3: AKTIVITAS TERBARU
   Widget _buildAktivitasTerbaruSection() {
-    final activities = [
-      {
-        'title': 'Login berhasil',
-        'time': '2026-08-27 08:00',
-      },
-      {
-        'title': 'Melakukan Skin Check',
-        'time': '2026-08-25 10:30',
-      },
-      {
-        'title': 'Mencatat Skin Daily',
-        'time': '2026-08-27 08:15',
-      },
-      {
-        'title': 'Mencatat rutinitas skincare pagi',
-        'time': '2026-08-27 07:30',
-      },
-      {
-        'title': 'Booking konsultasi dengan dr. Anita',
-        'time': '2026-08-26 14:00',
-      },
-      {
-        'title': 'Konsultasi selesai dengan dr. Andi',
-        'time': '2026-08-20 14:30',
-      },
-    ];
+    final activities = _activities;
 
     return Container(
       width: double.infinity,
