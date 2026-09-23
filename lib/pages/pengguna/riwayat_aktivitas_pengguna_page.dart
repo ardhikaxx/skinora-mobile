@@ -1,6 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../services/activity_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../utils/app_dates.dart';
 
 class ActivityItem {
   final String title;
@@ -12,7 +17,7 @@ class ActivityItem {
   });
 }
 
-class RiwayatAktivitasPenggunaPage extends StatelessWidget {
+class RiwayatAktivitasPenggunaPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
 
   const RiwayatAktivitasPenggunaPage({
@@ -20,6 +25,13 @@ class RiwayatAktivitasPenggunaPage extends StatelessWidget {
     this.onNavigateTab,
   });
 
+  @override
+  State<RiwayatAktivitasPenggunaPage> createState() =>
+      _RiwayatAktivitasPenggunaPageState();
+}
+
+class _RiwayatAktivitasPenggunaPageState
+    extends State<RiwayatAktivitasPenggunaPage> {
   static const Color primaryMaroon = Color(0xFF8B2B38);
   static const Color darkText = Color(0xFF3F141E);
   static const Color subText = Color(0xFF8E8E93);
@@ -28,7 +40,7 @@ class RiwayatAktivitasPenggunaPage extends StatelessWidget {
   static const Color iconBadgeBg = Color(0xFFFFECEB);
   static const Color iconColor = Color(0xFFD9534F);
 
-  static const List<ActivityItem> activities = [
+  List<ActivityItem> activities = const [
     ActivityItem(
       title: 'Mencatat Skin Daily',
       timestamp: '2026-08-27 08:15',
@@ -58,6 +70,40 @@ class RiwayatAktivitasPenggunaPage extends StatelessWidget {
       timestamp: '2026-08-20 14:30',
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  String _fmtTime(Object? ts) {
+    if (ts is Timestamp) return AppDates.dateTime(ts.toDate());
+    return ts?.toString() ?? '';
+  }
+
+  /// Riwayat aktivitas milik pengguna dari Firestore. Tanpa Firebase, seed
+  /// demo tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final items = await ActivityService.listMine(uid);
+      if (!mounted) return;
+      setState(() {
+        if (items.isEmpty) return;
+        activities = items
+            .map((m) => ActivityItem(
+                  title: (m['title'] as String?) ?? '',
+                  timestamp: _fmtTime(m['createdAt']),
+                ))
+            .toList();
+      });
+    } catch (_) {
+      // biarkan seed demo bila query gagal
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -211,7 +257,7 @@ class RiwayatAktivitasPenggunaPage extends StatelessWidget {
         onTap: (index) {
           Navigator.popUntil(context, (route) => route.isFirst);
           if (index != 4) {
-            onNavigateTab?.call(index);
+            widget.onNavigateTab?.call(index);
           }
         },
       ),
