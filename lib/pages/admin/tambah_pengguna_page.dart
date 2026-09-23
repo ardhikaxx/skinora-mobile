@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../models/admin_user_model.dart';
+import '../../services/backend.dart';
+import '../../services/user_service.dart';
 
 class TambahPenggunaPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
@@ -37,7 +39,7 @@ class _TambahPenggunaPageState extends State<TambahPenggunaPage> {
     super.dispose();
   }
 
-  void _handleSubmit() {
+  Future<void> _handleSubmit() async {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
 
@@ -63,7 +65,7 @@ class _TambahPenggunaPageState extends State<TambahPenggunaPage> {
       return;
     }
 
-    final newUser = AdminUserModel(
+    var newUser = AdminUserModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name,
       email: email,
@@ -73,11 +75,25 @@ class _TambahPenggunaPageState extends State<TambahPenggunaPage> {
       address: _addressController.text.trim().isEmpty
           ? 'Jl. Sudirman, Jakarta'
           : _addressController.text.trim(),
-      birthDate: '1998-05-20',
+      birthDate: '',
       gender: _selectedGender,
       status: UserStatus.aktif,
     );
 
+    // Tulis ke Firestore (pre-provision — password tidak disimpan di database).
+    if (Backend.useFirebase) {
+      try {
+        newUser = await UserService.createPengguna(newUser);
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menambah pengguna: $e')),
+        );
+        return;
+      }
+    }
+
+    if (!mounted) return;
     Navigator.pop(context, newUser);
   }
 
