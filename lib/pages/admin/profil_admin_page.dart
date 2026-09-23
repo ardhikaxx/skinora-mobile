@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/dialogs/logout_dialog.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/consultation_service.dart';
+import '../../services/user_service.dart';
 import 'edit_profil_admin_page.dart';
 import 'laporan_riwayat_page.dart';
 import 'pengaturan_admin_page.dart';
@@ -28,12 +32,17 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
   static const Color labelText = Color(0xFF8E8E93);
   static const Color badgeBg = Color(0xFFFFD5C8);
 
-  // Profile data
+  // Profile data (default demo — diganti dari Firestore bila Firebase aktif)
   String _nama = 'Admin Skinora';
-  final String _email = 'admin@demo.com';
+  String _email = 'admin@demo.com';
   String _telepon = '081234567899';
   String _alamat = 'Jl. Teknologi No. 1, Jakarta';
-  final String _tanggalLahir = '1985-01-01';
+  String _tanggalLahir = '1985-01-01';
+
+  // Ringkasan platform (default demo)
+  String _statPengguna = '5';
+  String _statDokter = '4';
+  String _statKonsultasi = '13';
 
   // Helper to extract initials (e.g., Admin Skinora -> AS)
   String get _initials {
@@ -43,6 +52,50 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
       return parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
     }
     return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  String _pick(Object? v, String fallback) {
+    final s = (v as String?) ?? '';
+    return s.isEmpty ? fallback : s;
+  }
+
+  /// Muat profile admin + statistik ringkasan. Tanpa Firebase, data demo
+  /// tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    try {
+      final results = await Future.wait<Object?>([
+        AuthService.loadProfile(),
+        UserService.countPengguna(),
+        UserService.countDokterAktif(),
+        ConsultationService.countAll(),
+      ]);
+      final profile = results[0] as dynamic;
+      final pengguna = results[1] as int?;
+      final dokter = results[2] as int?;
+      final konsultasi = results[3] as int?;
+      if (!mounted) return;
+      setState(() {
+        if (profile != null) {
+          _nama = _pick(profile.name, _nama);
+          _email = _pick(profile.email, _email);
+          _telepon = _pick(profile.phone, _telepon);
+          _alamat = _pick(profile.address, _alamat);
+          _tanggalLahir = _pick(profile.birthDate, _tanggalLahir);
+        }
+        if (pengguna != null && pengguna > 0) _statPengguna = '$pengguna';
+        if (dokter != null && dokter > 0) _statDokter = '$dokter';
+        if (konsultasi != null) _statKonsultasi = '$konsultasi';
+      });
+    } catch (_) {
+      // profil tetap memakai nilai demo bila gagal
+    }
   }
 
   @override
@@ -262,7 +315,7 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
               Expanded(
                 child: _buildPlatformStatCard(
                   icon: LucideIcons.users,
-                  count: '5',
+                  count: _statPengguna,
                   label: 'Pengguna',
                   onTap: () => widget.onNavigateTab?.call(2),
                 ),
@@ -273,7 +326,7 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
               Expanded(
                 child: _buildPlatformStatCard(
                   icon: LucideIcons.stethoscope,
-                  count: '4',
+                  count: _statDokter,
                   label: 'Dokter',
                   onTap: () => widget.onNavigateTab?.call(1),
                 ),
@@ -284,7 +337,7 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
               Expanded(
                 child: _buildPlatformStatCard(
                   icon: LucideIcons.barChart2,
-                  count: '13',
+                  count: _statKonsultasi,
                   label: 'Konsultasi',
                   onTap: () {
                     Navigator.push(
