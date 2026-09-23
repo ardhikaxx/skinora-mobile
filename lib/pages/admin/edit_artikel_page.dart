@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../models/admin_article_model.dart';
+import '../../services/article_service.dart';
+import '../../services/backend.dart';
 
 class EditArtikelPage extends StatefulWidget {
   final AdminArticleModel article;
@@ -44,7 +46,7 @@ class _EditArtikelPageState extends State<EditArtikelPage> {
     super.dispose();
   }
 
-  void _handleSave() {
+  Future<void> _handleSave() async {
     final title = _titleController.text.trim();
     final category = _categoryController.text.trim();
     final content = _contentController.text.trim();
@@ -76,6 +78,19 @@ class _EditArtikelPageState extends State<EditArtikelPage> {
       status: _selectedStatus,
     );
 
+    if (Backend.useFirebase) {
+      try {
+        await ArticleService.update(updatedArticle);
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menyimpan artikel: $e')),
+        );
+        return;
+      }
+    }
+
+    if (!mounted) return;
     Navigator.pop(context, updatedArticle);
   }
 
