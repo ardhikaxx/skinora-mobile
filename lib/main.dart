@@ -1,4 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'firebase_options.dart';
+import 'services/auth_service.dart';
 import 'pages/auth/login_page.dart';
 import 'pages/auth/register_page.dart';
 import 'pages/admin/admin_main_page.dart';
@@ -69,24 +74,88 @@ import 'pages/pengguna/skincare_page.dart';
 import 'pages/pengguna/riwayat_skincare_page.dart';
 import 'pages/pengguna/riwayat_aktivitas_pengguna_page.dart';
 
-void main() {
+import 'dart:async';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Firebase Authentication (Email & Password) + Cloud Firestore.
+  // Bila init gagal (platform belum terdaftar / konfigurasi belum ada),
+  // aplikasi tetap berjalan dalam mode demo (lihat services/backend.dart).
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    debugPrint('Firebase.initializeApp gagal: $e');
+  }
+
+  // Uji lokal terhadap Firebase Emulator:
+  // flutter run --dart-define=FIREBASE_EMULATOR=true
+  if (const bool.fromEnvironment('FIREBASE_EMULATOR')) {
+    try {
+      await FirebaseAuth.instance.useAuthEmulator('127.0.0.1', 9099);
+      FirebaseFirestore.instance.useFirestoreEmulator('127.0.0.1', 8080);
+      debugPrint('Firebase emulator aktif (auth:9099, firestore:8080)');
+    } catch (e) {
+      debugPrint('Gagal mengaktifkan emulator: $e');
+    }
+  }
+
   runApp(const SkinoraApp());
 }
 
-class SkinoraApp extends StatelessWidget {
+/// Navigator global — dipakai listener auth state (sumber status login).
+final GlobalKey<NavigatorState> rootNavigatorKey =
+    GlobalKey<NavigatorState>();
+
+class SkinoraApp extends StatefulWidget {
   const SkinoraApp({super.key});
 
   static const Color brandColor = Color(0xFFB23A48);
+
+  @override
+  State<SkinoraApp> createState() => _SkinoraAppState();
+}
+
+class _SkinoraAppState extends State<SkinoraApp> {
+  StreamSubscription<User?>? _authSub;
+  bool _seenAuthenticated = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auth state adalah source of truth: saat sesi berakhir (logout dari
+    // luar / token kedaluwarsa / akun dihapus) kembali ke halaman login.
+    _authSub = AuthService.authStateChanges.listen((user) {
+      if (user != null) {
+        _seenAuthenticated = true;
+        return;
+      }
+      if (!_seenAuthenticated) return;
+      _seenAuthenticated = false;
+      final nav = rootNavigatorKey.currentState;
+      if (nav == null) return;
+      nav.pushNamedAndRemoveUntil('/login', (route) => false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Skinora App',
       debugShowCheckedModeBanner: false,
+      navigatorKey: rootNavigatorKey,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: brandColor,
-          primary: brandColor,
+          seedColor: SkinoraApp.brandColor,
+          primary: SkinoraApp.brandColor,
         ),
         useMaterial3: true,
         scaffoldBackgroundColor: const Color(0xFFFCFCFD),
