@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/navbottom/admin_navbottom.dart';
+import '../../services/backend.dart';
+import '../../services/specialization_service.dart';
 import 'edit_spesialisasi_page.dart';
 import 'tambah_spesialisasi_page.dart';
 
@@ -50,6 +52,47 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
     SpesialisasiModel(id: '6', name: 'Dermatitis', isActive: true),
     SpesialisasiModel(id: '7', name: 'Infeksi Kulit', isActive: false),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  /// Ambil master spesialisasi dari Firestore. Tanpa Firebase, daftar demo
+  /// tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    try {
+      final records = await SpecializationService.list();
+      if (records.isEmpty || !mounted) return;
+      setState(() {
+        _specializations
+          ..clear()
+          ..addAll(records.map((r) => SpesialisasiModel(
+                id: r.id,
+                name: r.name,
+                isActive: r.isActive,
+              )));
+      });
+    } catch (_) {
+      // daftar tetap menampilkan seed demo bila query gagal
+    }
+  }
+
+  Future<void> _guard(Future<void> Function() action, String failMessage) async {
+    if (!Backend.useFirebase) return;
+    try {
+      await action();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$failMessage: $e')),
+        );
+      }
+      rethrow;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -331,6 +374,15 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
       ),
     );
     if (result != null && result.isNotEmpty && mounted) {
+      try {
+        await _guard(
+          () => SpecializationService.create(result),
+          'Gagal menambah spesialisasi',
+        );
+      } catch (_) {
+        return;
+      }
+      if (!mounted) return;
       setState(() {
         _specializations.add(
           SpesialisasiModel(
@@ -358,6 +410,15 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
       ),
     );
     if (result != null && result.isNotEmpty && mounted) {
+      try {
+        await _guard(
+          () => SpecializationService.rename(item.id, result),
+          'Gagal memperbarui spesialisasi',
+        );
+      } catch (_) {
+        return;
+      }
+      if (!mounted) return;
       setState(() {
         item.name = result;
       });
@@ -376,7 +437,16 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
         message: 'Nonaktifkan "${item.name}"?',
         confirmLabel: 'Nonaktifkan',
         confirmColor: const Color(0xFFEF4444),
-        onConfirm: () {
+        onConfirm: () async {
+          try {
+            await _guard(
+              () => SpecializationService.setActive(item.id, false),
+              'Gagal mengubah status spesialisasi',
+            );
+          } catch (_) {
+            return;
+          }
+          if (!mounted) return;
           setState(() {
             item.isActive = false;
           });
@@ -393,7 +463,16 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
         message: 'Aktifkan "${item.name}"?',
         confirmLabel: 'Aktifkan',
         confirmColor: primaryMaroon,
-        onConfirm: () {
+        onConfirm: () async {
+          try {
+            await _guard(
+              () => SpecializationService.setActive(item.id, true),
+              'Gagal mengubah status spesialisasi',
+            );
+          } catch (_) {
+            return;
+          }
+          if (!mounted) return;
           setState(() {
             item.isActive = true;
           });
@@ -413,7 +492,16 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
       message: 'Hapus "${item.name}" secara permanen?',
       confirmLabel: 'Hapus',
       confirmColor: const Color(0xFFEF4444),
-      onConfirm: () {
+      onConfirm: () async {
+        try {
+          await _guard(
+            () => SpecializationService.delete(item.id),
+            'Gagal menghapus spesialisasi',
+          );
+        } catch (_) {
+          return;
+        }
+        if (!mounted) return;
         final name = item.name;
         setState(() {
           _specializations.removeWhere((el) => el.id == item.id);
