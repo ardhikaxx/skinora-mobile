@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/consultation_service.dart';
 
 class ConsultationChatMessage {
   final String id;
@@ -19,12 +22,14 @@ class ConsultationChatMessage {
 class RiwayatRuangKonsultasiPage extends StatefulWidget {
   final String doctorName;
   final String status;
+  final String? consultationId;
   final ValueChanged<int>? onNavigateTab;
 
   const RiwayatRuangKonsultasiPage({
     super.key,
     this.doctorName = 'dr. Anita Dewi, Sp.KK',
     this.status = 'Terjadwal',
+    this.consultationId,
     this.onNavigateTab,
   });
 
@@ -46,7 +51,7 @@ class _RiwayatRuangKonsultasiPageState
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  final List<ConsultationChatMessage> _messages = [
+  List<ConsultationChatMessage> _messages = [
     const ConsultationChatMessage(
       id: '1',
       text: 'Selamat pagi, Leonita. Ada yang bisa saya bantu hari ini?',
@@ -104,19 +109,74 @@ class _RiwayatRuangKonsultasiPageState
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  /// Pesan konsultasi dari Firestore. Tanpa Firebase, seed demo tetap
+  /// dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final consultationId = widget.consultationId;
+    if (consultationId == null || consultationId.isEmpty) return;
+    if (consultationId.contains(RegExp(r'^\d+$'))) return;
+    try {
+      final items = await ConsultationService.loadMessages(consultationId);
+      if (items.isEmpty || !mounted) return;
+      setState(() {
+        _messages = items.map((m) {
+          final senderRole = (m['senderRole'] as String?) ?? '';
+          return ConsultationChatMessage(
+            id: (m['id'] as String?) ?? '',
+            text: (m['text'] as String?) ?? '',
+            time: (m['time'] as String?) ?? '',
+            isFromUser: senderRole == 'user',
+          );
+        }).toList();
+      });
+    } catch (_) {
+      // chat tetap menampilkan seed demo bila query gagal
+    }
+  }
+
+  @override
   void dispose() {
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
 
     final now = DateTime.now();
     final timeStr =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+    final consultationId = widget.consultationId;
+    if (Backend.useFirebase &&
+        consultationId != null &&
+        consultationId.isNotEmpty) {
+      try {
+        await ConsultationService.sendMessage(
+          consultationId: consultationId,
+          senderId: AuthService.uid ?? 'user',
+          senderRole: 'user',
+          text: text,
+          time: timeStr,
+        );
+        _textController.clear();
+        return;
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengirim pesan: $e')),
+        );
+        return;
+      }
+    }
 
     setState(() {
       _messages.add(
