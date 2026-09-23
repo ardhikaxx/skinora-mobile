@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/consultation_service.dart';
 import 'detail_riwayat_konsultasi_page.dart';
 
 class HistoryChatMessage {
@@ -189,6 +192,77 @@ class _RiwayatKonsultasiPageState extends State<RiwayatKonsultasiPage> {
 
   List<ConsultationHistoryModel> get _historyList =>
       DoctorConsultationStore().history;
+
+  // id Firestore -> data mentah untuk load chat di detail.
+  final Map<String, Map<String, dynamic>> _backendMeta = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  /// Riwayat konsultasi selesai dari Firestore. Tanpa Firebase, seed demo
+  /// tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final items = await ConsultationService.listForDoctor(
+        uid,
+        includeFinished: true,
+      );
+      final finished =
+          items.where((m) => ((m['status'] as String?) ?? '') == 'selesai');
+      if (!mounted) return;
+      final list = <ConsultationHistoryModel>[];
+      for (final m in finished) {
+        final id = (m['id'] as String?) ?? '';
+        _backendMeta[id] = m;
+        var chat = const <HistoryChatMessage>[];
+        try {
+          final msgs = await ConsultationService.loadMessages(id);
+          chat = msgs
+              .map((x) => HistoryChatMessage(
+                    sender: ((x['senderRole'] as String?) ?? '') == 'dokter'
+                        ? 'Dokter'
+                        : 'Pasien',
+                    message: (x['text'] as String?) ?? '',
+                  ))
+              .toList();
+        } catch (_) {
+          // chat kosong = tampil default UI
+        }
+        final date = (m['dateIso'] as String?) ?? '';
+        final time = ((m['timeStart'] as String?) ?? '').isNotEmpty
+            ? '${m['timeStart']} - ${m['timeEnd']}'
+            : (m['scheduleTime'] as String?) ?? '';
+        list.add(ConsultationHistoryModel(
+          id: id,
+          patientName: (m['patientName'] as String?) ?? 'Pasien',
+          dateTime: date.isEmpty
+              ? ((m['scheduleDate'] as String?) ?? '')
+              : '$date • $time',
+          diagnosis: ((m['diagnosis'] as String?) ?? '').isEmpty
+              ? 'Hiperpigmentasi Pasca-Inflamasi (PIH)'
+              : (m['diagnosis'] as String?)!,
+          notes: ((m['notes'] as String?) ?? '').isEmpty
+              ? 'Rekomendasi serum Vitamin C pagi hari dan retinol ringan malam hari. Evaluasi dalam 4-6 minggu.'
+              : (m['notes'] as String?)!,
+          chatHistory: chat,
+        ));
+      }
+      if (list.isEmpty) return;
+      setState(() {
+        DoctorConsultationStore().history
+          ..clear()
+          ..addAll(list);
+      });
+    } catch (_) {
+      // biarkan seed demo bila query gagal
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
