@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../models/admin_article_model.dart';
+import '../../services/article_service.dart';
+import '../../services/backend.dart';
 
 class TambahArtikelPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
@@ -34,7 +36,7 @@ class _TambahArtikelPageState extends State<TambahArtikelPage> {
     super.dispose();
   }
 
-  void _handleSubmit() {
+  Future<void> _handleSubmit() async {
     final title = _titleController.text.trim();
     final category = _categoryController.text.trim();
     final content = _contentController.text.trim();
@@ -65,7 +67,7 @@ class _TambahArtikelPageState extends State<TambahArtikelPage> {
     final dateStr =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
 
-    final newArticle = AdminArticleModel(
+    var newArticle = AdminArticleModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: title,
       category: category,
@@ -74,6 +76,19 @@ class _TambahArtikelPageState extends State<TambahArtikelPage> {
       status: _selectedStatus,
     );
 
+    if (Backend.useFirebase) {
+      try {
+        newArticle = await ArticleService.create(newArticle);
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menyimpan artikel: $e')),
+        );
+        return;
+      }
+    }
+
+    if (!mounted) return;
     Navigator.pop(context, newArticle);
   }
 
