@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../services/activity_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/notification_service.dart';
+import '../dokter/dokter_main_page.dart';
 import '../pengguna/pengguna_main_page.dart';
 import 'login_page.dart';
 
@@ -22,12 +27,16 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
+  bool _busy = false;
 
-  void _handleRegister() {
+  /// Registrasi via Firebase Authentication Email & Password.
+  /// Hanya untuk pengguna (dan dokter yang sudah di-provision admin).
+  /// Admin tidak bisa register; dokter baru mewarisi role dari provision.
+  Future<void> _handleRegister() async {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final phone = _phoneController.text.trim();
-    final password = _passwordController.text.trim();
+    final password = _passwordController.text;
 
     if (name.isEmpty || email.isEmpty || phone.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -49,18 +58,68 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
-    // Registrasi berhasil -> langsung masuk ke halaman utama Pengguna
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Pendaftaran berhasil! Selamat datang, $name.'),
-        backgroundColor: primaryColor,
-      ),
-    );
+    if (!Backend.useFirebase) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Backend Firebase belum terkonfigurasi.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const PenggunaMainPage()),
-    );
+    setState(() => _busy = true);
+    try {
+      await AuthService.register(
+        name: name,
+        email: email,
+        phone: phone,
+        password: password,
+      );
+      final profile = await AuthService.loadProfile();
+      final role = profile?.role ?? 'pengguna';
+
+      await ActivityService.log(
+        title: 'Login berhasil',
+        tag: 'Login',
+        actor: name,
+        actorUid: profile?.uid ?? '',
+      );
+      await NotificationService.notifyAdmins(
+        title: 'User Baru',
+        description: '$name telah mendaftar sebagai pengguna baru',
+        iconKey: 'users',
+        type: 'user',
+        createdBy: profile?.uid ?? '',
+      );
+
+      if (!mounted) return;
+      // Registrasi berhasil -> langsung masuk ke shell sesuai role
+      // (hanya pengguna & dokter; admin tidak bisa register).
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Pendaftaran berhasil! Selamat datang, $name.'),
+          backgroundColor: primaryColor,
+        ),
+      );
+
+      final Widget home = role == 'dokter'
+          ? const DokterMainPage()
+          : const PenggunaMainPage();
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => home),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AuthService.describeAuthError(e)),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
   }
 
   @override
@@ -332,7 +391,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           width: double.infinity,
                           height: 48,
                           child: ElevatedButton(
-                            onPressed: _handleRegister,
+                            onPressed: _busy ? null : _handleRegister,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: primaryColor,
                               foregroundColor: Colors.white,
