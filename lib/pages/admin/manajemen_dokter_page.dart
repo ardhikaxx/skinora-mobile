@@ -3,6 +3,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../models/admin_doctor_model.dart';
+import '../../services/backend.dart';
+import '../../services/user_service.dart';
 import 'detail_dokter_page.dart';
 import 'tambah_dokter_page.dart';
 
@@ -87,6 +89,27 @@ class _ManajemenDokterPageState extends State<ManajemenDokterPage> {
       status: DoctorStatus.terverifikasi,
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  /// Ambil data dokter dari Firestore (admin). Tanpa Firebase, daftar demo
+  /// tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    try {
+      final doctors = await UserService.listDokter();
+      if (doctors.isEmpty || !mounted) return;
+      setState(() => _doctors
+        ..clear()
+        ..addAll(doctors));
+    } catch (_) {
+      // daftar tetap menampilkan seed demo bila query gagal
+    }
+  }
 
   @override
   void dispose() {
