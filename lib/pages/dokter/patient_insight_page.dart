@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/consultation_service.dart';
+import '../../services/skin_service.dart';
+import '../../services/user_service.dart';
+import '../../utils/app_dates.dart';
 import 'detail_patient_insight_page.dart';
 
 class PatientInsightModel {
@@ -81,6 +87,82 @@ class _PatientInsightPageState extends State<PatientInsightPage> {
       lastConsultation: '15 Agu 2026',
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  /// Daftar pasien dari konsultasi dokter. Tanpa Firebase, seed demo tetap
+  /// dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final consults = await ConsultationService.listForDoctor(
+        uid,
+        includeFinished: true,
+      );
+      final counts = <String, int>{};
+      final lastSeen = <String, String>{};
+      for (final c in consults) {
+        final pid = (c['patientId'] as String?) ?? '';
+        if (pid.isEmpty) continue;
+        counts[pid] = (counts[pid] ?? 0) + 1;
+        if (!lastSeen.containsKey(pid)) {
+          final date = (c['dateIso'] as String?) ?? '';
+          if (date.isNotEmpty) {
+            final parsed = AppDates.tryParseIso(date);
+            if (parsed != null) lastSeen[pid] = AppDates.short(parsed);
+          }
+        }
+      }
+      if (counts.isEmpty) return;
+
+      final entries = <MapEntry<String, PatientInsightModel>>[];
+      for (final e in counts.entries) {
+        final profile = await UserService.loadByUid(e.key);
+        if (profile == null || profile.name.isEmpty) continue;
+        var skinType = '-';
+        var primaryConcern = '-';
+        try {
+          final checks =
+              await SkinService.listSkinChecks(e.key, limit: 1);
+          if (checks.isNotEmpty) {
+            final m = checks.first;
+            final st = (m['resultSkinType'] as String?) ?? '';
+            if (st.isNotEmpty) skinType = st;
+            final locs = (m['locations'] as List?)?.cast<String>() ??
+                const <String>[];
+            if (locs.isNotEmpty) primaryConcern = locs.join(', ');
+          }
+        } catch (_) {
+          // skin check kosong/gagal → biarkan '-'
+        }
+        entries.add(MapEntry(
+          e.key,
+          PatientInsightModel(
+            id: e.key,
+            name: profile.name,
+            consultationCount: '${e.value} konsultasi',
+            skinType: skinType,
+            primaryConcern: primaryConcern,
+            lastConsultation: lastSeen[e.key] ?? '-',
+          ),
+        ));
+      }
+      if (entries.isEmpty || !mounted) return;
+      setState(() {
+        _patients
+          ..clear()
+          ..addAll(entries.map((e) => e.value));
+      });
+    } catch (_) {
+      // biarkan seed demo bila query gagal
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
