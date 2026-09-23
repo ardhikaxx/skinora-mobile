@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/navbottom/admin_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/user_service.dart';
 
 class PengaturanAdminPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
@@ -22,7 +25,42 @@ class _PengaturanAdminPageState extends State<PengaturanAdminPage> {
 
   bool _enableNotifications = true;
 
-  void _handleSave() {
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  /// Ambil `settings.notificationsEnabled` milik admin. Tanpa Firebase,
+  /// nilai default demo dipertahankan agar UI/tes tidak berubah.
+  Future<void> _loadSettings() async {
+    if (!Backend.useFirebase) return;
+    try {
+      final profile = await AuthService.loadProfile();
+      if (!mounted || profile == null) return;
+      setState(() => _enableNotifications = profile.notificationsEnabled);
+    } catch (_) {
+      // biarkan nilai default
+    }
+  }
+
+  Future<void> _handleSave() async {
+    final uid = AuthService.uid;
+    if (Backend.useFirebase && uid != null) {
+      try {
+        await UserService.updateSettings(
+          uid,
+          notificationsEnabled: _enableNotifications,
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menyimpan pengaturan: $e')),
+        );
+        return;
+      }
+    }
+    if (!mounted) return;
     AdminSuccessDialog.show(
       context,
       message: 'Pengaturan admin berhasil disimpan',
