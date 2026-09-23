@@ -1,6 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/admin_navbottom.dart';
+import '../../services/backend.dart';
+import '../../services/notification_service.dart';
+import '../../utils/app_dates.dart';
 
 class NotificationModel {
   final String id;
@@ -60,6 +64,46 @@ class _NotifikasiAdminPageState extends State<NotifikasiAdminPage> {
       isUnread: false,
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  String _fmtTime(Object? ts) {
+    if (ts is Timestamp) return AppDates.dateTime(ts.toDate());
+    return ts?.toString() ?? '';
+  }
+
+  /// Ambil notifikasi audience admin dari Firestore. Tanpa Firebase, data
+  /// demo tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    try {
+      final items = await NotificationService.listAudience(
+        NotificationService.adminAudience,
+      );
+      if (!mounted) return;
+      setState(() {
+        if (items.isEmpty) return;
+        _notifications
+          ..clear()
+          ..addAll(items.map((m) => NotificationModel(
+                id: (m['id'] as String?) ?? '',
+                title: (m['title'] as String?) ?? '',
+                description: (m['description'] as String?) ?? '',
+                time: _fmtTime(m['createdAt']),
+                isUnread: m['isUnread'] == true,
+              )));
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memuat notifikasi: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -186,6 +230,10 @@ class _NotifikasiAdminPageState extends State<NotifikasiAdminPage> {
             setState(() {
               item.isUnread = false;
             });
+            if (Backend.useFirebase && item.id.isNotEmpty) {
+              NotificationService.markRead(item.id).catchError((Object _) =>
+                  Future<void>.value());
+            }
             _handleNotificationAction(item);
           },
           borderRadius: BorderRadius.circular(18),
