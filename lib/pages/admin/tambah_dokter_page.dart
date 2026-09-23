@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../models/admin_doctor_model.dart';
+import '../../services/backend.dart';
+import '../../services/specialization_service.dart';
+import '../../services/user_service.dart';
 
 class TambahDokterPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
@@ -28,7 +31,7 @@ class _TambahDokterPageState extends State<TambahDokterPage> {
   final _bioController = TextEditingController();
 
   String _selectedSpecialization = 'Estetika Kulit';
-  final List<String> _specializations = [
+  List<String> _specializations = [
     'Estetika Kulit',
     'Jerawat',
     'Alergi',
@@ -37,6 +40,30 @@ class _TambahDokterPageState extends State<TambahDokterPage> {
     'Dermatitis',
     'Infeksi Kulit',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSpecializations();
+  }
+
+  /// Spesialisasi aktif dari master Firestore. Tanpa Firebase, list demo
+  /// tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadSpecializations() async {
+    if (!Backend.useFirebase) return;
+    try {
+      final names = await SpecializationService.listActiveNames();
+      if (names.isEmpty || !mounted) return;
+      setState(() {
+        _specializations = names;
+        if (!names.contains(_selectedSpecialization)) {
+          _selectedSpecialization = names.first;
+        }
+      });
+    } catch (_) {
+      // dropdown tetap memakai seed bila query gagal
+    }
+  }
 
   @override
   void dispose() {
@@ -49,7 +76,7 @@ class _TambahDokterPageState extends State<TambahDokterPage> {
     super.dispose();
   }
 
-  void _handleSubmit() {
+  Future<void> _handleSubmit() async {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
 
@@ -75,7 +102,7 @@ class _TambahDokterPageState extends State<TambahDokterPage> {
       return;
     }
 
-    final newDoctor = AdminDoctorModel(
+    var newDoctor = AdminDoctorModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name,
       email: email,
@@ -95,6 +122,20 @@ class _TambahDokterPageState extends State<TambahDokterPage> {
       status: DoctorStatus.menunggu,
     );
 
+    // Tulis ke Firestore (pre-provision — password tidak disimpan di database).
+    if (Backend.useFirebase) {
+      try {
+        newDoctor = await UserService.createDokter(newDoctor);
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menambah dokter: $e')),
+        );
+        return;
+      }
+    }
+
+    if (!mounted) return;
     Navigator.pop(context, newDoctor);
   }
 
