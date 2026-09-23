@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../services/backend.dart';
+import '../../services/user_service.dart';
 import 'riwayat_konsultasi_page.dart';
 import 'profil_dokter_page.dart';
 
@@ -43,14 +45,14 @@ class _KonsultasiDokterPenggunaPageState
   final TextEditingController _searchController = TextEditingController();
   String _selectedCategory = 'Semua';
 
-  final List<String> _categories = [
+  List<String> _categories = [
     'Semua',
     'Estetika Kulit',
     'Jerawat',
     'Anti-Aging',
   ];
 
-  final List<DoctorSearchModel> _allDoctors = const [
+  List<DoctorSearchModel> _allDoctors = const [
     DoctorSearchModel(
       id: '1',
       name: 'dr. Anita Dewi, Sp.KK',
@@ -73,6 +75,43 @@ class _KonsultasiDokterPenggunaPageState
       isVerified: true,
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  /// Daftar dokter terverifikasi dari Firestore. Tanpa Firebase, seed demo
+  /// tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    try {
+      final doctors = await UserService.listVerifiedDokter();
+      if (doctors.isEmpty || !mounted) return;
+      setState(() {
+        _allDoctors = doctors
+            .map((d) => DoctorSearchModel(
+                  id: d.backendId,
+                  name: d.name,
+                  specialization: d.specialization,
+                  category: d.specialization,
+                  isVerified: true,
+                ))
+            .toList();
+        final specs = <String>{
+          'Semua',
+          for (final d in doctors)
+            if (d.specialization.isNotEmpty) d.specialization,
+        };
+        if (specs.length > _categories.length) {
+          _categories = specs.toList();
+        }
+      });
+    } catch (_) {
+      // daftar dokter tetap memakai seed demo bila query gagal
+    }
+  }
 
   @override
   void dispose() {
