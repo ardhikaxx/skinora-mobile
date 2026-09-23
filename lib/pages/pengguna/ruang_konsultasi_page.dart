@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/consultation_service.dart';
 import 'riwayat_konsultasi_page.dart';
 
 class ChatMessageModel {
@@ -21,6 +24,7 @@ class RuangKonsultasiPenggunaPage extends StatefulWidget {
   final String? doctorId;
   final String doctorName;
   final String status;
+  final String? consultationId;
   final ValueChanged<int>? onNavigateTab;
 
   const RuangKonsultasiPenggunaPage({
@@ -28,6 +32,7 @@ class RuangKonsultasiPenggunaPage extends StatefulWidget {
     this.doctorId,
     this.doctorName = 'dr. Anita Dewi, Sp.KK',
     this.status = 'Terjadwal',
+    this.consultationId,
     this.onNavigateTab,
   });
 
@@ -49,6 +54,51 @@ class _RuangKonsultasiPenggunaPageState
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessageModel> _messages = [];
+  Stream<List<Map<String, dynamic>>>? _msgSub;
+
+  @override
+  void initState() {
+    super.initState();
+    final consultationId = widget.consultationId;
+    if (Backend.useFirebase &&
+        consultationId != null &&
+        consultationId.isNotEmpty) {
+      _msgSub = ConsultationService.messageStream(consultationId);
+      _msgSub!.listen(
+        (items) {
+          if (!mounted) return;
+          setState(() {
+            _messages
+              ..clear()
+              ..addAll(items.map((m) {
+                final senderRole = (m['senderRole'] as String?) ?? '';
+                final timeRaw = (m['time'] as String?) ?? '';
+                return ChatMessageModel(
+                  id: (m['id'] as String?) ?? '',
+                  text: (m['text'] as String?) ?? '',
+                  time: timeRaw,
+                  isFromUser: senderRole == 'user',
+                );
+              }));
+          });
+          _scrollToBottom();
+        },
+        onError: (_) {},
+      );
+    }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -57,13 +107,38 @@ class _RuangKonsultasiPenggunaPageState
     super.dispose();
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
 
     final now = DateTime.now();
     final timeStr =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+    final consultationId = widget.consultationId;
+    final uid = AuthService.uid;
+    if (Backend.useFirebase &&
+        consultationId != null &&
+        consultationId.isNotEmpty &&
+        uid != null) {
+      try {
+        await ConsultationService.sendMessage(
+          consultationId: consultationId,
+          senderId: uid,
+          senderRole: 'user',
+          text: text,
+          time: timeStr,
+        );
+        _textController.clear();
+        return;
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengirim pesan: $e')),
+        );
+        return;
+      }
+    }
 
     setState(() {
       _messages.add(
@@ -76,16 +151,7 @@ class _RuangKonsultasiPenggunaPageState
       );
       _textController.clear();
     });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
+    _scrollToBottom();
   }
 
   void _handleExit() {
@@ -336,7 +402,9 @@ class _RuangKonsultasiPenggunaPageState
               child: TextField(
                 controller: _textController,
                 textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _sendMessage(),
+                onSubmitted: (_) {
+                  _sendMessage();
+                },
                 decoration: const InputDecoration(
                   hintText: 'Ketik pesan...',
                   hintStyle: TextStyle(
