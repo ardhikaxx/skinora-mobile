@@ -3,6 +3,10 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../models/admin_doctor_model.dart';
+import '../../services/activity_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/user_service.dart';
 
 class DetailDokterPage extends StatefulWidget {
   final AdminDoctorModel doctor;
@@ -33,6 +37,37 @@ class _DetailDokterPageState extends State<DetailDokterPage> {
 
   // --- Actions ---
 
+  Future<void> _persistStatus(AdminDoctorModel updated, String tag) async {
+    if (!Backend.useFirebase) return;
+    await UserService.updateDokterStatus(updated);
+    await ActivityService.log(
+      title: '$tag ${updated.name}',
+      tag: tag,
+      actor: 'Admin',
+      actorUid: AuthService.uid ?? 'admin',
+    );
+  }
+
+  Future<void> _applyStatus({
+    required DoctorStatus status,
+    required String successMessage,
+    required String activityTag,
+  }) async {
+    final updated = _doctor.copyWith(status: status);
+    try {
+      await _persistStatus(updated, activityTag);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memperbarui status: $e')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _doctor = updated);
+    AdminSuccessDialog.show(context, message: successMessage);
+  }
+
   /// Action: Tangguhkan Dokter (Screen 4 & 5)
   void _onTangguhkan() {
     AdminConfirmDialog.show(
@@ -41,10 +76,20 @@ class _DetailDokterPageState extends State<DetailDokterPage> {
       message: 'Apakah Anda yakin ingin menangguhkan dokter ini?',
       confirmLabel: 'Tangguhkan',
       confirmColor: const Color(0xFFEF4444),
-      onConfirm: () {
-        setState(() {
-          _doctor = _doctor.copyWith(status: DoctorStatus.ditangguhkan);
-        });
+      onConfirm: () async {
+        final updated = _doctor.copyWith(status: DoctorStatus.ditangguhkan);
+        try {
+          await _persistStatus(updated, 'Verifikasi');
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Gagal memperbarui status: $e')),
+            );
+          }
+          return;
+        }
+        if (!mounted) return;
+        setState(() => _doctor = updated);
         AdminSuccessDialog.show(
           context,
           message: '${_doctor.name} telah ditangguhkan',
@@ -55,12 +100,10 @@ class _DetailDokterPageState extends State<DetailDokterPage> {
 
   /// Action: Aktifkan Kembali Dokter (Screen 6)
   void _onAktifkanKembali() {
-    setState(() {
-      _doctor = _doctor.copyWith(status: DoctorStatus.terverifikasi);
-    });
-    AdminSuccessDialog.show(
-      context,
-      message: '${_doctor.name} telah diaktifkan kembali',
+    _applyStatus(
+      status: DoctorStatus.terverifikasi,
+      successMessage: '${_doctor.name} telah diaktifkan kembali',
+      activityTag: 'Verifikasi',
     );
   }
 
@@ -74,10 +117,20 @@ class _DetailDokterPageState extends State<DetailDokterPage> {
       confirmColor: primaryMaroon,
       iconColor: const Color(0xFFD97706),
       iconBgColor: const Color(0xFFFEF3C7),
-      onConfirm: () {
-        setState(() {
-          _doctor = _doctor.copyWith(status: DoctorStatus.terverifikasi);
-        });
+      onConfirm: () async {
+        final updated = _doctor.copyWith(status: DoctorStatus.terverifikasi);
+        try {
+          await _persistStatus(updated, 'Verifikasi');
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Gagal memperbarui status: $e')),
+            );
+          }
+          return;
+        }
+        if (!mounted) return;
+        setState(() => _doctor = updated);
         AdminSuccessDialog.show(
           context,
           message: '${_doctor.name} telah diverifikasi',
@@ -94,10 +147,20 @@ class _DetailDokterPageState extends State<DetailDokterPage> {
       message: 'Apakah Anda yakin ingin menolak dokter ini?',
       confirmLabel: 'Tolak',
       confirmColor: const Color(0xFFEF4444),
-      onConfirm: () {
-        setState(() {
-          _doctor = _doctor.copyWith(status: DoctorStatus.ditolak);
-        });
+      onConfirm: () async {
+        final updated = _doctor.copyWith(status: DoctorStatus.ditolak);
+        try {
+          await _persistStatus(updated, 'Verifikasi');
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Gagal memperbarui status: $e')),
+            );
+          }
+          return;
+        }
+        if (!mounted) return;
+        setState(() => _doctor = updated);
         AdminSuccessDialog.show(
           context,
           message: '${_doctor.name} telah ditolak',
