@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../services/activity_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
 import '../admin/admin_main_page.dart';
 import '../dokter/dokter_main_page.dart';
 import '../pengguna/pengguna_main_page.dart';
@@ -24,9 +27,51 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
   bool _rememberMe = false;
   String? _errorMessage;
+  bool _busy = false;
 
-  void _handleLogin() {
-    final input = _emailController.text.trim().toLowerCase();
+  @override
+  void initState() {
+    super.initState();
+    _restoreSessionIfNeeded();
+  }
+
+  /// Session persistence: bila pengguna sudah login, langsung diarahkan
+  /// ke shell sesuai role tanpa mengubah tampilan halaman login.
+  Future<void> _restoreSessionIfNeeded() async {
+    if (!Backend.useFirebase) return;
+    final user = AuthService.currentUser;
+    if (user == null) return;
+    final profile = await AuthService.loadProfile();
+    if (!mounted) return;
+    if (profile == null || !profile.canLogin) {
+      await AuthService.signOut();
+      return;
+    }
+    _routeToHome(profile.role);
+  }
+
+  void _routeToHome(String role) {
+    Widget home;
+    switch (role) {
+      case 'admin':
+        home = const AdminMainPage();
+      case 'dokter':
+        home = const DokterMainPage();
+      default:
+        home = const PenggunaMainPage();
+    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => home),
+    );
+  }
+
+  /// Login Email & Password via Firebase Authentication.
+  /// Role diambil dari `users/{uid}.role` — bukan dari tebakan string input.
+  Future<void> _handleLogin() async {
+    final input = _emailController.text.trim();
+    final email = input.toLowerCase();
+    final password = _passwordController.text;
 
     setState(() {
       _errorMessage = null;
@@ -38,25 +83,87 @@ class _LoginPageState extends State<LoginPage> {
       });
       return;
     }
-
-    // Role check berdasarkan input (bisa ketik admin / dokter / pengguna atau email yang mengandung role tsb)
-    if (input == 'admin' || input.contains('admin')) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const AdminMainPage()),
-      );
-    } else if (input == 'dokter' || input.contains('dokter') || input.contains('doctor')) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const DokterMainPage()),
-      );
-    } else if (input == 'pengguna' || input.contains('pengguna') || input.contains('user') || input.isNotEmpty) {
-      // Jika ketik pengguna atau input umum lainnya, arahkan ke role Pengguna Umum
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const PenggunaMainPage()),
-      );
+    if (password.isEmpty) {
+      setState(() {
+        _errorMessage = 'Silakan masukkan password Anda';
+      });
+      return;
     }
+
+    if (!Backend.useFirebase) {
+      setState(() {
+        _errorMessage = 'Backend Firebase belum terkonfigurasi.';
+      });
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      await AuthService.signIn(email: email, password: password);
+      final profile = await AuthService.loadProfile();
+      if (profile == null) {
+        await AuthService.signOut();
+        setState(() {
+          _errorMessage = 'Akun tidak terdaftar. Silakan daftar terlebih dahulu.';
+          _busy = false;
+        });
+        return;
+      }
+      if (!profile.canLogin) {
+        await AuthService.signOut();
+        setState(() {
+          _errorMessage = 'Akun Anda ditangguhkan. Hubungi administrator.';
+          _busy = false;
+        });
+        return;
+      }
+      // Log aktivitas login (Firestore) — hanya bila backend aktif.
+      await ActivityService.log(
+        title: 'Login berhasil',
+        tag: 'Login',
+        actor: profile.name,
+        actorUid: profile.uid,
+      );
+      _routeToHome(profile.role);
+    } catch (e) {
+      setState(() {
+        _errorMessage = AuthService.describeAuthError(e);
+        _busy = false;
+      });
+    }
+  }
+
+  void _handleForgotPassword() {
+    final email = _emailController.text.trim().toLowerCase();
+    if (!Backend.useFirebase) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Backend Firebase belum terkonfigurasi.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    if (email.isEmpty) {
+      setState(() {
+        _errorMessage = 'Masukkan email terlebih dahulu untuk reset password.';
+      });
+      return;
+    }
+    AuthService.sendPasswordReset(email).then((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Email reset password telah dikirim.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }).catchError((Object e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = AuthService.describeAuthError(e);
+      });
+    });
   }
 
   @override
@@ -304,14 +411,7 @@ class _LoginPageState extends State<LoginPage> {
                               ],
                             ),
                             GestureDetector(
-                              onTap: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Fitur reset password belum tersedia.'),
-                                    duration: Duration(seconds: 2),
-                                  ),
-                                );
-                              },
+                              onTap: _handleForgotPassword,
                               child: const Text(
                                 'Lupa password?',
                                 style: TextStyle(
@@ -330,7 +430,7 @@ class _LoginPageState extends State<LoginPage> {
                           width: double.infinity,
                           height: 48,
                           child: ElevatedButton(
-                            onPressed: _handleLogin,
+                            onPressed: _busy ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: primaryColor,
                               foregroundColor: Colors.white,
