@@ -1,6 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/skin_service.dart';
+import '../../utils/app_dates.dart';
 import 'skin_check_result_page.dart';
 
 class SkinCheckHistoryModel {
@@ -47,7 +52,7 @@ class _RiwayatSkinCheckPageState extends State<RiwayatSkinCheckPage> {
   static const Color chipNeutralBorder = Color(0xFFE5E5EA);
   static const Color chipNeutralText = Color(0xFF6B5E5E);
 
-  final List<SkinCheckHistoryModel> _historyList = const [
+  List<SkinCheckHistoryModel> _historyList = const [
     SkinCheckHistoryModel(
       id: '1',
       date: '2026-08-28',
@@ -66,6 +71,61 @@ class _RiwayatSkinCheckPageState extends State<RiwayatSkinCheckPage> {
       neutralTags: ['Non-Sensitif'],
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  String _fmtDate(Object? ts) {
+    if (ts is Timestamp) return AppDates.iso(ts.toDate());
+    return ts?.toString() ?? '';
+  }
+
+  /// Riwayat skin check milik pengguna dari Firestore. Tanpa Firebase, seed
+  /// demo tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final items = await SkinService.listSkinChecks(uid);
+      if (items.isEmpty || !mounted) return;
+      setState(() {
+        _historyList = items.map((m) {
+          final skinType = (m['resultSkinType'] as String?) ?? 'Normal';
+          final sensitivity = (m['resultSensitivity'] as String?) ?? 'Non-Sensitif';
+          final acneRisk = (m['resultAcneRisk'] as String?) ?? 'Tidak Rentan';
+          final nonSens = !sensitivity.toLowerCase().contains('sensitif') ||
+              sensitivity.toLowerCase().contains('non');
+          final notRentan = acneRisk.toLowerCase().contains('tidak');
+          final tags = [
+            skinType,
+            nonSens ? 'Non-Sensitif' : sensitivity,
+            notRentan ? 'Tidak Rentan' : acneRisk,
+          ];
+          return SkinCheckHistoryModel(
+            id: (m['id'] as String?) ?? '',
+            date: _fmtDate(m['createdAt']),
+            skinType: skinType,
+            subtitle:
+                '${nonSens ? 'Non-Sensitif' : sensitivity} - $acneRisk',
+            icon: skinType.toLowerCase() == 'normal'
+                ? LucideIcons.sun
+                : LucideIcons.shield,
+            tags: tags,
+            neutralTags: [
+              if (nonSens) 'Non-Sensitif',
+              if (notRentan) 'Tidak Rentan',
+            ],
+          );
+        }).toList();
+      });
+    } catch (_) {
+      // riwayat tetap menampilkan seed demo bila query gagal
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
