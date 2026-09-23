@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/user_service.dart';
 import 'edit_profil_pengguna_page.dart';
 import 'pengaturan_pengguna_page.dart';
 import 'tentang_pengguna_page.dart';
@@ -30,11 +33,49 @@ class _ProfilPenggunaPageState extends State<ProfilPenggunaPage> {
   static const Color innerBorder = Color(0xFFEBEBEB);
 
   String _name = 'Leonita Yulyta Agustin';
-  final String _email = 'leonita@demo.com';
+  String _email = 'leonita@demo.com';
   String _phone = '081234567890';
   String _address = 'Jl. Sudirman No. 123, Jakarta';
-  final String _birthDate = '1995-06-15';
-  final String _gender = 'Perempuan';
+  String _birthDate = '1995-06-15';
+  String _gender = 'Perempuan';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  /// Profile milik pengguna dari Firestore. Tanpa Firebase, seed demo
+  /// tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final profile = await UserService.loadByUid(uid);
+      if (profile == null || !mounted) return;
+      setState(() {
+        if (profile.name.isNotEmpty) _name = profile.name;
+        if (profile.email.isNotEmpty) _email = profile.email;
+        if (profile.phone.isNotEmpty) _phone = profile.phone;
+        if (profile.address.isNotEmpty) _address = profile.address;
+        if (profile.birthDate.isNotEmpty) _birthDate = profile.birthDate;
+        if (profile.gender.isNotEmpty) _gender = profile.gender;
+      });
+    } catch (_) {
+      // profil tetap menampilkan data demo bila query gagal
+    }
+  }
+
+  String _initials(String name) {
+    final parts =
+        name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return 'LY';
+    if (parts.length == 1) {
+      return parts.first.substring(0, 1).toUpperCase();
+    }
+    return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
+  }
 
   void _showLogoutDialog() {
     LogoutDialog.show(context);
@@ -145,10 +186,10 @@ class _ProfilPenggunaPageState extends State<ProfilPenggunaPage> {
               color: avatarBg,
               borderRadius: BorderRadius.circular(18),
             ),
-            child: const Center(
+            child: Center(
               child: Text(
-                'LY',
-                style: TextStyle(
+                _initials(_name),
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
