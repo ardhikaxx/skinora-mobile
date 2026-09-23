@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/consultation_service.dart';
+import '../../services/user_service.dart';
 import 'pengaturan_dokter_page.dart';
 import 'edit_profil_dokter_page.dart';
 import 'tentang_dokter_page.dart';
@@ -27,6 +31,69 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
   static const Color subText = Color(0xFF757575);
   static const Color statSectionBg = Color(0xFFFFD5C8);
   static const Color badgeBg = Color(0xFFFFD5C8);
+
+  String _statKonsultasi = '9';
+  String _statPasien = '4';
+  String _statSelesai = '4';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  /// Muat profile dokter + ringkasan praktik dari Firestore. Tanpa Firebase,
+  /// seed demo tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final results = await Future.wait<Object?>([
+        UserService.loadByUid(uid),
+        ConsultationService.listForDoctor(uid, includeFinished: true),
+      ]);
+      final profile = results[0] as dynamic;
+      final consults = results[1] as List<Map<String, dynamic>>?;
+      if (!mounted) return;
+      setState(() {
+        if (profile != null) {
+          final store = DoctorProfileStore();
+          final name = (profile.name as String?) ?? '';
+          if (name.isNotEmpty) store.name = name;
+          final email = (profile.email as String?) ?? '';
+          if (email.isNotEmpty) store.email = email;
+          final phone = (profile.phone as String?) ?? '';
+          if (phone.isNotEmpty) store.phone = phone;
+          final address = (profile.address as String?) ?? '';
+          if (address.isNotEmpty) store.address = address;
+          final spec = (profile.specialization as String?) ?? '';
+          if (spec.isNotEmpty) store.specialization = spec;
+          final exp = (profile.experience as String?) ?? '';
+          if (exp.isNotEmpty) store.experience = exp;
+          final str = (profile.str as String?) ?? '';
+          if (str.isNotEmpty) store.str = str;
+          final bio = (profile.bio as String?) ?? '';
+          if (bio.isNotEmpty) store.bio = bio;
+        }
+        if (consults != null && consults.isNotEmpty) {
+          final pasien = consults
+              .map((c) => (c['patientId'] as String?) ?? '')
+              .where((id) => id.isNotEmpty)
+              .toSet()
+              .length;
+          final selesai = consults
+              .where((c) => ((c['status'] as String?) ?? '') == 'selesai')
+              .length;
+          _statKonsultasi = '${consults.length}';
+          if (pasien > 0) _statPasien = '$pasien';
+          _statSelesai = '$selesai';
+        }
+      });
+    } catch (_) {
+      // biarkan seed demo bila query gagal
+    }
+  }
 
   void _showSuccessDialog(String message) {
     showDialog<void>(
@@ -356,31 +423,31 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
           const SizedBox(height: 14),
           Row(
             children: [
-              // Konsultasi: 9
+              // Konsultasi
               Expanded(
                 child: _buildPraktikStatCard(
                   icon: LucideIcons.messageSquare,
-                  count: '9',
+                  count: _statKonsultasi,
                   label: 'Konsultasi',
                 ),
               ),
               const SizedBox(width: 10),
 
-              // Pasien: 4 (Matching image copy 4.png)
+              // Pasien
               Expanded(
                 child: _buildPraktikStatCard(
                   icon: LucideIcons.user,
-                  count: '4',
+                  count: _statPasien,
                   label: 'Pasien',
                 ),
               ),
               const SizedBox(width: 10),
 
-              // Selesai: 4 (Matching image copy 4.png)
+              // Selesai
               Expanded(
                 child: _buildPraktikStatCard(
                   icon: LucideIcons.calendarCheck,
-                  count: '4',
+                  count: _statSelesai,
                   label: 'Selesai',
                 ),
               ),
