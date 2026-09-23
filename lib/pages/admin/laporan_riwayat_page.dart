@@ -1,6 +1,14 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/admin_navbottom.dart';
+import '../../models/admin_article_model.dart';
+import '../../services/activity_service.dart';
+import '../../services/article_service.dart';
+import '../../services/backend.dart';
+import '../../services/consultation_service.dart';
+import '../../services/user_service.dart';
+import '../../utils/app_dates.dart';
 
 class ActivityLogModel {
   final String title;
@@ -41,6 +49,29 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
   String _selectedCategory = 'Semua';
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+
+  // Angka ringkasan — default demo, diganti bila Firebase aktif.
+  String _ringTotalKonsultasi = '13';
+  String _ringDokterAktif = '3';
+  String _ringPengguna = '5';
+  String _ringArtikel = '7';
+  String _statusTerjadwal = '3';
+  String _statusBerlangsung = '3';
+  String _statusSelesai = '7';
+  String _statusBatal = '0';
+  String _pctTerjadwal = '23%';
+  String _pctBerlangsung = '23%';
+  String _pctSelesai = '54%';
+  String _pctBatal = '0%';
+  String _topLogin = '3';
+  String _topSkinDaily = '2';
+  String _topSkinCheck = '1';
+  String _topSkincare = '1';
+
+  String _pctOf(int count, int total) {
+    if (total <= 0) return '0%';
+    return '${((count / total) * 100).round()}%';
+  }
 
   final List<String> _categories = [
     'Semua',
@@ -152,6 +183,123 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
           activity.tag.toLowerCase().contains(_searchQuery.toLowerCase());
       return matchesCategory && matchesQuery;
     }).toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  String _fmtTime(Object? ts) {
+    if (ts is Timestamp) return AppDates.dateTime(ts.toDate());
+    return ts?.toString() ?? '';
+  }
+
+  IconData _iconForTag(String tag) {
+    switch (tag) {
+      case 'Login':
+        return LucideIcons.zap;
+      case 'Skin Check':
+        return LucideIcons.scan;
+      case 'Skin Daily':
+        return LucideIcons.fileText;
+      case 'Skincare':
+        return LucideIcons.sparkles;
+      case 'Booking':
+        return LucideIcons.calendar;
+      case 'Konsultasi':
+        return LucideIcons.circleCheck;
+      case 'Review':
+        return LucideIcons.trendingUp;
+      case 'Verifikasi':
+        return LucideIcons.shieldCheck;
+      case 'Artikel':
+        return LucideIcons.fileText;
+      default:
+        return LucideIcons.zap;
+    }
+  }
+
+  /// Muat statistik + log aktivitas global dari Firestore. Tanpa Firebase,
+  /// angka & log demo tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    try {
+      final results = await Future.wait<Object?>([
+        ConsultationService.countAll(),
+        ConsultationService.countByStatus('terjadwal'),
+        ConsultationService.countByStatus('berlangsung'),
+        ConsultationService.countByStatus('selesai'),
+        ConsultationService.countByStatus('dibatalkan'),
+        UserService.countPengguna(),
+        UserService.countDokterAktif(),
+        ArticleService.listPublished(),
+        ActivityService.listAll(),
+      ]);
+
+      int? asInt(Object? v) => v is int ? v : null;
+      final total = asInt(results[0]);
+      final terjadwal = asInt(results[1]);
+      final berlangsung = asInt(results[2]);
+      final selesai = asInt(results[3]);
+      final batal = asInt(results[4]);
+      final pengguna = asInt(results[5]);
+      final dokter = asInt(results[6]);
+      final articles = results[7] as List<AdminArticleModel>?;
+      final acts = results[8] as List<Map<String, dynamic>>?;
+
+      if (!mounted) return;
+      setState(() {
+        if (total != null) {
+          _ringTotalKonsultasi = '$total';
+        }
+        if (terjadwal != null) _statusTerjadwal = '$terjadwal';
+        if (berlangsung != null) _statusBerlangsung = '$berlangsung';
+        if (selesai != null) _statusSelesai = '$selesai';
+        if (batal != null) _statusBatal = '$batal';
+        final totalN = total ??
+            ((terjadwal ?? 0) +
+                (berlangsung ?? 0) +
+                (selesai ?? 0) +
+                (batal ?? 0));
+        if (totalN > 0) {
+          _pctTerjadwal = _pctOf(terjadwal ?? 0, totalN);
+          _pctBerlangsung = _pctOf(berlangsung ?? 0, totalN);
+          _pctSelesai = _pctOf(selesai ?? 0, totalN);
+          _pctBatal = _pctOf(batal ?? 0, totalN);
+        }
+        if (pengguna != null && pengguna > 0) _ringPengguna = '$pengguna';
+        if (dokter != null && dokter > 0) {
+          _ringDokterAktif = '$dokter';
+        }
+        if (articles != null) _ringArtikel = '${articles.length}';
+
+        if (acts != null && acts.isNotEmpty) {
+          _allActivities
+            ..clear()
+            ..addAll(acts.map((m) {
+              final tag = (m['tag'] as String?) ?? 'Login';
+              return ActivityLogModel(
+                title: (m['title'] as String?) ?? '',
+                tag: tag,
+                actor: (m['actor'] as String?) ?? '',
+                time: _fmtTime(m['createdAt']),
+                icon: _iconForTag(tag),
+              );
+            }));
+
+          int countTag(String tag) =>
+              _allActivities.where((a) => a.tag == tag).length;
+          _topLogin = '${countTag('Login')}';
+          _topSkinDaily = '${countTag('Skin Daily')}';
+          _topSkinCheck = '${countTag('Skin Check')}';
+          _topSkincare = '${countTag('Skincare')}';
+        }
+      });
+    } catch (_) {
+      // laporan tetap menampilkan angka demo bila query gagal
+    }
   }
 
   @override
@@ -329,21 +477,21 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
             children: [
               Expanded(
                 child: _buildRingkasanItem(
-                  count: '13',
+                  count: _ringTotalKonsultasi,
                   label: 'Total\nKonsultasi',
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _buildRingkasanItem(
-                  count: '3',
+                  count: _ringDokterAktif,
                   label: 'Dokter\nAktif',
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _buildRingkasanItem(
-                  count: '5',
+                  count: _ringPengguna,
                   label: 'Total\nPengguna',
                 ),
               ),
@@ -393,8 +541,8 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
-            Text(
+          children: [
+            const Text(
               'STATUS KONSULTASI',
               style: TextStyle(
                 fontSize: 12.0,
@@ -404,8 +552,8 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
               ),
             ),
             Text(
-              '13 total',
-              style: TextStyle(
+              '$_ringTotalKonsultasi total',
+              style: const TextStyle(
                 fontSize: 11.5,
                 color: dateText,
               ),
@@ -418,8 +566,8 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
             Expanded(
               child: _buildStatusCard(
                 icon: LucideIcons.messageSquare,
-                percentage: '23%',
-                count: '3',
+                percentage: _pctTerjadwal,
+                count: _statusTerjadwal,
                 label: 'Terjadwal',
               ),
             ),
@@ -427,8 +575,8 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
             Expanded(
               child: _buildStatusCard(
                 icon: LucideIcons.timer,
-                percentage: '23%',
-                count: '3',
+                percentage: _pctBerlangsung,
+                count: _statusBerlangsung,
                 label: 'Berlangsung',
               ),
             ),
@@ -440,8 +588,8 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
             Expanded(
               child: _buildStatusCard(
                 icon: LucideIcons.circleCheck,
-                percentage: '54%',
-                count: '7',
+                percentage: _pctSelesai,
+                count: _statusSelesai,
                 label: 'Selesai',
               ),
             ),
@@ -449,8 +597,8 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
             Expanded(
               child: _buildStatusCard(
                 icon: LucideIcons.circleX,
-                percentage: '0%',
-                count: '0',
+                percentage: _pctBatal,
+                count: _statusBatal,
                 label: 'Dibatalkan',
               ),
             ),
@@ -579,9 +727,9 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                const Text(
-                  '13',
-                  style: TextStyle(
+                 Text(
+                  _ringTotalKonsultasi,
+                  style: const TextStyle(
                     fontSize: 22.0,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF1E1E1E),
@@ -645,17 +793,17 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
-                  children: const [
+                  children: [
                     Text(
-                      '7',
-                      style: TextStyle(
+                      _ringArtikel,
+                      style: const TextStyle(
                         fontSize: 22.0,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF1E1E1E),
                       ),
                     ),
-                    SizedBox(width: 6),
-                    Expanded(
+                    const SizedBox(width: 6),
+                    const Expanded(
                       child: Text(
                         '↗ 2 baru bulan ini',
                         style: TextStyle(
@@ -695,7 +843,7 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
             Expanded(
               child: _buildTopActivityCard(
                 icon: LucideIcons.zap,
-                count: '3',
+                count: _topLogin,
                 label: 'Login',
               ),
             ),
@@ -703,7 +851,7 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
             Expanded(
               child: _buildTopActivityCard(
                 icon: LucideIcons.fileText,
-                count: '2',
+                count: _topSkinDaily,
                 label: 'Skin Daily',
               ),
             ),
@@ -715,7 +863,7 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
             Expanded(
               child: _buildTopActivityCard(
                 icon: LucideIcons.scan,
-                count: '1',
+                count: _topSkinCheck,
                 label: 'Skin Check',
               ),
             ),
@@ -723,7 +871,7 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
             Expanded(
               child: _buildTopActivityCard(
                 icon: LucideIcons.sparkles,
-                count: '1',
+                count: _topSkincare,
                 label: 'Skincare',
               ),
             ),
