@@ -1,6 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/admin_navbottom.dart';
+import '../../services/activity_service.dart';
+import '../../services/backend.dart';
+import '../../utils/app_dates.dart';
 
 class AdminActivityItem {
   final String title;
@@ -12,7 +16,7 @@ class AdminActivityItem {
   });
 }
 
-class RiwayatAktivitasAdminPage extends StatelessWidget {
+class RiwayatAktivitasAdminPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
 
   const RiwayatAktivitasAdminPage({
@@ -20,12 +24,18 @@ class RiwayatAktivitasAdminPage extends StatelessWidget {
     this.onNavigateTab,
   });
 
+  @override
+  State<RiwayatAktivitasAdminPage> createState() =>
+      _RiwayatAktivitasAdminPageState();
+}
+
+class _RiwayatAktivitasAdminPageState extends State<RiwayatAktivitasAdminPage> {
   static const Color darkText = Color(0xFF1E293B);
   static const Color subText = Color(0xFF8E8E93);
   static const Color orangeIconBg = Color(0xFFFFD5C8);
   static const Color orangeIconColor = Color(0xFFE65100);
 
-  final List<AdminActivityItem> _activities = const [
+  List<AdminActivityItem> _activities = const [
     AdminActivityItem(
       title: 'Login admin berhasil',
       time: '2026-08-27 07:55',
@@ -39,6 +49,41 @@ class RiwayatAktivitasAdminPage extends StatelessWidget {
       time: '2026-08-01 12:00',
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  String _fmtTime(Object? ts) {
+    if (ts is Timestamp) return AppDates.dateTime(ts.toDate());
+    return ts?.toString() ?? '';
+  }
+
+  /// Riwayat aktivitas global (admin) dari Firestore. Tanpa Firebase, data
+  /// demo tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    try {
+      final items = await ActivityService.listAll();
+      if (!mounted) return;
+      setState(() {
+        if (items.isEmpty) return;
+        _activities = items
+            .map((m) => AdminActivityItem(
+                  title: (m['title'] as String?) ?? '',
+                  time: _fmtTime(m['createdAt']),
+                ))
+            .toList();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memuat riwayat aktivitas: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -182,7 +227,7 @@ class RiwayatAktivitasAdminPage extends StatelessWidget {
         onTap: (index) {
           Navigator.popUntil(context, (route) => route.isFirst);
           if (index != 4) {
-            onNavigateTab?.call(index);
+            widget.onNavigateTab?.call(index);
           }
         },
       ),
