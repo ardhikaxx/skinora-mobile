@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/admin_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/user_service.dart';
 
 class EditProfilAdminPage extends StatefulWidget {
   final String initialNama;
@@ -54,7 +57,7 @@ class _EditProfilAdminPageState extends State<EditProfilAdminPage> {
     return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
   }
 
-  void _handleSave() {
+  Future<void> _handleSave() async {
     final nama = _namaController.text.trim();
     if (nama.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -72,6 +75,25 @@ class _EditProfilAdminPageState extends State<EditProfilAdminPage> {
       'alamat': _alamatController.text.trim(),
     };
 
+    // Tulis perubahan profil ke Firestore (bila sesi login aktif).
+    final uid = AuthService.uid;
+    if (Backend.useFirebase && uid != null) {
+      try {
+        await UserService.updateOwnProfile(uid, fields: {
+          'name': nama,
+          'phone': updatedData['telepon'],
+          'address': updatedData['alamat'],
+        });
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menyimpan profil: $e')),
+        );
+        return;
+      }
+    }
+
+    if (!mounted) return;
     Navigator.pop(context, updatedData);
   }
 
