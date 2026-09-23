@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/consultation_service.dart';
 
 class ChatBubbleModel {
   final String id;
@@ -45,6 +50,7 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   late List<ChatBubbleModel> _messages;
+  StreamSubscription<List<Map<String, dynamic>>>? _msgSub;
 
   @override
   void initState() {
@@ -100,22 +106,82 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
         isFromDoctor: false,
       ),
     ];
+    _loadFromBackend();
+  }
+
+  /// Streaming pesan dari Firestore. Tanpa Firebase, seed demo tetap
+  /// dipakai agar UI/tes tidak berubah.
+  void _loadFromBackend() {
+    if (!Backend.useFirebase) return;
+    final id = widget.consultationId;
+    if (id == null || id.isEmpty) return;
+    _msgSub = ConsultationService.messageStream(id).listen(
+      (items) {
+        if (!mounted || items.isEmpty) return;
+        setState(() {
+          _messages = items.map((m) {
+            final role = (m['senderRole'] as String?) ?? '';
+            return ChatBubbleModel(
+              id: (m['id'] as String?) ?? '',
+              text: (m['text'] as String?) ?? '',
+              time: (m['time'] as String?) ?? '',
+              isFromDoctor: role == 'dokter',
+            );
+          }).toList();
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients) {
+            _scrollController.jumpTo(
+              _scrollController.position.maxScrollExtent,
+            );
+          }
+        });
+      },
+      onError: (_) {},
+    );
   }
 
   @override
   void dispose() {
+    _msgSub?.cancel();
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
 
     final now = DateTime.now();
     final timeStr =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+    // Persist ke Firestore (stream akan update UI).
+    if (Backend.useFirebase) {
+      final id = widget.consultationId;
+      final uid = AuthService.uid;
+      if (id != null && id.isNotEmpty && uid != null) {
+        try {
+          await ConsultationService.sendMessage(
+            consultationId: id,
+            senderId: uid,
+            senderRole: 'dokter',
+            text: text,
+            time: timeStr,
+          );
+          _textController.clear();
+          return;
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Gagal mengirim pesan: $e')),
+            );
+          }
+          return;
+        }
+      }
+    }
 
     setState(() {
       _messages.add(
