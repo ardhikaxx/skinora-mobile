@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/user_service.dart';
 
 class DoctorProfileStore {
   static final DoctorProfileStore _instance = DoctorProfileStore._internal();
@@ -78,6 +81,48 @@ class _EditProfilDokterPageState extends State<EditProfilDokterPage> {
 
     _currentInitials = store.initials;
     _nameController.addListener(_updateInitials);
+    _loadFromBackend();
+  }
+
+  /// Isi form dari Firestore bila sesi aktif. Tanpa Firebase, seed demo
+  /// tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final profile = await UserService.loadByUid(uid);
+      if (profile == null || !mounted) return;
+      final store = DoctorProfileStore();
+      if (profile.name.isNotEmpty) store.name = profile.name;
+      if (profile.email.isNotEmpty) store.email = profile.email;
+      if (profile.specialization.isNotEmpty) {
+        store.specialization = profile.specialization;
+      }
+      if (profile.experience.isNotEmpty) store.experience = profile.experience;
+      if (profile.phone.isNotEmpty) store.phone = profile.phone;
+      if (profile.address.isNotEmpty) store.address = profile.address;
+      if (profile.bio.isNotEmpty) store.bio = profile.bio;
+      if (profile.str.isNotEmpty) store.str = profile.str;
+      setState(() {
+        if (profile.name.isNotEmpty) {
+          _nameController.text = profile.name;
+        }
+        if (profile.specialization.isNotEmpty) {
+          _specializationController.text = profile.specialization;
+        }
+        if (profile.experience.isNotEmpty) {
+          _experienceController.text = profile.experience;
+        }
+        if (profile.phone.isNotEmpty) _phoneController.text = profile.phone;
+        if (profile.address.isNotEmpty) {
+          _addressController.text = profile.address;
+        }
+        if (profile.bio.isNotEmpty) _bioController.text = profile.bio;
+      });
+    } catch (_) {
+      // biarkan seed demo bila query gagal
+    }
   }
 
   void _updateInitials() {
@@ -115,7 +160,7 @@ class _EditProfilDokterPageState extends State<EditProfilDokterPage> {
     super.dispose();
   }
 
-  void _handleSave() {
+  Future<void> _handleSave() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -135,6 +180,33 @@ class _EditProfilDokterPageState extends State<EditProfilDokterPage> {
     store.address = _addressController.text.trim();
     store.bio = _bioController.text.trim();
 
+    if (Backend.useFirebase) {
+      final uid = AuthService.uid;
+      if (uid != null) {
+        try {
+          await UserService.updateOwnProfile(
+            uid,
+            fields: {
+              'name': store.name,
+              'specialization': store.specialization,
+              'experience': store.experience,
+              'phone': store.phone,
+              'address': store.address,
+              'bio': store.bio,
+              'str': store.str,
+            },
+          );
+        } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Gagal menyimpan profil: $e')),
+          );
+          return;
+        }
+      }
+    }
+
+    if (!mounted) return;
     Navigator.pop(context, true);
   }
 
