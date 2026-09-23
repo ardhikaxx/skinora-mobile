@@ -56,7 +56,9 @@ class _RiwayatKonsultasiPenggunaPageState
   static const Color badgeSelesaiText = Color(0xFF6B5E5E);
   static const Color badgeSelesaiBorder = Color(0xFFE5E5EA);
 
-  List<UserConsultationHistoryModel> _historyList = const [
+  List<UserConsultationHistoryModel> _historyList = Backend.useFirebase
+      ? <UserConsultationHistoryModel>[]
+      : const <UserConsultationHistoryModel>[
     UserConsultationHistoryModel(
       id: '1',
       doctorName: 'dr. Anita Dewi, Sp.KK',
@@ -130,7 +132,7 @@ class _RiwayatKonsultasiPenggunaPageState
     if (uid == null) return;
     try {
       final items = await ConsultationService.listForPatient(uid);
-      if (items.isEmpty || !mounted) return;
+      if (!mounted) return;
       setState(() {
         _historyList = items.map((m) {
           final rawDate = (m['scheduleDate'] as String?) ?? '';
@@ -155,7 +157,9 @@ class _RiwayatKonsultasiPenggunaPageState
         }).toList();
       });
     } catch (_) {
-      // riwayat tetap menampilkan seed demo bila query gagal
+      // Query gagal → kosongkan, jangan tampilkan seed palsu di production.
+      if (!mounted) return;
+      setState(() => _historyList = <UserConsultationHistoryModel>[]);
     }
   }
 

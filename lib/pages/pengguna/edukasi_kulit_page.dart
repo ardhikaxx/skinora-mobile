@@ -47,7 +47,9 @@ class _EdukasiKulitPenggunaPageState extends State<EdukasiKulitPenggunaPage> {
   final TextEditingController _searchController = TextEditingController();
   String _selectedCategory = 'Semua';
 
-  final List<String> _categories = [
+  List<String> _categories = Backend.useFirebase
+      ? <String>['Semua']
+      : <String>[
     'Semua',
     'Kulit Dasar',
     'Skincare',
@@ -56,7 +58,9 @@ class _EdukasiKulitPenggunaPageState extends State<EdukasiKulitPenggunaPage> {
     'Tips & Trik',
   ];
 
-  List<SkinEducationModel> _allArticles = const [
+  List<SkinEducationModel> _allArticles = Backend.useFirebase
+      ? <SkinEducationModel>[]
+      : const <SkinEducationModel>[
     SkinEducationModel(
       id: '1',
       category: 'KULIT DASAR',
@@ -125,7 +129,7 @@ class _EdukasiKulitPenggunaPageState extends State<EdukasiKulitPenggunaPage> {
     if (!Backend.useFirebase) return;
     try {
       final articles = await ArticleService.listPublished();
-      if (articles.isEmpty || !mounted) return;
+      if (!mounted) return;
       setState(() {
         _allArticles = articles
             .map((a) => SkinEducationModel(
@@ -143,9 +147,22 @@ class _EdukasiKulitPenggunaPageState extends State<EdukasiKulitPenggunaPage> {
                   content: a.content,
                 ))
             .toList();
+        _categories = <String>{
+          'Semua',
+          for (final a in articles)
+            if (a.category.isNotEmpty) a.category,
+        }.toList();
+        if (!_categories.contains(_selectedCategory)) {
+          _selectedCategory = 'Semua';
+        }
       });
     } catch (_) {
-      // daftar artikel tetap memakai seed demo bila query gagal
+      if (!mounted) return;
+      setState(() {
+        _allArticles = <SkinEducationModel>[];
+        _categories = <String>['Semua'];
+        _selectedCategory = 'Semua';
+      });
     }
   }
 

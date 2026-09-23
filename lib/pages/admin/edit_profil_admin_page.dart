@@ -13,9 +13,9 @@ class EditProfilAdminPage extends StatefulWidget {
 
   const EditProfilAdminPage({
     super.key,
-    this.initialNama = 'Admin Skinora',
-    this.initialTelepon = '081234567899',
-    this.initialAlamat = 'Jl. Teknologi No. 1, Jakarta',
+    this.initialNama = '',
+    this.initialTelepon = '',
+    this.initialAlamat = '',
     this.onNavigateTab,
   });
 

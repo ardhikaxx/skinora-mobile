@@ -32,9 +32,9 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
   static const Color statSectionBg = Color(0xFFFFD5C8);
   static const Color badgeBg = Color(0xFFFFD5C8);
 
-  String _statKonsultasi = '9';
-  String _statPasien = '4';
-  String _statSelesai = '4';
+  String _statKonsultasi = Backend.useFirebase ? '0' : '9';
+  String _statPasien = Backend.useFirebase ? '0' : '4';
+  String _statSelesai = Backend.useFirebase ? '0' : '4';
 
   @override
   void initState() {
@@ -59,39 +59,36 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
       setState(() {
         if (profile != null) {
           final store = DoctorProfileStore();
-          final name = (profile.name as String?) ?? '';
-          if (name.isNotEmpty) store.name = name;
-          final email = (profile.email as String?) ?? '';
-          if (email.isNotEmpty) store.email = email;
-          final phone = (profile.phone as String?) ?? '';
-          if (phone.isNotEmpty) store.phone = phone;
-          final address = (profile.address as String?) ?? '';
-          if (address.isNotEmpty) store.address = address;
-          final spec = (profile.specialization as String?) ?? '';
-          if (spec.isNotEmpty) store.specialization = spec;
-          final exp = (profile.experience as String?) ?? '';
-          if (exp.isNotEmpty) store.experience = exp;
-          final str = (profile.str as String?) ?? '';
-          if (str.isNotEmpty) store.str = str;
-          final bio = (profile.bio as String?) ?? '';
-          if (bio.isNotEmpty) store.bio = bio;
+          store.name = (profile.name as String?) ?? '';
+          store.email = (profile.email as String?) ?? '';
+          store.phone = (profile.phone as String?) ?? '';
+          store.address = (profile.address as String?) ?? '';
+          store.specialization = (profile.specialization as String?) ?? '';
+          store.experience = (profile.experience as String?) ?? '';
+          store.str = (profile.str as String?) ?? '';
+          store.bio = (profile.bio as String?) ?? '';
+          store.status = (profile.status as String?) ?? '';
         }
-        if (consults != null && consults.isNotEmpty) {
-          final pasien = consults
-              .map((c) => (c['patientId'] as String?) ?? '')
-              .where((id) => id.isNotEmpty)
-              .toSet()
-              .length;
-          final selesai = consults
-              .where((c) => ((c['status'] as String?) ?? '') == 'selesai')
-              .length;
-          _statKonsultasi = '${consults.length}';
-          if (pasien > 0) _statPasien = '$pasien';
-          _statSelesai = '$selesai';
-        }
+        final list = consults ?? const <Map<String, dynamic>>[];
+        final pasien = list
+            .map((c) => (c['patientId'] as String?) ?? '')
+            .where((id) => id.isNotEmpty)
+            .toSet()
+            .length;
+        final selesai = list
+            .where((c) => ((c['status'] as String?) ?? '') == 'selesai')
+            .length;
+        _statKonsultasi = '${list.length}';
+        _statPasien = '$pasien';
+        _statSelesai = '$selesai';
       });
     } catch (_) {
-      // biarkan seed demo bila query gagal
+      if (!mounted) return;
+      setState(() {
+        _statKonsultasi = '0';
+        _statPasien = '0';
+        _statSelesai = '0';
+      });
     }
   }
 
@@ -366,11 +363,14 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    // Badge 1: Estetika Kulit
-                    _buildPillBadge(store.specialization),
-                    const SizedBox(width: 6),
-                    // Badge 2: Terverifikasi
-                    _buildPillBadge('Terverifikasi'),
+                    // Badge 1: Spesialisasi (dari store)
+                    if (store.specialization.isNotEmpty) ...[
+                      _buildPillBadge(store.specialization),
+                      const SizedBox(width: 6),
+                    ],
+                    // Badge 2: Status verifikasi (dari field status)
+                    if (_statusBadgeLabel(store.status).isNotEmpty)
+                      _buildPillBadge(_statusBadgeLabel(store.status)),
                   ],
                 ),
               ],
@@ -379,6 +379,21 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
         ],
       ),
     );
+  }
+
+  /// Label badge status; '' bila belum ada data (Firebase kosong).
+  String _statusBadgeLabel(String status) {
+    if (status.isEmpty) return Backend.useFirebase ? '' : 'Terverifikasi';
+    switch (status) {
+      case 'terverifikasi':
+        return 'Terverifikasi';
+      case 'menunggu':
+        return 'Menunggu Verifikasi';
+      case 'ditolak':
+        return 'Ditolak';
+      default:
+        return status[0].toUpperCase() + status.substring(1);
+    }
   }
 
   Widget _buildPillBadge(String label) {

@@ -43,15 +43,19 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
   static const Color activeBadgeBg = Color(0xFFFFD5C8);
   static const Color inactiveBadgeBg = Color(0xFFFFE5E0);
 
-  final List<SpesialisasiModel> _specializations = [
-    SpesialisasiModel(id: '1', name: 'Jerawat', isActive: true),
-    SpesialisasiModel(id: '2', name: 'Estetika Kulit', isActive: true),
-    SpesialisasiModel(id: '3', name: 'Alergi', isActive: true),
-    SpesialisasiModel(id: '4', name: 'Anti-Aging', isActive: true),
-    SpesialisasiModel(id: '5', name: 'Pigmentasi', isActive: true),
-    SpesialisasiModel(id: '6', name: 'Dermatitis', isActive: true),
-    SpesialisasiModel(id: '7', name: 'Infeksi Kulit', isActive: false),
-  ];
+  /// Seed demo HANYA untuk widget test / mode tanpa Firebase.
+  /// Dengan Firebase, daftar diisi dari Firestore (boleh kosong).
+  final List<SpesialisasiModel> _specializations = Backend.useFirebase
+      ? <SpesialisasiModel>[]
+      : <SpesialisasiModel>[
+          SpesialisasiModel(id: '1', name: 'Jerawat', isActive: true),
+          SpesialisasiModel(id: '2', name: 'Estetika Kulit', isActive: true),
+          SpesialisasiModel(id: '3', name: 'Alergi', isActive: true),
+          SpesialisasiModel(id: '4', name: 'Anti-Aging', isActive: true),
+          SpesialisasiModel(id: '5', name: 'Pigmentasi', isActive: true),
+          SpesialisasiModel(id: '6', name: 'Dermatitis', isActive: true),
+          SpesialisasiModel(id: '7', name: 'Infeksi Kulit', isActive: false),
+        ];
 
   @override
   void initState() {
@@ -60,23 +64,24 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
   }
 
   /// Ambil master spesialisasi dari Firestore. Tanpa Firebase, daftar demo
-  /// tetap dipakai agar UI/tes tidak berubah.
+  /// tetap dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil backend
+  /// selalu menggantikan seed — termasuk saat daftar kosong.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     try {
       final records = await SpecializationService.list();
-      if (records.isEmpty || !mounted) return;
-      setState(() {
-        _specializations
-          ..clear()
-          ..addAll(records.map((r) => SpesialisasiModel(
-                id: r.id,
-                name: r.name,
-                isActive: r.isActive,
-              )));
-      });
+      if (!mounted) return;
+      setState(() => _specializations
+        ..clear()
+        ..addAll(records.map((r) => SpesialisasiModel(
+              id: r.id,
+              name: r.name,
+              isActive: r.isActive,
+            ))));
     } catch (_) {
-      // daftar tetap menampilkan seed demo bila query gagal
+      // Query gagal → tampilkan kosong, jangan seed palsu di production.
+      if (!mounted) return;
+      setState(_specializations.clear);
     }
   }
 

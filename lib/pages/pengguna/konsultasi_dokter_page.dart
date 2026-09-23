@@ -45,14 +45,18 @@ class _KonsultasiDokterPenggunaPageState
   final TextEditingController _searchController = TextEditingController();
   String _selectedCategory = 'Semua';
 
-  List<String> _categories = [
+  List<String> _categories = Backend.useFirebase
+      ? <String>['Semua']
+      : <String>[
     'Semua',
     'Estetika Kulit',
     'Jerawat',
     'Anti-Aging',
   ];
 
-  List<DoctorSearchModel> _allDoctors = const [
+  List<DoctorSearchModel> _allDoctors = Backend.useFirebase
+      ? <DoctorSearchModel>[]
+      : const <DoctorSearchModel>[
     DoctorSearchModel(
       id: '1',
       name: 'dr. Anita Dewi, Sp.KK',
@@ -88,7 +92,7 @@ class _KonsultasiDokterPenggunaPageState
     if (!Backend.useFirebase) return;
     try {
       final doctors = await UserService.listVerifiedDokter();
-      if (doctors.isEmpty || !mounted) return;
+      if (!mounted) return;
       setState(() {
         _allDoctors = doctors
             .map((d) => DoctorSearchModel(
@@ -99,17 +103,22 @@ class _KonsultasiDokterPenggunaPageState
                   isVerified: true,
                 ))
             .toList();
-        final specs = <String>{
+        _categories = <String>{
           'Semua',
           for (final d in doctors)
             if (d.specialization.isNotEmpty) d.specialization,
-        };
-        if (specs.length > _categories.length) {
-          _categories = specs.toList();
+        }.toList();
+        if (!_categories.contains(_selectedCategory)) {
+          _selectedCategory = 'Semua';
         }
       });
     } catch (_) {
-      // daftar dokter tetap memakai seed demo bila query gagal
+      if (!mounted) return;
+      setState(() {
+        _allDoctors = <DoctorSearchModel>[];
+        _categories = <String>['Semua'];
+        _selectedCategory = 'Semua';
+      });
     }
   }
 

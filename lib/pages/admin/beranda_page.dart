@@ -31,13 +31,17 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
   static const Color peachIconBg = Color(0xFFFFE3D8);
   static const Color activityIconBg = Color(0xFFFFD9CC);
 
-  String _statTerjadwal = '3';
-  String _statSelesai = '7';
-  String _statPengguna = '5';
-  String _statDokter = '4';
-  String _unreadNotif = '2';
+  /// Seed demo HANYA untuk widget test / mode tanpa Firebase.
+  /// Dengan Firebase, angka default '0' dan daftar aktivitas kosong.
+  String _statTerjadwal = Backend.useFirebase ? '0' : '3';
+  String _statSelesai = Backend.useFirebase ? '0' : '7';
+  String _statPengguna = Backend.useFirebase ? '0' : '5';
+  String _statDokter = Backend.useFirebase ? '0' : '4';
+  String _unreadNotif = Backend.useFirebase ? '0' : '2';
 
-  List<Map<String, String>> _activities = const [
+  List<Map<String, String>> _activities = Backend.useFirebase
+      ? const <Map<String, String>>[]
+      : const <Map<String, String>>[
     {'title': 'Login berhasil', 'time': '2026-08-27 08:00'},
     {'title': 'Melakukan Skin Check', 'time': '2026-08-25 10:30'},
     {'title': 'Mencatat Skin Daily', 'time': '2026-08-27 08:15'},
@@ -57,8 +61,9 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
     return ts?.toString() ?? '';
   }
 
-  /// Ambil statistik + aktivitas terbaru dari Firestore. Tanpa Firebase,
-  /// data demo tetap dipakai agar UI/tes tidak berubah.
+  /// Ambil statistik + aktivitas terbaru dari Firestore. Tanpa Firebase
+  /// (test), seed demo tetap dipakai. Dengan Firebase, hasil backend selalu
+  /// menggantikan seed — termasuk saat kosong — agar UI sinkron data asli.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     try {
@@ -78,24 +83,30 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
       final unread = results[5] as int?;
       if (!mounted) return;
       setState(() {
-        if (pengguna != null && pengguna > 0) {
-          _statPengguna = '$pengguna';
-        }
-        if (dokter != null && dokter > 0) _statDokter = '$dokter';
+        if (pengguna != null) _statPengguna = '$pengguna';
+        if (dokter != null) _statDokter = '$dokter';
         if (terjadwal != null) _statTerjadwal = '$terjadwal';
         if (selesai != null) _statSelesai = '$selesai';
         if (unread != null) _unreadNotif = '$unread';
-        if (acts != null && acts.isNotEmpty) {
-          _activities = acts
-              .map((a) => {
-                    'title': (a['title'] as String?) ?? '',
-                    'time': _fmtTime(a['createdAt']),
-                  })
-              .toList();
-        }
+        _activities = acts
+                ?.map((a) => <String, String>{
+                      'title': (a['title'] as String?) ?? '',
+                      'time': _fmtTime(a['createdAt']),
+                    })
+                .toList() ??
+            <Map<String, String>>[];
       });
     } catch (_) {
-      // dashboard tetap menampilkan angka demo bila query gagal
+      // Query gagal → reset angka '0' & aktivitas kosong, jangan seed palsu.
+      if (!mounted) return;
+      setState(() {
+        _statTerjadwal = '0';
+        _statSelesai = '0';
+        _statPengguna = '0';
+        _statDokter = '0';
+        _unreadNotif = '0';
+        _activities = <Map<String, String>>[];
+      });
     }
   }
 

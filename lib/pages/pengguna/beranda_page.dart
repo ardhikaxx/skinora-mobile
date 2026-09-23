@@ -26,8 +26,8 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
   static const Color subText = Color(0xFF757575);
   static const Color peachCardBg = Color(0xFFFFD5C3);
 
-  String _userName = 'Leonita Yulyta Agustin';
-  int _unreadNotif = 2;
+  String _userName = Backend.useFirebase ? '' : 'Leonita Yulyta Agustin';
+  int _unreadNotif = Backend.useFirebase ? 0 : 2;
 
   @override
   void initState() {
@@ -50,19 +50,22 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
       final unread = results[1] as int?;
       if (!mounted) return;
       setState(() {
-        final name = (profile?.name as String?) ?? '';
-        if (name.isNotEmpty) _userName = name;
-        if (unread != null) _unreadNotif = unread;
+        _userName = (profile?.name as String?) ?? '';
+        _unreadNotif = unread ?? 0;
       });
     } catch (_) {
-      // dashboard tetap menampilkan data demo bila query gagal
+      if (!mounted) return;
+      setState(() {
+        _userName = '';
+        _unreadNotif = 0;
+      });
     }
   }
 
   String _initials(String name) {
     final parts =
         name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    if (parts.isEmpty) return 'L';
+    if (parts.isEmpty) return '-';
     if (parts.length == 1) {
       return parts.first.substring(0, 1).toUpperCase();
     }

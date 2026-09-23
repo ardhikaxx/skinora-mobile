@@ -45,7 +45,9 @@ class _RiwayatSkincarePageState extends State<RiwayatSkincarePage> {
   // Default expanded index 0 (Jumat, 28 Agustus 2026) matching image copy 4.png
   final Set<int> _expandedIndices = {0};
 
-  List<SkincareHistoryEntry> _entries = const [
+  List<SkincareHistoryEntry> _entries = Backend.useFirebase
+      ? <SkincareHistoryEntry>[]
+      : const <SkincareHistoryEntry>[
     SkincareHistoryEntry(
       date: 'Jumat, 28 Agustus 2026',
       pagiCount: 5,
@@ -151,7 +153,7 @@ class _RiwayatSkincarePageState extends State<RiwayatSkincarePage> {
     if (uid == null) return;
     try {
       final items = await SkinService.listSkincare(uid);
-      if (items.isEmpty || !mounted) return;
+      if (!mounted) return;
       setState(() {
         _entries = items.map((m) {
           final pagi =
@@ -170,7 +172,11 @@ class _RiwayatSkincarePageState extends State<RiwayatSkincarePage> {
         if (_entries.isNotEmpty) _expandedIndices.add(0);
       });
     } catch (_) {
-      // riwayat tetap menampilkan seed demo bila query gagal
+      if (!mounted) return;
+      setState(() {
+        _entries = <SkincareHistoryEntry>[];
+        _expandedIndices.clear();
+      });
     }
   }
 

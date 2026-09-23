@@ -44,7 +44,9 @@ class _NotifikasiPenggunaPageState extends State<NotifikasiPenggunaPage> {
   static const Color dateText = Color(0xFF8E8E93);
   static const Color peachIconBg = Color(0xFFFFD5C3);
 
-  final List<PenggunaNotificationModel> _notifications = [
+  final List<PenggunaNotificationModel> _notifications = Backend.useFirebase
+      ? <PenggunaNotificationModel>[]
+      : <PenggunaNotificationModel>[
     PenggunaNotificationModel(
       id: '1',
       title: 'Konsultasi Hari Ini',
@@ -109,7 +111,6 @@ class _NotifikasiPenggunaPageState extends State<NotifikasiPenggunaPage> {
       );
       if (!mounted) return;
       setState(() {
-        if (items.isEmpty) return;
         _notifications
           ..clear()
           ..addAll(items.map((m) {
@@ -125,7 +126,8 @@ class _NotifikasiPenggunaPageState extends State<NotifikasiPenggunaPage> {
           }));
       });
     } catch (_) {
-      // biarkan seed demo bila query gagal
+      if (!mounted) return;
+      setState(_notifications.clear);
     }
   }
 

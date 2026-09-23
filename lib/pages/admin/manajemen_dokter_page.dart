@@ -39,56 +39,60 @@ class _ManajemenDokterPageState extends State<ManajemenDokterPage> {
     'Ditangguhkan',
   ];
 
-  late final List<AdminDoctorModel> _doctors = [
-    AdminDoctorModel(
-      id: '1',
-      name: 'dr. Anita Dewi, Sp.KK',
-      email: 'anita@demo.com',
-      phone: '081234567800',
-      specialization: 'Estetika Kulit',
-      experience: '8 tahun',
-      str: 'STR-2018-12345',
-      bio:
-          'Dokter spesialis kulit dan kelamin dengan pengalaman 8 tahun di bidang estetika kulit. Lulusan Fakultas Kedokteran Universitas Indonesia.',
-      status: DoctorStatus.terverifikasi,
-    ),
-    AdminDoctorModel(
-      id: '2',
-      name: 'dr. Andi Pratama, Sp.KK',
-      email: 'andi@demo.com',
-      phone: '081234567801',
-      specialization: 'Jerawat',
-      experience: '5 tahun',
-      str: 'STR-2020-12346',
-      bio:
-          'Spesialis dalam penanganan jerawat parah dan bekas luka jerawat. Lulusan Universitas Airlangga.',
-      status: DoctorStatus.terverifikasi,
-    ),
-    AdminDoctorModel(
-      id: '3',
-      name: 'dr. Sari Wulandari, Sp.KK',
-      email: 'sari@demo.com',
-      phone: '081234567802',
-      specialization: 'Alergi',
-      experience: '3 tahun',
-      str: 'STR-2022-12347',
-      bio:
-          'Dokter spesialis kulit dengan keahlian dalam penanganan alergi kulit dan dermatitis. Lulusan UGM.',
-      status: DoctorStatus.menunggu,
-    ),
-    AdminDoctorModel(
-      id: '4',
-      name: 'dr. Reza Firmansyah, Sp.KK',
-      email: 'reza@demo.com',
-      phone: '081234567803',
-      specialization: 'Anti-Aging',
-      experience: '7 tahun',
-      str: 'STR-2019-12348',
-      bio:
-          'Fokus pada terapi anti-aging dan peremajaan kulit non-invasif. Lulusan Universitas Padjadjaran.',
-      status: DoctorStatus.terverifikasi,
-    ),
-  ];
+  /// Seed demo HANYA untuk widget test / mode tanpa Firebase.
+  /// Dengan Firebase, daftar diisi dari Firestore (boleh kosong).
+  final List<AdminDoctorModel> _doctors = Backend.useFirebase
+      ? <AdminDoctorModel>[]
+      : <AdminDoctorModel>[
+          AdminDoctorModel(
+            id: '1',
+            name: 'dr. Anita Dewi, Sp.KK',
+            email: 'anita@demo.com',
+            phone: '081234567800',
+            specialization: 'Estetika Kulit',
+            experience: '8 tahun',
+            str: 'STR-2018-12345',
+            bio:
+                'Dokter spesialis kulit dan kelamin dengan pengalaman 8 tahun di bidang estetika kulit. Lulusan Fakultas Kedokteran Universitas Indonesia.',
+            status: DoctorStatus.terverifikasi,
+          ),
+          AdminDoctorModel(
+            id: '2',
+            name: 'dr. Andi Pratama, Sp.KK',
+            email: 'andi@demo.com',
+            phone: '081234567801',
+            specialization: 'Jerawat',
+            experience: '5 tahun',
+            str: 'STR-2020-12346',
+            bio:
+                'Spesialis dalam penanganan jerawat parah dan bekas luka jerawat. Lulusan Universitas Airlangga.',
+            status: DoctorStatus.terverifikasi,
+          ),
+          AdminDoctorModel(
+            id: '3',
+            name: 'dr. Sari Wulandari, Sp.KK',
+            email: 'sari@demo.com',
+            phone: '081234567802',
+            specialization: 'Alergi',
+            experience: '3 tahun',
+            str: 'STR-2022-12347',
+            bio:
+                'Dokter spesialis kulit dengan keahlian dalam penanganan alergi kulit dan dermatitis. Lulusan UGM.',
+            status: DoctorStatus.menunggu,
+          ),
+          AdminDoctorModel(
+            id: '4',
+            name: 'dr. Reza Firmansyah, Sp.KK',
+            email: 'reza@demo.com',
+            phone: '081234567803',
+            specialization: 'Anti-Aging',
+            experience: '7 tahun',
+            str: 'STR-2019-12348',
+            bio:
+                'Fokus pada terapi anti-aging dan peremajaan kulit non-invasif. Lulusan Universitas Padjadjaran.',
+            status: DoctorStatus.terverifikasi,
+          ),
+        ];
 
   @override
   void initState() {
@@ -96,18 +100,21 @@ class _ManajemenDokterPageState extends State<ManajemenDokterPage> {
     _loadFromBackend();
   }
 
-  /// Ambil data dokter dari Firestore (admin). Tanpa Firebase, daftar demo
-  /// tetap dipakai agar UI/tes tidak berubah.
+  /// Ambil data dokter dari Firestore. Tanpa Firebase (test), seed demo
+  /// tetap dipakai. Dengan Firebase, hasil backend selalu menggantikan seed
+  /// — termasuk saat daftar kosong — agar UI sinkron dengan data asli.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     try {
       final doctors = await UserService.listDokter();
-      if (doctors.isEmpty || !mounted) return;
+      if (!mounted) return;
       setState(() => _doctors
         ..clear()
         ..addAll(doctors));
     } catch (_) {
-      // daftar tetap menampilkan seed demo bila query gagal
+      // Query gagal → tampilkan kosong, jangan seed palsu di production.
+      if (!mounted) return;
+      setState(_doctors.clear);
     }
   }
 

@@ -121,6 +121,17 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
   };
 
   DoctorProfileDetailModel get _currentDoctor {
+    if (Backend.useFirebase) {
+      if (_liveDoctor != null) return _liveDoctor!;
+      return DoctorProfileDetailModel(
+        id: widget.doctorId ?? '',
+        name: widget.doctorName ?? '-',
+        specialization: widget.specialization ?? '-',
+        experience: '',
+        bio: '',
+        schedules: const [],
+      );
+    }
     if (widget.doctorId != null &&
         _doctorDatabase.containsKey(widget.doctorId)) {
       return _doctorDatabase[widget.doctorId]!;
@@ -147,81 +158,75 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
   }
 
   /// Profil dokter + slot jadwal dari Firestore. Tanpa Firebase, seed demo
-  /// tetap dipakai agar UI/tes tidak berubah.
+  /// tetap dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil backend
+  /// selalu menggantikan seed — jadwal hanya dari slot live, bukan seed.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     final doctorId = widget.doctorId;
-    if (doctorId == null || doctorId.isEmpty) return;
+    if (doctorId == null || doctorId.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _liveDoctor = null;
+        _availableSlots = const [];
+      });
+      return;
+    }
     try {
       final results = await Future.wait<Object?>([
         UserService.loadByUid(doctorId),
         ScheduleService.listSlots(doctorId),
       ]);
       final profile = results[0] as dynamic;
-      final slots = results[1] as List<SlotRecord>?;
+      final slots = (results[1] as List<SlotRecord>?) ?? const <SlotRecord>[];
       if (!mounted) return;
       setState(() {
-        if (profile != null) {
-          final seed = _doctorDatabase[doctorId] ??
-              (widget.doctorName != null
-                  ? _doctorDatabase.values.firstWhere(
-                      (d) =>
-                          d.name.toLowerCase() ==
-                          widget.doctorName!.toLowerCase(),
-                      orElse: () => _doctorDatabase['1']!,
-                    )
-                  : _doctorDatabase['1']!);
-          _liveDoctor = DoctorProfileDetailModel(
-            id: doctorId,
-            name: ((profile.name as String?) ?? '').isNotEmpty
-                ? profile.name as String
-                : seed.name,
-            specialization:
-                ((profile.specialization as String?) ?? '').isNotEmpty
-                    ? profile.specialization as String
-                    : seed.specialization,
-            experience: ((profile.experience as String?) ?? '').isNotEmpty
-                ? 'Pengalaman: ${profile.experience}'
-                : seed.experience,
-            bio: ((profile.bio as String?) ?? '').isNotEmpty
-                ? profile.bio as String
-                : seed.bio,
-            schedules: seed.schedules,
-          );
-        }
-        final open = (slots ?? const <SlotRecord>[])
+        _availableSlots = slots;
+        final open = slots
             .where((s) => !s.isBooked && s.date.isNotEmpty)
             .toList();
-        if (open.isNotEmpty) {
-          _availableSlots = open;
-          final byDate = <String, List<String>>{};
-          final order = <String>[];
-          for (final s in open) {
-            final t = s.timeStart.isNotEmpty ? s.timeStart : s.time;
-            byDate.putIfAbsent(s.date, () {
-              order.add(s.date);
-              return <String>[];
-            }).add(t);
-          }
-          _liveDoctor = DoctorProfileDetailModel(
-            id: _liveDoctor?.id ?? doctorId,
-            name: _liveDoctor?.name ?? _currentDoctor.name,
-            specialization:
-                _liveDoctor?.specialization ?? _currentDoctor.specialization,
-            experience: _liveDoctor?.experience ?? _currentDoctor.experience,
-            bio: _liveDoctor?.bio ?? _currentDoctor.bio,
-            schedules: [
-              for (final date in order)
-                DoctorScheduleModel(
-                  dayDate: date.toUpperCase(),
-                  timeSlots: byDate[date]!,
-                ),
-            ],
-          );
+        final byDate = <String, List<String>>{};
+        final order = <String>[];
+        for (final s in open) {
+          final t = s.timeStart.isNotEmpty ? s.timeStart : s.time;
+          byDate.putIfAbsent(s.date, () {
+            order.add(s.date);
+            return <String>[];
+          }).add(t);
         }
+        final name = ((profile?.name as String?) ?? '');
+        final specialization = ((profile?.specialization as String?) ?? '');
+        final experience = ((profile?.experience as String?) ?? '');
+        final bio = ((profile?.bio as String?) ?? '');
+        _liveDoctor = DoctorProfileDetailModel(
+          id: doctorId,
+          name: name.isNotEmpty
+              ? name
+              : (widget.doctorName?.isNotEmpty ?? false
+                  ? widget.doctorName!
+                  : '-'),
+          specialization: specialization.isNotEmpty
+              ? specialization
+              : (widget.specialization?.isNotEmpty ?? false
+                  ? widget.specialization!
+                  : '-'),
+          experience: experience.isNotEmpty ? 'Pengalaman: $experience' : '',
+          bio: bio,
+          schedules: [
+            for (final date in order)
+              DoctorScheduleModel(
+                dayDate: date.toUpperCase(),
+                timeSlots: byDate[date]!,
+              ),
+          ],
+        );
       });
     } catch (_) {
-      // profil dokter tetap menampilkan seed demo bila query gagal
+      // Query gagal → reset ke placeholder kosong, jangan seed palsu.
+      if (!mounted) return;
+      setState(() {
+        _liveDoctor = null;
+        _availableSlots = const [];
+      });
     }
   }
 

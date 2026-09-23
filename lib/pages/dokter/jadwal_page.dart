@@ -53,8 +53,8 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
   bool _isReady = false; // false = "Sibuk", true = "Siap"
   bool _isFormOpen = false;
 
-  final TextEditingController _dateController =
-      TextEditingController(text: 'Jumat, 28 Agustus 2026');
+  final TextEditingController _dateController = TextEditingController(
+      text: Backend.useFirebase ? '' : 'Jumat, 28 Agustus 2026');
   final TextEditingController _startTimeController = TextEditingController();
   final TextEditingController _endTimeController = TextEditingController();
 
@@ -67,7 +67,10 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
   @override
   void initState() {
     super.initState();
-    _scheduleDays = [
+    // Seed demo HANYA untuk widget test / mode tanpa Firebase.
+    _scheduleDays = Backend.useFirebase
+        ? <DayScheduleModel>[]
+        : <DayScheduleModel>[
       // 1. Jumat, 28 Agustus 2026
       DayScheduleModel(
         date: 'Jumat, 28 Agustus 2026',
@@ -153,7 +156,8 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
   }
 
   /// Muat slot + status ketersediaan dari Firestore. Tanpa Firebase, seed
-  /// demo tetap dipakai agar UI/tes tidak berubah.
+  /// demo tetap dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil
+  /// backend selalu menggantikan seed — termasuk saat kosong.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
@@ -169,11 +173,10 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
       setState(() {
         final available = profile == null ? null : (profile.isAvailable as bool?);
         if (available != null) _isReady = available;
-        if (slots == null || slots.isEmpty) return;
         _backendLoaded = true;
         _slotDocIds.clear();
         final grouped = <String, List<ScheduleSlotModel>>{};
-        for (final s in slots) {
+        for (final s in (slots ?? const <SlotRecord>[])) {
           final day = grouped.putIfAbsent(s.date, () => []);
           day.add(ScheduleSlotModel(
             id: s.id,
@@ -192,7 +195,13 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
         }
       });
     } catch (_) {
-      // biarkan seed demo bila query gagal
+      // Query gagal → tampilkan kosong, jangan seed palsu di production.
+      if (!mounted) return;
+      setState(() {
+        _backendLoaded = true;
+        _slotDocIds.clear();
+        _scheduleDays = <DayScheduleModel>[];
+      });
     }
   }
 

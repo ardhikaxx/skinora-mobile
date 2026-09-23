@@ -32,17 +32,18 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
   static const Color labelText = Color(0xFF8E8E93);
   static const Color badgeBg = Color(0xFFFFD5C8);
 
-  // Profile data (default demo — diganti dari Firestore bila Firebase aktif)
-  String _nama = 'Admin Skinora';
-  String _email = 'admin@demo.com';
-  String _telepon = '081234567899';
-  String _alamat = 'Jl. Teknologi No. 1, Jakarta';
-  String _tanggalLahir = '1985-01-01';
+  // Profile data — seed demo HANYA tanpa Firebase. Dengan Firebase, default
+  // placeholder kosong ('' / '-') hingga data asli dimuat dari Firestore.
+  String _nama = Backend.useFirebase ? '' : 'Admin Skinora';
+  String _email = Backend.useFirebase ? '' : 'admin@demo.com';
+  String _telepon = Backend.useFirebase ? '-' : '081234567899';
+  String _alamat = Backend.useFirebase ? '-' : 'Jl. Teknologi No. 1, Jakarta';
+  String _tanggalLahir = Backend.useFirebase ? '-' : '1985-01-01';
 
-  // Ringkasan platform (default demo)
-  String _statPengguna = '5';
-  String _statDokter = '4';
-  String _statKonsultasi = '13';
+  // Ringkasan platform — seed demo HANYA tanpa Firebase.
+  String _statPengguna = Backend.useFirebase ? '0' : '5';
+  String _statDokter = Backend.useFirebase ? '0' : '4';
+  String _statKonsultasi = Backend.useFirebase ? '0' : '13';
 
   // Helper to extract initials (e.g., Admin Skinora -> AS)
   String get _initials {
@@ -65,8 +66,9 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
     return s.isEmpty ? fallback : s;
   }
 
-  /// Muat profile admin + statistik ringkasan. Tanpa Firebase, data demo
-  /// tetap dipakai agar UI/tes tidak berubah.
+  /// Muat profile admin + statistik ringkasan. Tanpa Firebase (test), seed
+  /// demo tetap dipakai. Dengan Firebase, hasil backend selalu menggantikan
+  /// seed — termasuk saat kosong — agar UI sinkron dengan data asli.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     try {
@@ -83,18 +85,29 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
       if (!mounted) return;
       setState(() {
         if (profile != null) {
-          _nama = _pick(profile.name, _nama);
-          _email = _pick(profile.email, _email);
-          _telepon = _pick(profile.phone, _telepon);
-          _alamat = _pick(profile.address, _alamat);
-          _tanggalLahir = _pick(profile.birthDate, _tanggalLahir);
+          _nama = _pick(profile.name, '');
+          _email = _pick(profile.email, '');
+          _telepon = _pick(profile.phone, '-');
+          _alamat = _pick(profile.address, '-');
+          _tanggalLahir = _pick(profile.birthDate, '-');
         }
-        if (pengguna != null && pengguna > 0) _statPengguna = '$pengguna';
-        if (dokter != null && dokter > 0) _statDokter = '$dokter';
+        if (pengguna != null) _statPengguna = '$pengguna';
+        if (dokter != null) _statDokter = '$dokter';
         if (konsultasi != null) _statKonsultasi = '$konsultasi';
       });
     } catch (_) {
-      // profil tetap memakai nilai demo bila gagal
+      // Query gagal → reset placeholder, jangan nilai demo di production.
+      if (!mounted) return;
+      setState(() {
+        _nama = '';
+        _email = '';
+        _telepon = '-';
+        _alamat = '-';
+        _tanggalLahir = '-';
+        _statPengguna = '0';
+        _statDokter = '0';
+        _statKonsultasi = '0';
+      });
     }
   }
 

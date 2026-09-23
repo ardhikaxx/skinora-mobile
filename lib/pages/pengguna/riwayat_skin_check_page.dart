@@ -52,7 +52,9 @@ class _RiwayatSkinCheckPageState extends State<RiwayatSkinCheckPage> {
   static const Color chipNeutralBorder = Color(0xFFE5E5EA);
   static const Color chipNeutralText = Color(0xFF6B5E5E);
 
-  List<SkinCheckHistoryModel> _historyList = const [
+  List<SkinCheckHistoryModel> _historyList = Backend.useFirebase
+      ? <SkinCheckHistoryModel>[]
+      : const <SkinCheckHistoryModel>[
     SkinCheckHistoryModel(
       id: '1',
       date: '2026-08-28',
@@ -91,7 +93,7 @@ class _RiwayatSkinCheckPageState extends State<RiwayatSkinCheckPage> {
     if (uid == null) return;
     try {
       final items = await SkinService.listSkinChecks(uid);
-      if (items.isEmpty || !mounted) return;
+      if (!mounted) return;
       setState(() {
         _historyList = items.map((m) {
           final skinType = (m['resultSkinType'] as String?) ?? 'Normal';
@@ -123,7 +125,8 @@ class _RiwayatSkinCheckPageState extends State<RiwayatSkinCheckPage> {
         }).toList();
       });
     } catch (_) {
-      // riwayat tetap menampilkan seed demo bila query gagal
+      if (!mounted) return;
+      setState(() => _historyList = <SkinCheckHistoryModel>[]);
     }
   }
 

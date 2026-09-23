@@ -44,18 +44,20 @@ class _PengaturanPenggunaPageState extends State<PengaturanPenggunaPage> {
     if (uid == null) return;
     try {
       final profile = await UserService.loadByUid(uid);
-      if (profile == null || !mounted) return;
+      if (!mounted) return;
       setState(() {
+        if (profile == null) {
+          _notificationsEnabled = true;
+          _morningReminderController.text = '';
+          _eveningReminderController.text = '';
+          return;
+        }
         _notificationsEnabled = profile.notificationsEnabled;
-        if (profile.morningReminder.isNotEmpty) {
-          _morningReminderController.text = profile.morningReminder;
-        }
-        if (profile.eveningReminder.isNotEmpty) {
-          _eveningReminderController.text = profile.eveningReminder;
-        }
+        _morningReminderController.text = profile.morningReminder;
+        _eveningReminderController.text = profile.eveningReminder;
       });
     } catch (_) {
-      // pengaturan tetap memakai nilai default bila query gagal
+      // Query gagal → biarkan nilai default yang aman.
     }
   }
 

@@ -55,8 +55,10 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
   @override
   void initState() {
     super.initState();
-    // Pre-populate with conversation matching image copy 2.png
-    _messages = [
+    // Seed demo HANYA tanpa Firebase; dengan Firebase, stream yang mengisi.
+    _messages = Backend.useFirebase
+        ? <ChatBubbleModel>[]
+        : <ChatBubbleModel>[
       ChatBubbleModel(
         id: '1',
         text: 'Selamat pagi, ${widget.patientName.split(' ').first}. Ada yang bisa saya bantu hari ini?',
@@ -114,10 +116,13 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
   void _loadFromBackend() {
     if (!Backend.useFirebase) return;
     final id = widget.consultationId;
-    if (id == null || id.isEmpty) return;
+    if (id == null || id.isEmpty) {
+      _messages = const <ChatBubbleModel>[];
+      return;
+    }
     _msgSub = ConsultationService.messageStream(id).listen(
       (items) {
-        if (!mounted || items.isEmpty) return;
+        if (!mounted) return;
         setState(() {
           _messages = items.map((m) {
             final role = (m['senderRole'] as String?) ?? '';
@@ -137,7 +142,10 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
           }
         });
       },
-      onError: (_) {},
+      onError: (_) {
+        if (!mounted) return;
+        setState(() => _messages = const <ChatBubbleModel>[]);
+      },
     );
   }
 

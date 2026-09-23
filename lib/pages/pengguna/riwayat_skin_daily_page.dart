@@ -60,7 +60,9 @@ class _RiwayatSkinDailyPageState extends State<RiwayatSkinDailyPage> {
   // Track expanded cards
   final Set<int> _expandedIndices = {0};
 
-  List<DailyHistoryEntry> _entries = const [
+  List<DailyHistoryEntry> _entries = Backend.useFirebase
+      ? <DailyHistoryEntry>[]
+      : const <DailyHistoryEntry>[
     DailyHistoryEntry(
       date: 'Jumat, 28 Agustus 2026',
       status: 'Baik',
@@ -168,7 +170,7 @@ class _RiwayatSkinDailyPageState extends State<RiwayatSkinDailyPage> {
     if (uid == null) return;
     try {
       final items = await SkinService.listSkinDailies(uid);
-      if (items.isEmpty || !mounted) return;
+      if (!mounted) return;
       setState(() {
         _entries = items.map((m) {
           final symptoms =
@@ -196,7 +198,11 @@ class _RiwayatSkinDailyPageState extends State<RiwayatSkinDailyPage> {
         if (_entries.isNotEmpty) _expandedIndices.add(0);
       });
     } catch (_) {
-      // riwayat tetap menampilkan seed demo bila query gagal
+      if (!mounted) return;
+      setState(() {
+        _entries = <DailyHistoryEntry>[];
+        _expandedIndices.clear();
+      });
     }
   }
 

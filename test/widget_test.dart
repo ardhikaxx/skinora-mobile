@@ -843,9 +843,9 @@ void main() {
     expect(find.text('NAMA'), findsOneWidget);
     expect(find.text('TELEPON'), findsOneWidget);
     expect(find.text('ALAMAT'), findsOneWidget);
-    expect(find.text('AS'), findsOneWidget);
+    expect(find.text('A'), findsOneWidget);
 
-    final nameField = find.widgetWithText(TextField, 'Admin Skinora');
+    final nameField = find.byType(TextField).first;
     await tester.enterText(nameField, 'Super Admin');
     await tester.pumpAndSettle();
 
@@ -1686,6 +1686,7 @@ void main() {
     expect(find.text('STATUS'), findsOneWidget);
     expect(find.text('Selesai'), findsOneWidget);
     expect(find.text('RIWAYAT CHAT'), findsOneWidget);
+    expect(find.text('Belum ada riwayat chat'), findsNothing);
     expect(find.text('Dok, saya mau tanya soal perawatan kulit setelah operasi kecil'), findsOneWidget);
     expect(find.text('Tentu, operasi apa yang sudah dilakukan?'), findsOneWidget);
     expect(find.text('Operasi kecil untuk angkat tahi lalat di pipi kanan'), findsOneWidget);

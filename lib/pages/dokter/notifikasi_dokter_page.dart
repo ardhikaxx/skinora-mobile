@@ -44,24 +44,28 @@ class _NotifikasiDokterPageState extends State<NotifikasiDokterPage> {
   static const Color dateText = Color(0xFF9E9E9E);
   static const Color peachIconBg = Color(0xFFFFD5C8);
 
-  final List<DoctorNotificationModel> _notifications = [
-    DoctorNotificationModel(
-      id: '1',
-      title: 'Booking Baru',
-      description: 'Leonita booking jadwal konsultasi untuk hari ini',
-      time: '2026-08-28 08:30',
-      icon: LucideIcons.calendar,
-      isUnread: true,
-    ),
-    DoctorNotificationModel(
-      id: '2',
-      title: 'Jadwal Hari Ini',
-      description: 'Anda memiliki 3 konsultasi hari ini',
-      time: '2026-08-28 07:00',
-      icon: LucideIcons.messageSquare,
-      isUnread: false,
-    ),
-  ];
+  // Seed demo HANYA untuk widget test / mode tanpa Firebase.
+  // Dengan Firebase, daftar diisi dari Firestore (boleh kosong).
+  final List<DoctorNotificationModel> _notifications = Backend.useFirebase
+      ? <DoctorNotificationModel>[]
+      : <DoctorNotificationModel>[
+          DoctorNotificationModel(
+            id: '1',
+            title: 'Booking Baru',
+            description: 'Leonita booking jadwal konsultasi untuk hari ini',
+            time: '2026-08-28 08:30',
+            icon: LucideIcons.calendar,
+            isUnread: true,
+          ),
+          DoctorNotificationModel(
+            id: '2',
+            title: 'Jadwal Hari Ini',
+            description: 'Anda memiliki 3 konsultasi hari ini',
+            time: '2026-08-28 07:00',
+            icon: LucideIcons.messageSquare,
+            isUnread: false,
+          ),
+        ];
 
   @override
   void initState() {
@@ -85,7 +89,8 @@ class _NotifikasiDokterPageState extends State<NotifikasiDokterPage> {
   }
 
   /// Notifikasi audience dokter dari Firestore. Tanpa Firebase, seed demo
-  /// tetap dipakai agar UI/tes tidak berubah.
+  /// tetap dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil backend
+  /// selalu menggantikan seed — termasuk saat kosong.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
@@ -96,7 +101,6 @@ class _NotifikasiDokterPageState extends State<NotifikasiDokterPage> {
       );
       if (!mounted) return;
       setState(() {
-        if (items.isEmpty) return;
         _notifications
           ..clear()
           ..addAll(items.map((m) {
@@ -112,7 +116,9 @@ class _NotifikasiDokterPageState extends State<NotifikasiDokterPage> {
           }));
       });
     } catch (_) {
-      // biarkan seed demo bila query gagal
+      // Query gagal → tampilkan kosong, jangan seed palsu di production.
+      if (!mounted) return;
+      setState(_notifications.clear);
     }
   }
 

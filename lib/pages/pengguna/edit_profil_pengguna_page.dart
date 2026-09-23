@@ -13,8 +13,8 @@ class EditProfilPenggunaPage extends StatefulWidget {
 
   const EditProfilPenggunaPage({
     super.key,
-    this.initialName = 'Leonita Yulyta Agustin',
-    this.initialPhone = '081234567890',
+    this.initialName = '',
+    this.initialPhone = '',
     this.initialAddress = '',
     this.onNavigateTab,
   });

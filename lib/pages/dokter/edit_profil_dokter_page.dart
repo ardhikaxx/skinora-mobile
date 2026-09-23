@@ -10,18 +10,35 @@ class DoctorProfileStore {
   factory DoctorProfileStore() => _instance;
   DoctorProfileStore._internal();
 
-  String name = 'dr. Anita Dewi, Sp.KK';
-  String email = 'anita@demo.com';
-  String phone = '081234567800';
-  String address = 'Jl. Melati No. 10, Jakarta';
-  String specialization = 'Estetika Kulit';
-  String experience = '8 tahun';
-  String str = 'STR-2018-12345';
-  String bio =
-      'Dokter spesialis kulit dan kelamin berpengalaman dalam perawatan estetika dan peremajaan kulit.';
+  // Seed demo HANYA untuk widget test / mode tanpa Firebase.
+  // Dengan Firebase, field default kosong — diisi dari Firestore.
+  String name = Backend.useFirebase ? '' : 'dr. Anita Dewi, Sp.KK';
+  String email = Backend.useFirebase ? '' : 'anita@demo.com';
+  String phone = Backend.useFirebase ? '' : '081234567800';
+  String address = Backend.useFirebase ? '' : 'Jl. Melati No. 10, Jakarta';
+  String specialization = Backend.useFirebase ? '' : 'Estetika Kulit';
+  String experience = Backend.useFirebase ? '' : '8 tahun';
+  String str = Backend.useFirebase ? '' : 'STR-2018-12345';
+  String status = Backend.useFirebase ? '' : 'terverifikasi';
+  String bio = Backend.useFirebase
+      ? ''
+      : 'Dokter spesialis kulit dan kelamin berpengalaman dalam perawatan estetika dan peremajaan kulit.';
+
+  void clear() {
+    name = '';
+    email = '';
+    phone = '';
+    address = '';
+    specialization = '';
+    experience = '';
+    str = '';
+    status = '';
+    bio = '';
+  }
 
   String get initials {
     final parts = name.split(' ').where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '';
     if (parts.length >= 2) {
       final firstChar = parts[0].replaceAll(RegExp(r'[^a-zA-Z]'), '');
       final secondChar = parts[1].replaceAll(RegExp(r'[^a-zA-Z]'), '');
@@ -29,13 +46,11 @@ class DoctorProfileStore {
         return (firstChar[0] + secondChar[0]).toUpperCase();
       }
     }
-    if (parts.isNotEmpty) {
-      final firstChar = parts[0].replaceAll(RegExp(r'[^a-zA-Z]'), '');
-      if (firstChar.isNotEmpty) {
-        return firstChar[0].toUpperCase();
-      }
+    final firstChar = parts[0].replaceAll(RegExp(r'[^a-zA-Z]'), '');
+    if (firstChar.isNotEmpty) {
+      return firstChar[0].toUpperCase();
     }
-    return 'DA';
+    return Backend.useFirebase ? '' : 'DA';
   }
 }
 
@@ -65,7 +80,8 @@ class _EditProfilDokterPageState extends State<EditProfilDokterPage> {
   late TextEditingController _addressController;
   late TextEditingController _bioController;
 
-  String _currentInitials = 'DA';
+  String _currentInitials = Backend.useFirebase ? '' : 'DA';
+  bool _loadFailed = false;
 
   @override
   void initState() {
@@ -84,51 +100,69 @@ class _EditProfilDokterPageState extends State<EditProfilDokterPage> {
     _loadFromBackend();
   }
 
+  void _applyStoreToControllers() {
+    final store = DoctorProfileStore();
+    _nameController.text = store.name;
+    _specializationController.text = store.specialization;
+    _experienceController.text = store.experience;
+    _phoneController.text = store.phone;
+    _addressController.text = store.address;
+    _bioController.text = store.bio;
+    _currentInitials = store.initials;
+  }
+
   /// Isi form dari Firestore bila sesi aktif. Tanpa Firebase, seed demo
-  /// tetap dipakai agar UI/tes tidak berubah.
+  /// tetap dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil backend
+  /// selalu diterapkan — dan kegagalan mengosongkan form (bukan seed).
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
-    if (uid == null) return;
+    if (uid == null) {
+      // Tanpa sesi → jangan biarkan seed tertulis ke Firestore.
+      if (!mounted) return;
+      setState(() {
+        _loadFailed = true;
+        DoctorProfileStore().clear();
+        _applyStoreToControllers();
+      });
+      return;
+    }
     try {
       final profile = await UserService.loadByUid(uid);
-      if (profile == null || !mounted) return;
+      if (!mounted) return;
       final store = DoctorProfileStore();
-      if (profile.name.isNotEmpty) store.name = profile.name;
-      if (profile.email.isNotEmpty) store.email = profile.email;
-      if (profile.specialization.isNotEmpty) {
+      if (profile == null) {
+        _loadFailed = true;
+        store.clear();
+      } else {
+        _loadFailed = false;
+        // Selalu terapkan field dari profile (bukan hanya isNotEmpty).
+        store.name = profile.name;
+        store.email = profile.email;
         store.specialization = profile.specialization;
+        store.experience = profile.experience;
+        store.phone = profile.phone;
+        store.address = profile.address;
+        store.bio = profile.bio;
+        store.str = profile.str;
+        store.status = profile.status;
       }
-      if (profile.experience.isNotEmpty) store.experience = profile.experience;
-      if (profile.phone.isNotEmpty) store.phone = profile.phone;
-      if (profile.address.isNotEmpty) store.address = profile.address;
-      if (profile.bio.isNotEmpty) store.bio = profile.bio;
-      if (profile.str.isNotEmpty) store.str = profile.str;
-      setState(() {
-        if (profile.name.isNotEmpty) {
-          _nameController.text = profile.name;
-        }
-        if (profile.specialization.isNotEmpty) {
-          _specializationController.text = profile.specialization;
-        }
-        if (profile.experience.isNotEmpty) {
-          _experienceController.text = profile.experience;
-        }
-        if (profile.phone.isNotEmpty) _phoneController.text = profile.phone;
-        if (profile.address.isNotEmpty) {
-          _addressController.text = profile.address;
-        }
-        if (profile.bio.isNotEmpty) _bioController.text = profile.bio;
-      });
+      setState(_applyStoreToControllers);
     } catch (_) {
-      // biarkan seed demo bila query gagal
+      // Query gagal → kosongkan, jangan biarkan seed.
+      if (!mounted) return;
+      setState(() {
+        _loadFailed = true;
+        DoctorProfileStore().clear();
+        _applyStoreToControllers();
+      });
     }
   }
 
   void _updateInitials() {
     final tempName = _nameController.text.trim();
     final parts = tempName.split(' ').where((p) => p.isNotEmpty).toList();
-    String newInitials = 'DA';
+    String newInitials = Backend.useFirebase ? '' : 'DA';
     if (parts.length >= 2) {
       final first = parts[0].replaceAll(RegExp(r'[^a-zA-Z]'), '');
       final second = parts[1].replaceAll(RegExp(r'[^a-zA-Z]'), '');
@@ -166,6 +200,18 @@ class _EditProfilDokterPageState extends State<EditProfilDokterPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Nama tidak boleh kosong'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    // Dengan Firebase, data awal gagal dimuat → jangan menulis apa pun
+    // (mencegah seed/sampah masuk ke Firestore).
+    if (Backend.useFirebase && _loadFailed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profil belum dimuat, periksa koneksi lalu coba lagi'),
           duration: Duration(seconds: 2),
         ),
       );

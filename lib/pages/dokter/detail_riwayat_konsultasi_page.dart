@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
+import '../../services/backend.dart';
 import 'riwayat_konsultasi_page.dart';
 
 class DetailRiwayatKonsultasiPage extends StatelessWidget {
@@ -15,8 +16,8 @@ class DetailRiwayatKonsultasiPage extends StatelessWidget {
   const DetailRiwayatKonsultasiPage({
     super.key,
     this.consultation,
-    this.patientName = 'Leonita Yulyta Agustin',
-    this.dateTime = '2026-08-15 • 09:00 - 09:30',
+    this.patientName = '',
+    this.dateTime = '',
     this.status = 'Selesai',
     this.chatHistory,
     this.onNavigateTab,
@@ -29,21 +30,31 @@ class DetailRiwayatKonsultasiPage extends StatelessWidget {
   static const Color patientBubbleBg = Color(0xFFFFD5C8);
   static const Color badgeBg = Color(0xFFFFD5C8);
 
-  String get _name => consultation?.patientName ?? patientName;
-  String get _date => consultation?.dateTime ?? dateTime;
+  String get _name {
+    final raw = consultation?.patientName ?? patientName;
+    if (raw.isNotEmpty) return raw;
+    return Backend.useFirebase ? '-' : 'Leonita Yulyta Agustin';
+  }
+
+  String get _date {
+    final raw = consultation?.dateTime ?? dateTime;
+    if (raw.isNotEmpty) return raw;
+    return Backend.useFirebase ? '-' : '2026-08-15 • 09:00 - 09:30';
+  }
+  String get _statusLabel {
+    if (status.isNotEmpty) return status;
+    return 'Selesai';
+  }
 
   List<HistoryChatMessage> get _messages {
-    if (consultation != null && consultation!.chatHistory.isNotEmpty) {
-      return consultation!.chatHistory;
-    }
-    if (chatHistory != null && chatHistory!.isNotEmpty) {
-      return chatHistory!;
-    }
-    // Default chat history matching image copy 3.png
+    if (consultation != null) return consultation!.chatHistory;
+    if (chatHistory != null) return chatHistory!;
+    if (Backend.useFirebase) return const <HistoryChatMessage>[];
     return const [
       HistoryChatMessage(
         sender: 'Pasien',
-        message: 'Dok, saya mau tanya soal perawatan kulit setelah operasi kecil',
+        message:
+            'Dok, saya mau tanya soal perawatan kulit setelah operasi kecil',
       ),
       HistoryChatMessage(
         sender: 'Dokter',
@@ -276,7 +287,7 @@ class DetailRiwayatKonsultasiPage extends StatelessWidget {
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
-              children: const [
+              children: [
                 Icon(
                   LucideIcons.check,
                   size: 13,
@@ -284,7 +295,7 @@ class DetailRiwayatKonsultasiPage extends StatelessWidget {
                 ),
                 SizedBox(width: 4),
                 Text(
-                  'Selesai',
+                  _statusLabel,
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.bold,
@@ -345,6 +356,17 @@ class DetailRiwayatKonsultasiPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
+
+          // Empty state
+          if (messages.isEmpty)
+            const Text(
+              'Belum ada riwayat chat',
+              style: TextStyle(
+                fontSize: 13.0,
+                color: Color(0xFF9CA3AF),
+                height: 1.35,
+              ),
+            ),
 
           // Messages List
           ...messages.map((item) {

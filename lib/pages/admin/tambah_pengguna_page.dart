@@ -69,12 +69,8 @@ class _TambahPenggunaPageState extends State<TambahPenggunaPage> {
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name,
       email: email,
-      phone: _phoneController.text.trim().isEmpty
-          ? '081234567890'
-          : _phoneController.text.trim(),
-      address: _addressController.text.trim().isEmpty
-          ? 'Jl. Sudirman, Jakarta'
-          : _addressController.text.trim(),
+      phone: _phoneController.text.trim(),
+      address: _addressController.text.trim(),
       birthDate: '',
       gender: _selectedGender,
       status: UserStatus.aktif,

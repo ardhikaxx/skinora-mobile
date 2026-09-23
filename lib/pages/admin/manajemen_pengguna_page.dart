@@ -30,58 +30,62 @@ class _ManajemenPenggunaPageState extends State<ManajemenPenggunaPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  late final List<AdminUserModel> _users = [
-    AdminUserModel(
-      id: '1',
-      name: 'Leonita Yulyta Agustin',
-      email: 'leonita@demo.com',
-      phone: '081234567890',
-      address: 'Jl. Sudirman No. 123, Jakarta',
-      birthDate: '1995-06-15',
-      gender: 'Perempuan',
-      status: UserStatus.aktif,
-    ),
-    AdminUserModel(
-      id: '2',
-      name: 'Annida Tri Aulia',
-      email: 'annida@demo.com',
-      phone: '081234567891',
-      address: 'Jl. Melati No. 45, Bandung',
-      birthDate: '1998-03-22',
-      gender: 'Perempuan',
-      status: UserStatus.aktif,
-    ),
-    AdminUserModel(
-      id: '3',
-      name: 'Kafi Khaula Yukisa Zailina',
-      email: 'kafi@demo.com',
-      phone: '081234567892',
-      address: 'Jl. Pahlawan No. 12, Surabaya',
-      birthDate: '2000-11-10',
-      gender: 'Perempuan',
-      status: UserStatus.aktif,
-    ),
-    AdminUserModel(
-      id: '4',
-      name: 'Siti Aisa Nur Apriliana',
-      email: 'siti@demo.com',
-      phone: '081234567893',
-      address: 'Jl. Diponegoro No. 78, Yogyakarta',
-      birthDate: '1997-04-18',
-      gender: 'Perempuan',
-      status: UserStatus.aktif,
-    ),
-    AdminUserModel(
-      id: '5',
-      name: 'Nur Alisa Qiroati Sholeha',
-      email: 'alisa@demo.com',
-      phone: '081234567894',
-      address: 'Jl. Ahmad Yani No. 56, Semarang',
-      birthDate: '1999-08-05',
-      gender: 'Perempuan',
-      status: UserStatus.aktif,
-    ),
-  ];
+  /// Seed demo HANYA untuk widget test / mode tanpa Firebase.
+  /// Dengan Firebase, daftar diisi dari Firestore (boleh kosong).
+  final List<AdminUserModel> _users = Backend.useFirebase
+      ? <AdminUserModel>[]
+      : <AdminUserModel>[
+          AdminUserModel(
+            id: '1',
+            name: 'Leonita Yulyta Agustin',
+            email: 'leonita@demo.com',
+            phone: '081234567890',
+            address: 'Jl. Sudirman No. 123, Jakarta',
+            birthDate: '1995-06-15',
+            gender: 'Perempuan',
+            status: UserStatus.aktif,
+          ),
+          AdminUserModel(
+            id: '2',
+            name: 'Annida Tri Aulia',
+            email: 'annida@demo.com',
+            phone: '081234567891',
+            address: 'Jl. Melati No. 45, Bandung',
+            birthDate: '1998-03-22',
+            gender: 'Perempuan',
+            status: UserStatus.aktif,
+          ),
+          AdminUserModel(
+            id: '3',
+            name: 'Kafi Khaula Yukisa Zailina',
+            email: 'kafi@demo.com',
+            phone: '081234567892',
+            address: 'Jl. Pahlawan No. 12, Surabaya',
+            birthDate: '2000-11-10',
+            gender: 'Perempuan',
+            status: UserStatus.aktif,
+          ),
+          AdminUserModel(
+            id: '4',
+            name: 'Siti Aisa Nur Apriliana',
+            email: 'siti@demo.com',
+            phone: '081234567893',
+            address: 'Jl. Diponegoro No. 78, Yogyakarta',
+            birthDate: '1997-04-18',
+            gender: 'Perempuan',
+            status: UserStatus.aktif,
+          ),
+          AdminUserModel(
+            id: '5',
+            name: 'Nur Alisa Qiroati Sholeha',
+            email: 'alisa@demo.com',
+            phone: '081234567894',
+            address: 'Jl. Ahmad Yani No. 56, Semarang',
+            birthDate: '1999-08-05',
+            gender: 'Perempuan',
+            status: UserStatus.aktif,
+          ),
+        ];
 
   @override
   void initState() {
@@ -89,18 +93,21 @@ class _ManajemenPenggunaPageState extends State<ManajemenPenggunaPage> {
     _loadFromBackend();
   }
 
-  /// Ambil data pengguna dari Firestore (admin). Tanpa Firebase, daftar demo
-  /// yang sudah ada tetap dipakai agar UI/tes tidak berubah.
+  /// Ambil data pengguna dari Firestore. Tanpa Firebase (test), seed demo
+  /// tetap dipakai. Dengan Firebase, hasil backend selalu menggantikan seed
+  /// — termasuk saat daftar kosong — agar UI sinkron dengan data asli.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     try {
       final users = await UserService.listPengguna();
-      if (users.isEmpty || !mounted) return;
+      if (!mounted) return;
       setState(() => _users
         ..clear()
         ..addAll(users));
     } catch (_) {
-      // daftar tetap menampilkan seed demo bila query gagal
+      // Query gagal → tampilkan kosong, jangan seed palsu di production.
+      if (!mounted) return;
+      setState(_users.clear);
     }
   }
 
@@ -180,9 +187,6 @@ class _ManajemenPenggunaPageState extends State<ManajemenPenggunaPage> {
   }
 
   String _getAvatarInitial(AdminUserModel user) {
-    if (user.name == 'Nur Alisa Qiroati Sholeha') {
-      return 'S'; // Matches mockup Screen 1 & 6
-    }
     return user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U';
   }
 

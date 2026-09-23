@@ -40,7 +40,9 @@ class _RiwayatAktivitasPenggunaPageState
   static const Color iconBadgeBg = Color(0xFFFFECEB);
   static const Color iconColor = Color(0xFFD9534F);
 
-  List<ActivityItem> activities = const [
+  List<ActivityItem> activities = Backend.useFirebase
+      ? <ActivityItem>[]
+      : const <ActivityItem>[
     ActivityItem(
       title: 'Mencatat Skin Daily',
       timestamp: '2026-08-27 08:15',
@@ -92,7 +94,6 @@ class _RiwayatAktivitasPenggunaPageState
       final items = await ActivityService.listMine(uid);
       if (!mounted) return;
       setState(() {
-        if (items.isEmpty) return;
         activities = items
             .map((m) => ActivityItem(
                   title: (m['title'] as String?) ?? '',
@@ -101,7 +102,8 @@ class _RiwayatAktivitasPenggunaPageState
             .toList();
       });
     } catch (_) {
-      // biarkan seed demo bila query gagal
+      if (!mounted) return;
+      setState(() => activities = <ActivityItem>[]);
     }
   }
 

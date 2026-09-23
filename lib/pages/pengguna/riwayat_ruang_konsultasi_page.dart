@@ -51,7 +51,9 @@ class _RiwayatRuangKonsultasiPageState
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  List<ConsultationChatMessage> _messages = [
+  List<ConsultationChatMessage> _messages = Backend.useFirebase
+      ? <ConsultationChatMessage>[]
+      : <ConsultationChatMessage>[
     const ConsultationChatMessage(
       id: '1',
       text: 'Selamat pagi, Leonita. Ada yang bisa saya bantu hari ini?',
@@ -119,11 +121,16 @@ class _RiwayatRuangKonsultasiPageState
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     final consultationId = widget.consultationId;
-    if (consultationId == null || consultationId.isEmpty) return;
-    if (consultationId.contains(RegExp(r'^\d+$'))) return;
+    if (consultationId == null ||
+        consultationId.isEmpty ||
+        consultationId.contains(RegExp(r'^\d+$'))) {
+      if (!mounted) return;
+      setState(() => _messages = <ConsultationChatMessage>[]);
+      return;
+    }
     try {
       final items = await ConsultationService.loadMessages(consultationId);
-      if (items.isEmpty || !mounted) return;
+      if (!mounted) return;
       setState(() {
         _messages = items.map((m) {
           final senderRole = (m['senderRole'] as String?) ?? '';
@@ -136,7 +143,8 @@ class _RiwayatRuangKonsultasiPageState
         }).toList();
       });
     } catch (_) {
-      // chat tetap menampilkan seed demo bila query gagal
+      if (!mounted) return;
+      setState(() => _messages = <ConsultationChatMessage>[]);
     }
   }
 

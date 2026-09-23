@@ -41,29 +41,33 @@ class _NotifikasiAdminPageState extends State<NotifikasiAdminPage> {
   static const Color dateText = Color(0xFF9E9E9E);
   static const Color coralIconBg = Color(0xFFFFB0A3);
 
-  final List<NotificationModel> _notifications = [
-    NotificationModel(
-      id: '1',
-      title: 'Dokter Pending',
-      description: 'dr. Sari Wulandari menunggu verifikasi',
-      time: '2026-08-28 09:00',
-      isUnread: true,
-    ),
-    NotificationModel(
-      id: '2',
-      title: 'Konsultasi Baru',
-      description: 'Rina Sari memesan konsultasi dengan dr. Anita',
-      time: '2026-08-28 08:30',
-      isUnread: true,
-    ),
-    NotificationModel(
-      id: '3',
-      title: 'User Baru',
-      description: 'Maya Putri telah mendaftar sebagai pengguna baru',
-      time: '2026-08-27 14:00',
-      isUnread: false,
-    ),
-  ];
+  /// Seed demo HANYA untuk widget test / mode tanpa Firebase.
+  /// Dengan Firebase, daftar diisi dari Firestore (boleh kosong).
+  final List<NotificationModel> _notifications = Backend.useFirebase
+      ? <NotificationModel>[]
+      : <NotificationModel>[
+          NotificationModel(
+            id: '1',
+            title: 'Dokter Pending',
+            description: 'dr. Sari Wulandari menunggu verifikasi',
+            time: '2026-08-28 09:00',
+            isUnread: true,
+          ),
+          NotificationModel(
+            id: '2',
+            title: 'Konsultasi Baru',
+            description: 'Rina Sari memesan konsultasi dengan dr. Anita',
+            time: '2026-08-28 08:30',
+            isUnread: true,
+          ),
+          NotificationModel(
+            id: '3',
+            title: 'User Baru',
+            description: 'Maya Putri telah mendaftar sebagai pengguna baru',
+            time: '2026-08-27 14:00',
+            isUnread: false,
+          ),
+        ];
 
   @override
   void initState() {
@@ -77,7 +81,8 @@ class _NotifikasiAdminPageState extends State<NotifikasiAdminPage> {
   }
 
   /// Ambil notifikasi audience admin dari Firestore. Tanpa Firebase, data
-  /// demo tetap dipakai agar UI/tes tidak berubah.
+  /// demo tetap dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil
+  /// backend selalu menggantikan seed — termasuk saat daftar kosong.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     try {
@@ -85,20 +90,19 @@ class _NotifikasiAdminPageState extends State<NotifikasiAdminPage> {
         NotificationService.adminAudience,
       );
       if (!mounted) return;
-      setState(() {
-        if (items.isEmpty) return;
-        _notifications
-          ..clear()
-          ..addAll(items.map((m) => NotificationModel(
-                id: (m['id'] as String?) ?? '',
-                title: (m['title'] as String?) ?? '',
-                description: (m['description'] as String?) ?? '',
-                time: _fmtTime(m['createdAt']),
-                isUnread: m['isUnread'] == true,
-              )));
-      });
+      setState(() => _notifications
+        ..clear()
+        ..addAll(items.map((m) => NotificationModel(
+              id: (m['id'] as String?) ?? '',
+              title: (m['title'] as String?) ?? '',
+              description: (m['description'] as String?) ?? '',
+              time: _fmtTime(m['createdAt']),
+              isUnread: m['isUnread'] == true,
+            ))));
     } catch (e) {
+      // Query gagal → tampilkan kosong, jangan seed palsu di production.
       if (!mounted) return;
+      setState(_notifications.clear);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal memuat notifikasi: $e')),
       );

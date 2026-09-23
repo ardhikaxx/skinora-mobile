@@ -41,7 +41,9 @@ class _InsightKulitPenggunaPageState extends State<InsightKulitPenggunaPage> {
   static const Color pinkBurukBg = Color(0xFFFFCCD2);
   static const Color redBurukText = Color(0xFFD32F2F);
 
-  List<DailyInsightHistoryItem> _history7Hari = const [
+  List<DailyInsightHistoryItem> _history7Hari = Backend.useFirebase
+      ? <DailyInsightHistoryItem>[]
+      : const <DailyInsightHistoryItem>[
     DailyInsightHistoryItem(
       date: '2026-08-28',
       symptoms: 'Berminyak, Komedo',
@@ -79,13 +81,13 @@ class _InsightKulitPenggunaPageState extends State<InsightKulitPenggunaPage> {
     ),
   ];
 
-  int _baikCount = 4;
-  int _sedangCount = 2;
-  int _burukCount = 1;
-  String _topSymptom = 'Berminyak';
-  int _topSymptomCount = 2;
-  int _avgWater = 7;
-  int _fullRoutineDays = 4;
+  int _baikCount = Backend.useFirebase ? 0 : 4;
+  int _sedangCount = Backend.useFirebase ? 0 : 2;
+  int _burukCount = Backend.useFirebase ? 0 : 1;
+  String _topSymptom = Backend.useFirebase ? '-' : 'Berminyak';
+  int _topSymptomCount = Backend.useFirebase ? 0 : 2;
+  int _avgWater = Backend.useFirebase ? 0 : 7;
+  int _fullRoutineDays = Backend.useFirebase ? 0 : 4;
 
   @override
   void initState() {
@@ -101,7 +103,20 @@ class _InsightKulitPenggunaPageState extends State<InsightKulitPenggunaPage> {
     if (uid == null) return;
     try {
       final items = await SkinService.listSkinDailies(uid);
-      if (items.isEmpty || !mounted) return;
+      if (!mounted) return;
+      if (items.isEmpty) {
+        setState(() {
+          _history7Hari = <DailyInsightHistoryItem>[];
+          _baikCount = 0;
+          _sedangCount = 0;
+          _burukCount = 0;
+          _topSymptom = '-';
+          _topSymptomCount = 0;
+          _avgWater = 0;
+          _fullRoutineDays = 0;
+        });
+        return;
+      }
       final agg = SkinService.aggregateDailies(items);
       final recent = (agg['recent'] as List).cast<Map<String, dynamic>>();
       setState(() {
@@ -130,7 +145,17 @@ class _InsightKulitPenggunaPageState extends State<InsightKulitPenggunaPage> {
         }).toList();
       });
     } catch (_) {
-      // insight tetap menampilkan seed demo bila query gagal
+      if (!mounted) return;
+      setState(() {
+        _history7Hari = <DailyInsightHistoryItem>[];
+        _baikCount = 0;
+        _sedangCount = 0;
+        _burukCount = 0;
+        _topSymptom = '-';
+        _topSymptomCount = 0;
+        _avgWater = 0;
+        _fullRoutineDays = 0;
+      });
     }
   }
 

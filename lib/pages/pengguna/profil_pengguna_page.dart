@@ -32,12 +32,13 @@ class _ProfilPenggunaPageState extends State<ProfilPenggunaPage> {
   static const Color cardBorder = Color(0xFFEEEEEE);
   static const Color innerBorder = Color(0xFFEBEBEB);
 
-  String _name = 'Leonita Yulyta Agustin';
-  String _email = 'leonita@demo.com';
-  String _phone = '081234567890';
-  String _address = 'Jl. Sudirman No. 123, Jakarta';
-  String _birthDate = '1995-06-15';
-  String _gender = 'Perempuan';
+  String _name = Backend.useFirebase ? '' : 'Leonita Yulyta Agustin';
+  String _email = Backend.useFirebase ? '' : 'leonita@demo.com';
+  String _phone = Backend.useFirebase ? '' : '081234567890';
+  String _address =
+      Backend.useFirebase ? '' : 'Jl. Sudirman No. 123, Jakarta';
+  String _birthDate = Backend.useFirebase ? '' : '1995-06-15';
+  String _gender = Backend.useFirebase ? '' : 'Perempuan';
 
   @override
   void initState() {
@@ -53,24 +54,43 @@ class _ProfilPenggunaPageState extends State<ProfilPenggunaPage> {
     if (uid == null) return;
     try {
       final profile = await UserService.loadByUid(uid);
-      if (profile == null || !mounted) return;
+      if (!mounted) return;
+      if (profile == null) {
+        setState(() {
+          _name = '-';
+          _email = '-';
+          _phone = '-';
+          _address = '-';
+          _birthDate = '-';
+          _gender = '-';
+        });
+        return;
+      }
       setState(() {
-        if (profile.name.isNotEmpty) _name = profile.name;
-        if (profile.email.isNotEmpty) _email = profile.email;
-        if (profile.phone.isNotEmpty) _phone = profile.phone;
-        if (profile.address.isNotEmpty) _address = profile.address;
-        if (profile.birthDate.isNotEmpty) _birthDate = profile.birthDate;
-        if (profile.gender.isNotEmpty) _gender = profile.gender;
+        _name = profile.name;
+        _email = profile.email;
+        _phone = profile.phone;
+        _address = profile.address;
+        _birthDate = profile.birthDate;
+        _gender = profile.gender;
       });
     } catch (_) {
-      // profil tetap menampilkan data demo bila query gagal
+      if (!mounted) return;
+      setState(() {
+        _name = '-';
+        _email = '-';
+        _phone = '-';
+        _address = '-';
+        _birthDate = '-';
+        _gender = '-';
+      });
     }
   }
 
   String _initials(String name) {
     final parts =
         name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    if (parts.isEmpty) return 'LY';
+    if (parts.isEmpty) return '-';
     if (parts.length == 1) {
       return parts.first.substring(0, 1).toUpperCase();
     }

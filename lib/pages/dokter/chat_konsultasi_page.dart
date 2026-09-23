@@ -46,7 +46,42 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
   static const Color ongoingBadgeBg = Color(0xFFDCFCE7);
   static const Color ongoingBadgeText = Color(0xFF16A34A);
 
-  late List<ConsultationItemModel> _consultations;
+  // Seed demo HANYA untuk widget test / mode tanpa Firebase.
+  // Dengan Firebase, daftar diisi dari Firestore (boleh kosong).
+  final List<ConsultationItemModel> _consultations = Backend.useFirebase
+      ? <ConsultationItemModel>[]
+      : <ConsultationItemModel>[
+          ConsultationItemModel(
+            id: '1',
+            patientName: 'Leonita Yulyta Agustin',
+            dateTime: '2026-08-28 • 09:00 - 09:30',
+            status: 'Terjadwal',
+          ),
+          ConsultationItemModel(
+            id: '2',
+            patientName: 'Annida Tri Aulia',
+            dateTime: '2026-08-28 • 09:30 - 10:00',
+            status: 'Berlangsung',
+          ),
+          ConsultationItemModel(
+            id: '3',
+            patientName: 'Annida Tri Aulia',
+            dateTime: '2026-08-29 • 09:00 - 09:30',
+            status: 'Terjadwal',
+          ),
+          ConsultationItemModel(
+            id: '4',
+            patientName: 'Siti Aisa Nur Apriliana',
+            dateTime: '2026-08-29 • 09:30 - 10:00',
+            status: 'Terjadwal',
+          ),
+          ConsultationItemModel(
+            id: '5',
+            patientName: 'Leonita Yulyta Agustin',
+            dateTime: '2026-08-30 • 14:00 - 14:30',
+            status: 'Terjadwal',
+          ),
+        ];
 
   // id Firestore -> data mentah untuk persist aksi status.
   final Map<String, Map<String, dynamic>> _backendMeta = {};
@@ -54,39 +89,6 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
   @override
   void initState() {
     super.initState();
-    // Exactly matches Screen 1 of image copy 2.png
-    _consultations = [
-      ConsultationItemModel(
-        id: '1',
-        patientName: 'Leonita Yulyta Agustin',
-        dateTime: '2026-08-28 • 09:00 - 09:30',
-        status: 'Terjadwal',
-      ),
-      ConsultationItemModel(
-        id: '2',
-        patientName: 'Annida Tri Aulia',
-        dateTime: '2026-08-28 • 09:30 - 10:00',
-        status: 'Berlangsung',
-      ),
-      ConsultationItemModel(
-        id: '3',
-        patientName: 'Annida Tri Aulia',
-        dateTime: '2026-08-29 • 09:00 - 09:30',
-        status: 'Terjadwal',
-      ),
-      ConsultationItemModel(
-        id: '4',
-        patientName: 'Siti Aisa Nur Apriliana',
-        dateTime: '2026-08-29 • 09:30 - 10:00',
-        status: 'Terjadwal',
-      ),
-      ConsultationItemModel(
-        id: '5',
-        patientName: 'Leonita Yulyta Agustin',
-        dateTime: '2026-08-30 • 14:00 - 14:30',
-        status: 'Terjadwal',
-      ),
-    ];
     _loadFromBackend();
   }
 
@@ -103,7 +105,8 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
   }
 
   /// Konsultasi aktif dokter dari Firestore. Tanpa Firebase, seed demo
-  /// tetap dipakai agar UI/tes tidak berubah.
+  /// tetap dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil
+  /// backend selalu menggantikan seed — termasuk saat kosong.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
@@ -112,29 +115,35 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
       final items = await ConsultationService.listForDoctor(uid);
       if (!mounted) return;
       setState(() {
-        if (items.isEmpty) return;
         _backendMeta.clear();
-        _consultations = items
-            .where((m) => ((m['status'] as String?) ?? '') != 'selesai')
-            .map((m) {
-          final id = (m['id'] as String?) ?? '';
-          _backendMeta[id] = m;
-          final date = (m['dateIso'] as String?) ?? '';
-          final time = ((m['timeStart'] as String?) ?? '').isNotEmpty
-              ? '${m['timeStart']} - ${m['timeEnd']}'
-              : (m['scheduleTime'] as String?) ?? '';
-          return ConsultationItemModel(
-            id: id,
-            patientName: (m['patientName'] as String?) ?? 'Pasien',
-            dateTime: date.isEmpty
-                ? ((m['scheduleDate'] as String?) ?? '')
-                : '$date • $time',
-            status: _labelStatus((m['status'] as String?) ?? 'terjadwal'),
-          );
-        }).toList();
+        _consultations
+          ..clear()
+          ..addAll(items
+              .where((m) => ((m['status'] as String?) ?? '') != 'selesai')
+              .map((m) {
+        final id = (m['id'] as String?) ?? '';
+        _backendMeta[id] = m;
+        final date = (m['dateIso'] as String?) ?? '';
+        final time = ((m['timeStart'] as String?) ?? '').isNotEmpty
+            ? '${m['timeStart']} - ${m['timeEnd']}'
+            : (m['scheduleTime'] as String?) ?? '';
+        return ConsultationItemModel(
+          id: id,
+          patientName: (m['patientName'] as String?) ?? 'Pasien',
+          dateTime: date.isEmpty
+              ? ((m['scheduleDate'] as String?) ?? '')
+              : '$date • $time',
+          status: _labelStatus((m['status'] as String?) ?? 'terjadwal'),
+        );
+      }));
       });
     } catch (_) {
-      // biarkan seed demo bila query gagal
+      // Query gagal → tampilkan kosong, jangan seed palsu di production.
+      if (!mounted) return;
+      setState(() {
+        _backendMeta.clear();
+        _consultations.clear();
+      });
     }
   }
 
@@ -190,14 +199,17 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
       setState(() {
         _consultations.removeWhere((c) => c.id == item.id);
       });
-      // Masukkan ke riwayat konsultasi dokter (seed lokal utk demo)
-      DoctorConsultationStore().addCompletedConsultation(
-        patientName: item.patientName,
-        dateTime: item.dateTime,
-        diagnosis: 'Hiperpigmentasi Pasca-Inflamasi (PIH)',
-        notes:
-            'Rekomendasi serum Vitamin C pagi hari dan retinol ringan malam hari. Evaluasi dalam 4-6 minggu.',
-      );
+      // Seed lokal utk demo saja. Dengan Firebase, riwayat berasal dari
+      // Firestore — jangan tulis diagnosis dummy ke store.
+      if (!Backend.useFirebase) {
+        DoctorConsultationStore().addCompletedConsultation(
+          patientName: item.patientName,
+          dateTime: item.dateTime,
+          diagnosis: 'Hiperpigmentasi Pasca-Inflamasi (PIH)',
+          notes:
+              'Rekomendasi serum Vitamin C pagi hari dan retinol ringan malam hari. Evaluasi dalam 4-6 minggu.',
+        );
+      }
       if (mounted) {
         _showSuccessDialog();
       }

@@ -29,19 +29,24 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
   static const Color statSectionBg = Color(0xFFFFD5C3);
   static const Color bookedSlotBg = Color(0xFFFFBCAE);
 
-  String _greetingName = 'dr. Anita Dewi, Sp.KK';
-  String _specialization = 'Estetika Kulit';
-  int _unreadNotif = 1;
+  // Seed demo HANYA untuk widget test / mode tanpa Firebase.
+  // Dengan Firebase, dashboard diisi dari Firestore (boleh kosong/0).
+  String _greetingName =
+      Backend.useFirebase ? '' : 'dr. Anita Dewi, Sp.KK';
+  String _specialization = Backend.useFirebase ? '' : 'Estetika Kulit';
+  int _unreadNotif = 0;
 
-  String _statHariIni = '2';
-  String _statMenunggu = '1';
-  String _statSelesai = '1';
+  String _statHariIni = Backend.useFirebase ? '0' : '2';
+  String _statMenunggu = Backend.useFirebase ? '0' : '1';
+  String _statSelesai = Backend.useFirebase ? '0' : '1';
 
-  List<Map<String, String>> _todaySlots = const [
-    {'time': '09:00 - 09:30', 'status': 'Tersedia', 'badge': 'Kosong', 'booked': 'false'},
-    {'time': '09:30 - 10:00', 'status': 'Terjadwal', 'badge': 'Terjadwal', 'booked': 'true', 'bookedBy': 'Dibooking oleh user-4'},
-    {'time': '10:00 - 10:30', 'status': 'Terjadwal', 'badge': 'Terjadwal', 'booked': 'true', 'bookedBy': 'Dibooking oleh user-3'},
-  ];
+  List<Map<String, String>> _todaySlots = Backend.useFirebase
+      ? const []
+      : const [
+          {'time': '09:00 - 09:30', 'status': 'Tersedia', 'badge': 'Kosong', 'booked': 'false'},
+          {'time': '09:30 - 10:00', 'status': 'Terjadwal', 'badge': 'Terjadwal', 'booked': 'true', 'bookedBy': 'Dibooking oleh user-4'},
+          {'time': '10:00 - 10:30', 'status': 'Terjadwal', 'badge': 'Terjadwal', 'booked': 'true', 'bookedBy': 'Dibooking oleh user-3'},
+        ];
 
   ValueChanged<int>? get onNavigateTab => widget.onNavigateTab;
 
@@ -70,12 +75,10 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
       if (!mounted) return;
       setState(() {
         if (profile != null) {
-          final name = (profile.name as String?) ?? '';
-          if (name.isNotEmpty) _greetingName = name;
-          final spec = (profile.specialization as String?) ?? '';
-          if (spec.isNotEmpty) _specialization = spec;
+          _greetingName = (profile.name as String?) ?? '';
+          _specialization = (profile.specialization as String?) ?? '';
         }
-        if (unread != null && unread > 0) _unreadNotif = unread;
+        _unreadNotif = unread ?? 0;
         if (consults != null) {
           final todayIso = AppDates.todayIso();
           final todayCount = consults
@@ -87,13 +90,17 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
           final selesai = consults
               .where((c) => ((c['status'] as String?) ?? '') == 'selesai')
               .length;
-          if (todayCount > 0) _statHariIni = '$todayCount';
-          if (menunggu > 0) _statMenunggu = '$menunggu';
-          if (selesai > 0) _statSelesai = '$selesai';
+          _statHariIni = '$todayCount';
+          _statMenunggu = '$menunggu';
+          _statSelesai = '$selesai';
+        } else {
+          _statHariIni = '0';
+          _statMenunggu = '0';
+          _statSelesai = '0';
         }
-        if (slots != null && slots.isNotEmpty) {
+        if (slots != null) {
           final todayIso = AppDates.todayIso();
-          final today = slots
+          _todaySlots = slots
               .where((s) => s.dateIso == todayIso)
               .take(3)
               .map((s) => {
@@ -105,11 +112,20 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
                       'bookedBy': 'Dibooking oleh ${s.patientName}',
                   })
               .toList();
-          if (today.isNotEmpty) _todaySlots = today;
         }
       });
     } catch (_) {
-      // dashboard tetap menampilkan data demo bila query gagal
+      // Query gagal → reset ke default kosong, jangan seed palsu di production.
+      if (!mounted) return;
+      setState(() {
+        _greetingName = '';
+        _specialization = '';
+        _unreadNotif = 0;
+        _statHariIni = '0';
+        _statMenunggu = '0';
+        _statSelesai = '0';
+        _todaySlots = const [];
+      });
     }
   }
 

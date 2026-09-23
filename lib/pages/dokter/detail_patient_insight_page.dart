@@ -33,28 +33,59 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
 
   late PatientInsightModel _currentPatient;
 
-  // Data kesehatan pasien dari Firestore (fallback seed bila kosong).
+  // Data kesehatan pasien dari Firestore (kosong = empty state).
   List<Map<String, dynamic>> _skinChecks = const [];
   List<Map<String, dynamic>> _skinDailies = const [];
   List<Map<String, dynamic>> _skincareLogs = const [];
 
-  // Ringkasan insight — default seed, diganti bila data Firestore ada.
-  List<Map<String, String>> _topConditions = [
-    {'name': 'Berminyak', 'count': '2x'},
-    {'name': 'Jerawat', 'count': '2x'},
-    {'name': 'Kemerahan', 'count': '2x'},
-  ];
-  String _avgWater = '6.6';
-  String _avgSleep = '0';
-  String _skincarePct = '57%';
-  String _insightSkincare =
-      'Pasien memiliki kepatuhan skincare 57% dalam 7 hari terakhir';
-  String _insightWater = 'Rata-rata konsumsi air: 6.6 gelas per hari';
-  String _insightSleep = 'Rata-rata tidur: 0 jam per malam';
+  // Ringkasan insight — seed demo HANYA tanpa Firebase; dengan Firebase
+  // default kosong/0 dan dihitung dari data asli.
+  List<Map<String, String>> _topConditions = Backend.useFirebase
+      ? <Map<String, String>>[]
+      : <Map<String, String>>[
+          {'name': 'Berminyak', 'count': '2x'},
+          {'name': 'Jerawat', 'count': '2x'},
+          {'name': 'Kemerahan', 'count': '2x'},
+        ];
+  String _avgWater = Backend.useFirebase ? '0' : '6.6';
+  String _avgSleep = Backend.useFirebase ? '0' : '0';
+  String _skincarePct = Backend.useFirebase ? '0%' : '57%';
+  String _insightSkincare = Backend.useFirebase
+      ? 'Belum ada data'
+      : 'Pasien memiliki kepatuhan skincare 57% dalam 7 hari terakhir';
+  String _insightWater = Backend.useFirebase
+      ? 'Belum ada data'
+      : 'Rata-rata konsumsi air: 6.6 gelas per hari';
+  String _insightSleep = Backend.useFirebase
+      ? 'Belum ada data'
+      : 'Rata-rata tidur: 0 jam per malam';
 
-  /// Hitung ulang ringkasan dari `_skinDailies` / `_skincareLogs` bila ada data.
+  static PatientInsightModel get _emptyPatient => PatientInsightModel(
+        id: '',
+        name: 'Belum ada data',
+        consultationCount: '-',
+        skinType: '-',
+        primaryConcern: '-',
+        lastConsultation: '-',
+      );
+
+  void _resetInsightToEmpty() {
+    _topConditions = <Map<String, String>>[];
+    _avgWater = '0';
+    _avgSleep = '0';
+    _skincarePct = '0%';
+    _insightSkincare = 'Belum ada data';
+    _insightWater = 'Belum ada data';
+    _insightSleep = 'Belum ada data';
+  }
+
+  /// Hitung ulang ringkasan dari `_skinDailies` / `_skincareLogs`.
+  /// Kosong = reset ke 'Belum ada data' (data valid, bukan seed).
   void _refreshInsightFromData() {
-    if (_skinDailies.isEmpty) return;
+    if (_skinDailies.isEmpty) {
+      _resetInsightToEmpty();
+      return;
+    }
     final recent = _skinDailies.take(7).toList();
     final symptomCount = <String, int>{};
     double waterTotal = 0;
@@ -102,6 +133,8 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
       _topConditions = sorted.take(3).map((e) {
         return {'name': e.key, 'count': '${e.value}x'};
       }).toList();
+    } else {
+      _topConditions = <Map<String, String>>[];
     }
     final avgWater =
         waterCount == 0 ? 0.0 : double.parse((waterTotal / waterCount)
@@ -121,62 +154,72 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
     _insightSleep = 'Rata-rata tidur: $_avgSleep jam per malam';
   }
 
-  final List<PatientInsightModel> _allPatients = [
-    PatientInsightModel(
-      id: '1',
-      name: 'Annida Tri Aulia',
-      consultationCount: '3 konsultasi',
-      skinType: 'Berminyak & Acne-prone',
-      primaryConcern: 'Jerawat aktif & bekas noda jerawat',
-      lastConsultation: '27 Agu 2026',
-    ),
-    PatientInsightModel(
-      id: '2',
-      name: 'Leonita Yulyta Agustin',
-      consultationCount: '3 konsultasi',
-      skinType: 'Kombinasi',
-      primaryConcern: 'Skin barrier rusak & kemerahan',
-      lastConsultation: '26 Agu 2026',
-    ),
-    PatientInsightModel(
-      id: '3',
-      name: 'Kafi Khaula Yukisa Zailina',
-      consultationCount: '2 konsultasi',
-      skinType: 'Kering & Sensitif',
-      primaryConcern: 'Kulit bersisik & dehidrasi',
-      lastConsultation: '22 Agu 2026',
-    ),
-    PatientInsightModel(
-      id: '4',
-      name: 'Siti Aisa Nur Apriliana',
-      consultationCount: '2 konsultasi',
-      skinType: 'Normal ke Kering',
-      primaryConcern: 'Hiperpigmentasi & flek hitam',
-      lastConsultation: '19 Agu 2026',
-    ),
-    PatientInsightModel(
-      id: '5',
-      name: 'Nur Alisa Qiroati Sholeha',
-      consultationCount: '3 konsultasi',
-      skinType: 'Berminyak',
-      primaryConcern: 'Pori-pori besar & komedo',
-      lastConsultation: '15 Agu 2026',
-    ),
-  ];
+  // Seed demo HANYA untuk widget test / mode tanpa Firebase.
+  // Dengan Firebase, daftar pasien diisi dari Firestore (boleh kosong).
+  final List<PatientInsightModel> _allPatients = Backend.useFirebase
+      ? <PatientInsightModel>[]
+      : <PatientInsightModel>[
+          PatientInsightModel(
+            id: '1',
+            name: 'Annida Tri Aulia',
+            consultationCount: '3 konsultasi',
+            skinType: 'Berminyak & Acne-prone',
+            primaryConcern: 'Jerawat aktif & bekas noda jerawat',
+            lastConsultation: '27 Agu 2026',
+          ),
+          PatientInsightModel(
+            id: '2',
+            name: 'Leonita Yulyta Agustin',
+            consultationCount: '3 konsultasi',
+            skinType: 'Kombinasi',
+            primaryConcern: 'Skin barrier rusak & kemerahan',
+            lastConsultation: '26 Agu 2026',
+          ),
+          PatientInsightModel(
+            id: '3',
+            name: 'Kafi Khaula Yukisa Zailina',
+            consultationCount: '2 konsultasi',
+            skinType: 'Kering & Sensitif',
+            primaryConcern: 'Kulit bersisik & dehidrasi',
+            lastConsultation: '22 Agu 2026',
+          ),
+          PatientInsightModel(
+            id: '4',
+            name: 'Siti Aisa Nur Apriliana',
+            consultationCount: '2 konsultasi',
+            skinType: 'Normal ke Kering',
+            primaryConcern: 'Hiperpigmentasi & flek hitam',
+            lastConsultation: '19 Agu 2026',
+          ),
+          PatientInsightModel(
+            id: '5',
+            name: 'Nur Alisa Qiroati Sholeha',
+            consultationCount: '3 konsultasi',
+            skinType: 'Berminyak',
+            primaryConcern: 'Pori-pori besar & komedo',
+            lastConsultation: '15 Agu 2026',
+          ),
+        ];
 
   @override
   void initState() {
     super.initState();
-    _currentPatient = widget.patient ??
-        _allPatients.firstWhere(
-          (p) => p.name == 'Leonita Yulyta Agustin',
-          orElse: () => _allPatients[1],
-        );
+    if (widget.patient != null) {
+      _currentPatient = widget.patient!;
+    } else if (_allPatients.isNotEmpty) {
+      _currentPatient = _allPatients.firstWhere(
+        (p) => p.name == 'Leonita Yulyta Agustin',
+        orElse: () => _allPatients.first,
+      );
+    } else {
+      _currentPatient = _emptyPatient;
+    }
     _loadFromBackend();
   }
 
   /// Muat daftar pasien konsultasi + data skin subcollection. Tanpa Firebase,
-  /// seed demo tetap dipakai agar UI/tes tidak berubah.
+  /// seed demo tetap dipakai agar UI/tes tidak berubah. Dengan Firebase,
+  /// hasil backend selalu menggantikan seed — termasuk saat kosong.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
@@ -232,24 +275,61 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
 
       if (!mounted) return;
       setState(() {
-        if (loaded.isNotEmpty) {
-          _allPatients
-            ..clear()
-            ..addAll(loaded);
-          final match = _allPatients.where((p) => p.id == _currentPatient.id);
-          if (match.isNotEmpty) _currentPatient = match.first;
+        _allPatients
+          ..clear()
+          ..addAll(loaded);
+        final match =
+            _allPatients.where((p) => p.id == _currentPatient.id);
+        if (match.isNotEmpty) {
+          _currentPatient = match.first;
+        } else if (loaded.isNotEmpty) {
+          _currentPatient = loaded.first;
+        } else {
+          _currentPatient = _emptyPatient;
+          _skinChecks = const [];
+          _skinDailies = const [];
+          _skincareLogs = const [];
+          _resetInsightToEmpty();
         }
       });
-      await _loadPatientHealth(_currentPatient.id);
+      if (_currentPatient.id.isNotEmpty) {
+        await _loadPatientHealth(_currentPatient.id);
+      } else if (mounted) {
+        setState(() {
+          _skinChecks = const [];
+          _skinDailies = const [];
+          _skincareLogs = const [];
+          _resetInsightToEmpty();
+        });
+      }
     } catch (_) {
-      // biarkan seed demo bila query gagal
+      // Query gagal → tampilkan kosong, jangan seed palsu di production.
+      if (!mounted) return;
+      setState(() {
+        _allPatients.clear();
+        _currentPatient = _emptyPatient;
+        _skinChecks = const [];
+        _skinDailies = const [];
+        _skincareLogs = const [];
+        _resetInsightToEmpty();
+      });
     }
   }
 
   Future<void> _loadPatientHealth(String patientId) async {
     if (!Backend.useFirebase || patientId.isEmpty) return;
     final isSeedId = int.tryParse(patientId) != null;
-    if (isSeedId) return; // id seed demo bukan uid Firestore
+    if (isSeedId) {
+      // id seed demo bukan uid Firestore → tampilkan kosong.
+      if (!mounted) return;
+      setState(() {
+        _skinChecks = const [];
+        _skinDailies = const [];
+        _skincareLogs = const [];
+        _resetInsightToEmpty();
+      });
+      return;
+    }
     try {
       final results = await Future.wait<Object?>([
         SkinService.listSkinChecks(patientId, limit: 5),
@@ -264,7 +344,14 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
         _refreshInsightFromData();
       });
     } catch (_) {
-      // fallback ke seed UI
+      // Query gagal → kosongkan, jangan seed palsu di production.
+      if (!mounted) return;
+      setState(() {
+        _skinChecks = const [];
+        _skinDailies = const [];
+        _skincareLogs = const [];
+        _resetInsightToEmpty();
+      });
     }
   }
 
@@ -517,6 +604,36 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
     );
   }
 
+  Widget _buildEmptyData() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: cardBorder,
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: const Text(
+        'Belum ada data',
+        style: TextStyle(
+          fontSize: 13.0,
+          color: Color(0xFF9CA3AF),
+          height: 1.35,
+        ),
+      ),
+    );
+  }
+
   /// 1. Patient Profile Card
   Widget _buildPatientCard() {
     return Container(
@@ -609,6 +726,50 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
   /// 2. Kondisi Kulit Teratas Card
   Widget _buildKondisiKulitTeratasCard() {
     final conditions = _topConditions;
+
+    if (conditions.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: cardBorder,
+            width: 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text(
+              'KONDISI KULIT TERATAS',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF6B7280),
+                letterSpacing: 0.5,
+              ),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'Belum ada data',
+              style: TextStyle(
+                fontSize: 13.0,
+                color: Color(0xFF9CA3AF),
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.all(16.0),
@@ -876,6 +1037,8 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
         }).toList(),
       );
     }
+    // Tanpa data → seed hanya untuk demo non-Firebase; production kosong.
+    if (Backend.useFirebase) return _buildEmptyData();
     return Column(
       children: [
         // Check 1: 2026-08-28 (Kombinasi, Sensitif, Rentan)
@@ -1139,6 +1302,8 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
         }).toList(),
       );
     }
+    // Tanpa data → seed hanya untuk demo non-Firebase; production kosong.
+    if (Backend.useFirebase) return _buildEmptyData();
     final entries = [
       {
         'date': '2026-08-28',
@@ -1435,6 +1600,8 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
         }).toList(),
       );
     }
+    // Tanpa data → seed hanya untuk demo non-Firebase; production kosong.
+    if (Backend.useFirebase) return _buildEmptyData();
     return Column(
       children: [
         // Routine 1: 2026-08-28

@@ -45,7 +45,11 @@ class _PatientInsightPageState extends State<PatientInsightPage> {
   static const Color subText = Color(0xFF757575);
   static const Color coralIconBg = Color(0xFFFFB2A6);
 
-  final List<PatientInsightModel> _patients = [
+  // Seed demo HANYA untuk widget test / mode tanpa Firebase.
+  // Dengan Firebase, daftar diisi dari Firestore (boleh kosong).
+  final List<PatientInsightModel> _patients = Backend.useFirebase
+      ? <PatientInsightModel>[]
+      : <PatientInsightModel>[
     PatientInsightModel(
       id: '1',
       name: 'Annida Tri Aulia',
@@ -95,7 +99,8 @@ class _PatientInsightPageState extends State<PatientInsightPage> {
   }
 
   /// Daftar pasien dari konsultasi dokter. Tanpa Firebase, seed demo tetap
-  /// dipakai agar UI/tes tidak berubah.
+  /// dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil backend
+  /// selalu menggantikan seed — termasuk saat daftar kosong.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
@@ -119,7 +124,6 @@ class _PatientInsightPageState extends State<PatientInsightPage> {
           }
         }
       }
-      if (counts.isEmpty) return;
 
       final entries = <MapEntry<String, PatientInsightModel>>[];
       for (final e in counts.entries) {
@@ -153,14 +157,16 @@ class _PatientInsightPageState extends State<PatientInsightPage> {
           ),
         ));
       }
-      if (entries.isEmpty || !mounted) return;
+      if (!mounted) return;
       setState(() {
         _patients
           ..clear()
           ..addAll(entries.map((e) => e.value));
       });
     } catch (_) {
-      // biarkan seed demo bila query gagal
+      // Query gagal → tampilkan kosong, jangan seed palsu di production.
+      if (!mounted) return;
+      setState(_patients.clear);
     }
   }
 

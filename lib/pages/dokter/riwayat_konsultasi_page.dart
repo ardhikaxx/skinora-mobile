@@ -4,6 +4,7 @@ import '../../components/navbottom/dokter_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/consultation_service.dart';
+import '../../services/user_service.dart';
 import 'detail_riwayat_konsultasi_page.dart';
 
 class HistoryChatMessage {
@@ -38,107 +39,118 @@ class DoctorConsultationStore {
   static final DoctorConsultationStore _instance =
       DoctorConsultationStore._internal();
   factory DoctorConsultationStore() => _instance;
-  DoctorConsultationStore._internal();
+  DoctorConsultationStore._internal() {
+    _ensureHistory();
+  }
 
-  final List<ConsultationHistoryModel> history = [
-    ConsultationHistoryModel(
-      id: '1',
-      patientName: 'Kafi Khaula Yukisa Zailina',
-      dateTime: '2026-08-29 • 10:00 - 10:30',
-      diagnosis: 'Dermatitis Kontak Alergi & Dehidrasi Kulit',
-      notes:
-          'Hentikan penggunaan produk berkandungan alkohol dan fragrance. Gunakan pelembap berbahan dasar ceramide dan soothing gel.',
-      chatHistory: const [
-        HistoryChatMessage(
-          sender: 'Pasien',
-          message: 'Halo Dok, kulit saya terasa perih dan kemerahan sejak kemarin.',
-        ),
-        HistoryChatMessage(
-          sender: 'Dokter',
-          message: 'Apakah ada pemakaian produk baru sebelum gejala muncul?',
-        ),
-        HistoryChatMessage(
-          sender: 'Pasien',
-          message: 'Iya Dok, saya baru coba toner eksfoliasi 3 hari lalu.',
-        ),
-        HistoryChatMessage(
-          sender: 'Dokter',
-          message: 'Hentikan pemakaian toner tersebut dan fokus ke hidrasi dasar ya.',
-        ),
-      ],
-    ),
-    ConsultationHistoryModel(
-      id: '2',
-      patientName: 'Kafi Khaula Yukisa Zailina',
-      dateTime: '2026-08-28 • 10:00 - 10:30',
-      diagnosis: 'Pori-pori tersumbat & Komedo terbuka (Blackheads)',
-      notes:
-          'Eksfoliasi kimiawi menggunakan BHA/Salicylic acid 2% seminggu 2 kali pada malam hari. Double cleansing secara rutin.',
-      chatHistory: const [
-        HistoryChatMessage(
-          sender: 'Pasien',
-          message: 'Dok, di area hidung banyak bintik hitam komedo yang sulit hilang.',
-        ),
-        HistoryChatMessage(
-          sender: 'Dokter',
-          message: 'Bisa gunakan pembersih berbahan salicylic acid 2% secara teratur.',
-        ),
-      ],
-    ),
-    ConsultationHistoryModel(
-      id: '3',
-      patientName: 'Annida Tri Aulia',
-      dateTime: '2026-08-25 • 10:00 - 10:30',
-      diagnosis: 'Acne Vulgaris derajat ringan-sedang',
-      notes:
-          'Resep obat oles benzoyl peroxide 2.5% pagi hari dan retinoid tipis pada malam hari. Tetap gunakan sunscreen non-komedogenik.',
-      chatHistory: const [
-        HistoryChatMessage(
-          sender: 'Pasien',
-          message: 'Dok, jerawat meradang di dahi dan dagu semakin banyak.',
-        ),
-        HistoryChatMessage(
-          sender: 'Dokter',
-          message: 'Gunakan benzoyl peroxide untuk jerawat aktif dan jaga kebersihan wajah.',
-        ),
-      ],
-    ),
-    ConsultationHistoryModel(
-      id: '4',
-      patientName: 'Leonita Yulyta Agustin',
-      dateTime: '2026-08-15 • 09:00 - 09:30',
-      diagnosis: 'Perawatan Pasca Operasi Kulit',
-      notes:
-          'Hindari paparan matahari langsung selama 2 minggu. Gunakan krim antibiotik yang diresepkan.',
-      // Exact chat history shown in image copy 3.png Screen 2
-      chatHistory: const [
-        HistoryChatMessage(
-          sender: 'Pasien',
-          message: 'Dok, saya mau tanya soal perawatan kulit setelah operasi kecil',
-        ),
-        HistoryChatMessage(
-          sender: 'Dokter',
-          message: 'Tentu, operasi apa yang sudah dilakukan?',
-        ),
-        HistoryChatMessage(
-          sender: 'Pasien',
-          message: 'Operasi kecil untuk angkat tahi lalat di pipi kanan',
-        ),
-        HistoryChatMessage(
-          sender: 'Dokter',
-          message:
-              'Baik, hindari paparan matahari langsung selama 2 minggu. Gunakan krim antibiotik yang sudah saya resepkan.',
-        ),
-      ],
-    ),
-  ];
+  // Seed demo HANYA untuk widget test / mode tanpa Firebase.
+  // Dengan Firebase, history diisi dari Firestore (boleh kosong).
+  late final List<ConsultationHistoryModel> history;
+
+  void _ensureHistory() {
+    if (Backend.useFirebase) {
+      history = <ConsultationHistoryModel>[];
+      return;
+    }
+    history = <ConsultationHistoryModel>[
+      ConsultationHistoryModel(
+        id: '1',
+        patientName: 'Kafi Khaula Yukisa Zailina',
+        dateTime: '2026-08-29 • 10:00 - 10:30',
+        diagnosis: 'Dermatitis Kontak Alergi & Dehidrasi Kulit',
+        notes:
+            'Hentikan penggunaan produk berkandungan alkohol dan fragrance. Gunakan pelembap berbahan dasar ceramide dan soothing gel.',
+        chatHistory: const [
+          HistoryChatMessage(
+            sender: 'Pasien',
+            message: 'Halo Dok, kulit saya terasa perih dan kemerahan sejak kemarin.',
+          ),
+          HistoryChatMessage(
+            sender: 'Dokter',
+            message: 'Apakah ada pemakaian produk baru sebelum gejala muncul?',
+          ),
+          HistoryChatMessage(
+            sender: 'Pasien',
+            message: 'Iya Dok, saya baru coba toner eksfoliasi 3 hari lalu.',
+          ),
+          HistoryChatMessage(
+            sender: 'Dokter',
+            message: 'Hentikan pemakaian toner tersebut dan fokus ke hidrasi dasar ya.',
+          ),
+        ],
+      ),
+      ConsultationHistoryModel(
+        id: '2',
+        patientName: 'Kafi Khaula Yukisa Zailina',
+        dateTime: '2026-08-28 • 10:00 - 10:30',
+        diagnosis: 'Pori-pori tersumbat & Komedo terbuka (Blackheads)',
+        notes:
+            'Eksfoliasi kimiawi menggunakan BHA/Salicylic acid 2% seminggu 2 kali pada malam hari. Double cleansing secara rutin.',
+        chatHistory: const [
+          HistoryChatMessage(
+            sender: 'Pasien',
+            message: 'Dok, di area hidung banyak bintik hitam komedo yang sulit hilang.',
+          ),
+          HistoryChatMessage(
+            sender: 'Dokter',
+            message: 'Bisa gunakan pembersih berbahan salicylic acid 2% secara teratur.',
+          ),
+        ],
+      ),
+      ConsultationHistoryModel(
+        id: '3',
+        patientName: 'Annida Tri Aulia',
+        dateTime: '2026-08-25 • 10:00 - 10:30',
+        diagnosis: 'Acne Vulgaris derajat ringan-sedang',
+        notes:
+            'Resep obat oles benzoyl peroxide 2.5% pagi hari dan retinoid tipis pada malam hari. Tetap gunakan sunscreen non-komedogenik.',
+        chatHistory: const [
+          HistoryChatMessage(
+            sender: 'Pasien',
+            message: 'Dok, jerawat meradang di dahi dan dagu semakin banyak.',
+          ),
+          HistoryChatMessage(
+            sender: 'Dokter',
+            message: 'Gunakan benzoyl peroxide untuk jerawat aktif dan jaga kebersihan wajah.',
+          ),
+        ],
+      ),
+      ConsultationHistoryModel(
+        id: '4',
+        patientName: 'Leonita Yulyta Agustin',
+        dateTime: '2026-08-15 • 09:00 - 09:30',
+        diagnosis: 'Perawatan Pasca Operasi Kulit',
+        notes:
+            'Hindari paparan matahari langsung selama 2 minggu. Gunakan krim antibiotik yang diresepkan.',
+        // Exact chat history shown in image copy 3.png Screen 2
+        chatHistory: const [
+          HistoryChatMessage(
+            sender: 'Pasien',
+            message: 'Dok, saya mau tanya soal perawatan kulit setelah operasi kecil',
+          ),
+          HistoryChatMessage(
+            sender: 'Dokter',
+            message: 'Tentu, operasi apa yang sudah dilakukan?',
+          ),
+          HistoryChatMessage(
+            sender: 'Pasien',
+            message: 'Operasi kecil untuk angkat tahi lalat di pipi kanan',
+          ),
+          HistoryChatMessage(
+            sender: 'Dokter',
+            message:
+                'Baik, hindari paparan matahari langsung selama 2 minggu. Gunakan krim antibiotik yang sudah saya resepkan.',
+          ),
+        ],
+      ),
+    ];
+  }
 
   void addCompletedConsultation({
     required String patientName,
     required String dateTime,
-    String diagnosis = 'Hiperpigmentasi Pasca-Inflamasi (PIH)',
-    String notes =
-        'Rekomendasi serum Vitamin C pagi hari dan retinol ringan malam hari. Evaluasi dalam 4-6 minggu.',
+    String diagnosis = '',
+    String notes = '',
     List<HistoryChatMessage>? chatHistory,
   }) {
     history.insert(
@@ -149,21 +161,7 @@ class DoctorConsultationStore {
         dateTime: dateTime,
         diagnosis: diagnosis,
         notes: notes,
-        chatHistory: chatHistory ??
-            const [
-              HistoryChatMessage(
-                sender: 'Dokter',
-                message: 'Selamat pagi. Ada yang bisa saya bantu hari ini?',
-              ),
-              HistoryChatMessage(
-                sender: 'Pasien',
-                message: 'Selamat pagi Dok, konsultasi perawatan kulit rutin.',
-              ),
-              HistoryChatMessage(
-                sender: 'Dokter',
-                message: 'Terima kasih, konsultasi telah selesai.',
-              ),
-            ],
+        chatHistory: chatHistory ?? const <HistoryChatMessage>[],
       ),
     );
   }
@@ -203,7 +201,8 @@ class _RiwayatKonsultasiPageState extends State<RiwayatKonsultasiPage> {
   }
 
   /// Riwayat konsultasi selesai dari Firestore. Tanpa Firebase, seed demo
-  /// tetap dipakai agar UI/tes tidak berubah.
+  /// tetap dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil backend
+  /// selalu menggantikan seed — termasuk saat daftar kosong.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
@@ -238,29 +237,39 @@ class _RiwayatKonsultasiPageState extends State<RiwayatKonsultasiPage> {
         final time = ((m['timeStart'] as String?) ?? '').isNotEmpty
             ? '${m['timeStart']} - ${m['timeEnd']}'
             : (m['scheduleTime'] as String?) ?? '';
+        var patientName = (m['patientName'] as String?) ?? '';
+        if (patientName.isEmpty) {
+          final pid = (m['patientId'] as String?) ?? '';
+          if (pid.isNotEmpty) {
+            try {
+              final p = await UserService.loadByUid(pid);
+              if (p != null && p.name.isNotEmpty) patientName = p.name;
+            } catch (_) {
+              // profil gagal → tetap 'Pasien'
+            }
+          }
+        }
+        if (patientName.isEmpty) patientName = 'Pasien';
         list.add(ConsultationHistoryModel(
           id: id,
-          patientName: (m['patientName'] as String?) ?? 'Pasien',
+          patientName: patientName,
           dateTime: date.isEmpty
               ? ((m['scheduleDate'] as String?) ?? '')
               : '$date • $time',
-          diagnosis: ((m['diagnosis'] as String?) ?? '').isEmpty
-              ? 'Hiperpigmentasi Pasca-Inflamasi (PIH)'
-              : (m['diagnosis'] as String?)!,
-          notes: ((m['notes'] as String?) ?? '').isEmpty
-              ? 'Rekomendasi serum Vitamin C pagi hari dan retinol ringan malam hari. Evaluasi dalam 4-6 minggu.'
-              : (m['notes'] as String?)!,
+          diagnosis: (m['diagnosis'] as String?) ?? '',
+          notes: (m['notes'] as String?) ?? '',
           chatHistory: chat,
         ));
       }
-      if (list.isEmpty) return;
       setState(() {
         DoctorConsultationStore().history
           ..clear()
           ..addAll(list);
       });
     } catch (_) {
-      // biarkan seed demo bila query gagal
+      // Query gagal → tampilkan kosong, jangan seed palsu di production.
+      if (!mounted) return;
+      setState(DoctorConsultationStore().history.clear);
     }
   }
 

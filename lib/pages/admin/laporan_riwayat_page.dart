@@ -50,23 +50,24 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
-  // Angka ringkasan — default demo, diganti bila Firebase aktif.
-  String _ringTotalKonsultasi = '13';
-  String _ringDokterAktif = '3';
-  String _ringPengguna = '5';
-  String _ringArtikel = '7';
-  String _statusTerjadwal = '3';
-  String _statusBerlangsung = '3';
-  String _statusSelesai = '7';
-  String _statusBatal = '0';
-  String _pctTerjadwal = '23%';
-  String _pctBerlangsung = '23%';
-  String _pctSelesai = '54%';
-  String _pctBatal = '0%';
-  String _topLogin = '3';
-  String _topSkinDaily = '2';
-  String _topSkinCheck = '1';
-  String _topSkincare = '1';
+  // Angka ringkasan — seed demo HANYA tanpa Firebase. Dengan Firebase,
+  // default '0'/'0%' hingga data asli dimuat dari Firestore.
+  String _ringTotalKonsultasi = Backend.useFirebase ? '0' : '13';
+  String _ringDokterAktif = Backend.useFirebase ? '0' : '3';
+  String _ringPengguna = Backend.useFirebase ? '0' : '5';
+  String _ringArtikel = Backend.useFirebase ? '0' : '7';
+  String _statusTerjadwal = Backend.useFirebase ? '0' : '3';
+  String _statusBerlangsung = Backend.useFirebase ? '0' : '3';
+  String _statusSelesai = Backend.useFirebase ? '0' : '7';
+  String _statusBatal = Backend.useFirebase ? '0' : '0';
+  String _pctTerjadwal = Backend.useFirebase ? '0%' : '23%';
+  String _pctBerlangsung = Backend.useFirebase ? '0%' : '23%';
+  String _pctSelesai = Backend.useFirebase ? '0%' : '54%';
+  String _pctBatal = Backend.useFirebase ? '0%' : '0%';
+  String _topLogin = Backend.useFirebase ? '0' : '3';
+  String _topSkinDaily = Backend.useFirebase ? '0' : '2';
+  String _topSkinCheck = Backend.useFirebase ? '0' : '1';
+  String _topSkincare = Backend.useFirebase ? '0' : '1';
 
   String _pctOf(int count, int total) {
     if (total <= 0) return '0%';
@@ -86,7 +87,11 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
     'Artikel',
   ];
 
-  final List<ActivityLogModel> _allActivities = [
+  /// Seed log demo HANYA untuk widget test / mode tanpa Firebase.
+  /// Dengan Firebase, log diisi dari Firestore (boleh kosong).
+  final List<ActivityLogModel> _allActivities = Backend.useFirebase
+      ? <ActivityLogModel>[]
+      : <ActivityLogModel>[
     ActivityLogModel(
       title: 'Login berhasil',
       tag: 'Login',
@@ -221,8 +226,9 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
     }
   }
 
-  /// Muat statistik + log aktivitas global dari Firestore. Tanpa Firebase,
-  /// angka & log demo tetap dipakai agar UI/tes tidak berubah.
+  /// Muat statistik + log aktivitas global dari Firestore. Tanpa Firebase
+  /// (test), seed demo tetap dipakai. Dengan Firebase, hasil backend selalu
+  /// menggantikan seed — termasuk saat kosong — agar UI sinkron data asli.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     try {
@@ -251,9 +257,7 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
 
       if (!mounted) return;
       setState(() {
-        if (total != null) {
-          _ringTotalKonsultasi = '$total';
-        }
+        if (total != null) _ringTotalKonsultasi = '$total';
         if (terjadwal != null) _statusTerjadwal = '$terjadwal';
         if (berlangsung != null) _statusBerlangsung = '$berlangsung';
         if (selesai != null) _statusSelesai = '$selesai';
@@ -263,42 +267,56 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
                 (berlangsung ?? 0) +
                 (selesai ?? 0) +
                 (batal ?? 0));
-        if (totalN > 0) {
-          _pctTerjadwal = _pctOf(terjadwal ?? 0, totalN);
-          _pctBerlangsung = _pctOf(berlangsung ?? 0, totalN);
-          _pctSelesai = _pctOf(selesai ?? 0, totalN);
-          _pctBatal = _pctOf(batal ?? 0, totalN);
-        }
-        if (pengguna != null && pengguna > 0) _ringPengguna = '$pengguna';
-        if (dokter != null && dokter > 0) {
-          _ringDokterAktif = '$dokter';
-        }
+        _pctTerjadwal = _pctOf(terjadwal ?? 0, totalN);
+        _pctBerlangsung = _pctOf(berlangsung ?? 0, totalN);
+        _pctSelesai = _pctOf(selesai ?? 0, totalN);
+        _pctBatal = _pctOf(batal ?? 0, totalN);
+        if (pengguna != null) _ringPengguna = '$pengguna';
+        if (dokter != null) _ringDokterAktif = '$dokter';
         if (articles != null) _ringArtikel = '${articles.length}';
 
-        if (acts != null && acts.isNotEmpty) {
-          _allActivities
-            ..clear()
-            ..addAll(acts.map((m) {
-              final tag = (m['tag'] as String?) ?? 'Login';
-              return ActivityLogModel(
-                title: (m['title'] as String?) ?? '',
-                tag: tag,
-                actor: (m['actor'] as String?) ?? '',
-                time: _fmtTime(m['createdAt']),
-                icon: _iconForTag(tag),
-              );
-            }));
+        _allActivities
+          ..clear()
+          ..addAll((acts ?? <Map<String, dynamic>>[]).map((m) {
+            final tag = (m['tag'] as String?) ?? 'Login';
+            return ActivityLogModel(
+              title: (m['title'] as String?) ?? '',
+              tag: tag,
+              actor: (m['actor'] as String?) ?? '',
+              time: _fmtTime(m['createdAt']),
+              icon: _iconForTag(tag),
+            );
+          }));
 
-          int countTag(String tag) =>
-              _allActivities.where((a) => a.tag == tag).length;
-          _topLogin = '${countTag('Login')}';
-          _topSkinDaily = '${countTag('Skin Daily')}';
-          _topSkinCheck = '${countTag('Skin Check')}';
-          _topSkincare = '${countTag('Skincare')}';
-        }
+        int countTag(String tag) =>
+            _allActivities.where((a) => a.tag == tag).length;
+        _topLogin = '${countTag('Login')}';
+        _topSkinDaily = '${countTag('Skin Daily')}';
+        _topSkinCheck = '${countTag('Skin Check')}';
+        _topSkincare = '${countTag('Skincare')}';
       });
     } catch (_) {
-      // laporan tetap menampilkan angka demo bila query gagal
+      // Query gagal → reset angka '0' & log kosong, jangan seed palsu.
+      if (!mounted) return;
+      setState(() {
+        _ringTotalKonsultasi = '0';
+        _ringDokterAktif = '0';
+        _ringPengguna = '0';
+        _ringArtikel = '0';
+        _statusTerjadwal = '0';
+        _statusBerlangsung = '0';
+        _statusSelesai = '0';
+        _statusBatal = '0';
+        _pctTerjadwal = '0%';
+        _pctBerlangsung = '0%';
+        _pctSelesai = '0%';
+        _pctBatal = '0%';
+        _topLogin = '0';
+        _topSkinDaily = '0';
+        _topSkinCheck = '0';
+        _topSkincare = '0';
+        _allActivities.clear();
+      });
     }
   }
 

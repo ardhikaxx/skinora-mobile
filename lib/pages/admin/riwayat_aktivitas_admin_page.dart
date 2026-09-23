@@ -35,20 +35,24 @@ class _RiwayatAktivitasAdminPageState extends State<RiwayatAktivitasAdminPage> {
   static const Color orangeIconBg = Color(0xFFFFD5C8);
   static const Color orangeIconColor = Color(0xFFE65100);
 
-  List<AdminActivityItem> _activities = const [
-    AdminActivityItem(
-      title: 'Login admin berhasil',
-      time: '2026-08-27 07:55',
-    ),
-    AdminActivityItem(
-      title: 'Memverifikasi dr. Anita Dewi',
-      time: '2026-08-15 10:00',
-    ),
-    AdminActivityItem(
-      title: 'Mempublikasikan artikel:\nMengenal Tipe Kulit',
-      time: '2026-08-01 12:00',
-    ),
-  ];
+  /// Seed demo HANYA untuk widget test / mode tanpa Firebase.
+  /// Dengan Firebase, daftar diisi dari Firestore (boleh kosong).
+  final List<AdminActivityItem> _activities = Backend.useFirebase
+      ? <AdminActivityItem>[]
+      : <AdminActivityItem>[
+          AdminActivityItem(
+            title: 'Login admin berhasil',
+            time: '2026-08-27 07:55',
+          ),
+          AdminActivityItem(
+            title: 'Memverifikasi dr. Anita Dewi',
+            time: '2026-08-15 10:00',
+          ),
+          AdminActivityItem(
+            title: 'Mempublikasikan artikel:\nMengenal Tipe Kulit',
+            time: '2026-08-01 12:00',
+          ),
+        ];
 
   @override
   void initState() {
@@ -62,23 +66,23 @@ class _RiwayatAktivitasAdminPageState extends State<RiwayatAktivitasAdminPage> {
   }
 
   /// Riwayat aktivitas global (admin) dari Firestore. Tanpa Firebase, data
-  /// demo tetap dipakai agar UI/tes tidak berubah.
+  /// demo tetap dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil
+  /// backend selalu menggantikan seed — termasuk saat daftar kosong.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     try {
       final items = await ActivityService.listAll();
       if (!mounted) return;
-      setState(() {
-        if (items.isEmpty) return;
-        _activities = items
-            .map((m) => AdminActivityItem(
-                  title: (m['title'] as String?) ?? '',
-                  time: _fmtTime(m['createdAt']),
-                ))
-            .toList();
-      });
+      setState(() => _activities
+        ..clear()
+        ..addAll(items.map((m) => AdminActivityItem(
+              title: (m['title'] as String?) ?? '',
+              time: _fmtTime(m['createdAt']),
+            ))));
     } catch (e) {
+      // Query gagal → tampilkan kosong, jangan seed palsu di production.
       if (!mounted) return;
+      setState(_activities.clear);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal memuat riwayat aktivitas: $e')),
       );

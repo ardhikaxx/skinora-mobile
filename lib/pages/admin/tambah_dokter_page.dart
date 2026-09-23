@@ -30,16 +30,21 @@ class _TambahDokterPageState extends State<TambahDokterPage> {
   final _strController = TextEditingController();
   final _bioController = TextEditingController();
 
-  String _selectedSpecialization = 'Estetika Kulit';
-  List<String> _specializations = [
-    'Estetika Kulit',
-    'Jerawat',
-    'Alergi',
-    'Anti-Aging',
-    'Pigmentasi',
-    'Dermatitis',
-    'Infeksi Kulit',
-  ];
+  /// Seed demo HANYA untuk widget test / mode tanpa Firebase.
+  /// Dengan Firebase, dropdown diisi dari master Firestore (boleh kosong).
+  String? _selectedSpecialization =
+      Backend.useFirebase ? null : 'Estetika Kulit';
+  List<String> _specializations = Backend.useFirebase
+      ? <String>[]
+      : <String>[
+          'Estetika Kulit',
+          'Jerawat',
+          'Alergi',
+          'Anti-Aging',
+          'Pigmentasi',
+          'Dermatitis',
+          'Infeksi Kulit',
+        ];
 
   @override
   void initState() {
@@ -47,21 +52,29 @@ class _TambahDokterPageState extends State<TambahDokterPage> {
     _loadSpecializations();
   }
 
-  /// Spesialisasi aktif dari master Firestore. Tanpa Firebase, list demo
-  /// tetap dipakai agar UI/tes tidak berubah.
+  /// Spesialisasi aktif dari master Firestore. Tanpa Firebase (test), seed
+  /// demo tetap dipakai. Dengan Firebase, hasil backend selalu menggantikan
+  /// seed — termasuk saat kosong — agar UI sinkron dengan data asli.
   Future<void> _loadSpecializations() async {
     if (!Backend.useFirebase) return;
     try {
       final names = await SpecializationService.listActiveNames();
-      if (names.isEmpty || !mounted) return;
+      if (!mounted) return;
       setState(() {
         _specializations = names;
-        if (!names.contains(_selectedSpecialization)) {
+        if (names.isEmpty) {
+          _selectedSpecialization = null;
+        } else if (!names.contains(_selectedSpecialization)) {
           _selectedSpecialization = names.first;
         }
       });
     } catch (_) {
-      // dropdown tetap memakai seed bila query gagal
+      // Query gagal → dropdown kosong, jangan seed palsu di production.
+      if (!mounted) return;
+      setState(() {
+        _specializations = <String>[];
+        _selectedSpecialization = null;
+      });
     }
   }
 
@@ -106,19 +119,11 @@ class _TambahDokterPageState extends State<TambahDokterPage> {
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name,
       email: email,
-      phone: _phoneController.text.trim().isEmpty
-          ? '081234567890'
-          : _phoneController.text.trim(),
-      specialization: _selectedSpecialization,
-      experience: _experienceController.text.trim().isEmpty
-          ? '3 tahun'
-          : _experienceController.text.trim(),
-      str: _strController.text.trim().isEmpty
-          ? 'STR-${DateTime.now().year}-99999'
-          : _strController.text.trim(),
-      bio: _bioController.text.trim().isEmpty
-          ? 'Dokter spesialis dengan dedikasi tinggi dalam kesehatan kulit.'
-          : _bioController.text.trim(),
+      phone: _phoneController.text.trim(),
+      specialization: _selectedSpecialization ?? '',
+      experience: _experienceController.text.trim(),
+      str: _strController.text.trim(),
+      bio: _bioController.text.trim(),
       status: DoctorStatus.menunggu,
     );
 
