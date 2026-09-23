@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../models/admin_article_model.dart';
+import '../../services/article_service.dart';
+import '../../services/backend.dart';
 import 'edit_artikel_page.dart';
 import 'tambah_artikel_page.dart';
 
@@ -122,6 +124,27 @@ class _ManajemenEdukasiPageState extends State<ManajemenEdukasiPage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _loadFromBackend();
+  }
+
+  /// Ambil semua artikel dari Firestore (admin). Tanpa Firebase, daftar demo
+  /// tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    try {
+      final articles = await ArticleService.listAll();
+      if (articles.isEmpty || !mounted) return;
+      setState(() => _articles
+        ..clear()
+        ..addAll(articles));
+    } catch (_) {
+      // daftar tetap menampilkan seed demo bila query gagal
+    }
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -173,13 +196,24 @@ class _ManajemenEdukasiPageState extends State<ManajemenEdukasiPage> {
     }
   }
 
-  void _handleToggleStatus(AdminArticleModel article) {
-    setState(() {
-      if (article.status == ArticleStatus.diterbitkan) {
-        article.status = ArticleStatus.draf;
-      } else {
-        article.status = ArticleStatus.diterbitkan;
+  Future<void> _handleToggleStatus(AdminArticleModel article) async {
+    final newStatus = article.status == ArticleStatus.diterbitkan
+        ? ArticleStatus.draf
+        : ArticleStatus.diterbitkan;
+    if (Backend.useFirebase) {
+      try {
+        await ArticleService.updateStatus(article.backendId, newStatus);
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengubah status artikel: $e')),
+        );
+        return;
       }
+    }
+    if (!mounted) return;
+    setState(() {
+      article.status = newStatus;
     });
 
     final message = article.status == ArticleStatus.diterbitkan
@@ -199,7 +233,20 @@ class _ManajemenEdukasiPageState extends State<ManajemenEdukasiPage> {
       message: 'Apakah Anda yakin ingin menghapus "${article.title}"?',
       confirmLabel: 'Hapus',
       confirmColor: const Color(0xFFEF4444),
-      onConfirm: () {
+      onConfirm: () async {
+        if (Backend.useFirebase) {
+          try {
+            await ArticleService.delete(article.backendId);
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Gagal menghapus artikel: $e')),
+              );
+            }
+            return;
+          }
+        }
+        if (!mounted) return;
         setState(() {
           _articles.removeWhere((a) => a.id == article.id);
         });
