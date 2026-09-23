@@ -20,6 +20,12 @@ class AdminDoctorModel {
   String bio;
   DoctorStatus status;
 
+  /// Firestore document id (== Firebase Auth uid when registered).
+  final String? fsDocId;
+
+  /// false => document still lives in `provisioned_accounts` (not registered yet).
+  final bool registered;
+
   AdminDoctorModel({
     required this.id,
     required this.name,
@@ -30,7 +36,11 @@ class AdminDoctorModel {
     required this.str,
     required this.bio,
     required this.status,
+    this.fsDocId,
+    this.registered = true,
   });
+
+  String get backendId => fsDocId ?? id;
 
   AdminDoctorModel copyWith({
     String? id,
@@ -42,6 +52,8 @@ class AdminDoctorModel {
     String? str,
     String? bio,
     DoctorStatus? status,
+    String? fsDocId,
+    bool? registered,
   }) {
     return AdminDoctorModel(
       id: id ?? this.id,
@@ -53,6 +65,8 @@ class AdminDoctorModel {
       str: str ?? this.str,
       bio: bio ?? this.bio,
       status: status ?? this.status,
+      fsDocId: fsDocId ?? this.fsDocId,
+      registered: registered ?? this.registered,
     );
   }
 }
