@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/skin_service.dart';
 import 'skin_check_result_page.dart';
 
 class SkinCheckQuestion7Page extends StatefulWidget {
@@ -59,6 +62,86 @@ class _SkinCheckQuestion7PageState extends State<SkinCheckQuestion7Page> {
     setState(() {
       _tempController.text = '29°C';
     });
+  }
+
+  String get _sensitivityResult => widget.sensitivity
+          .toLowerCase()
+          .contains('sering')
+      ? 'Sangat Sensitif'
+      : 'Sensitif';
+
+  /// Skor hasil skin check dari jawaban (tanpa mengubah UI).
+  String get _skinTypeResult {
+    final oil = widget.oilCondition.toLowerCase();
+    if (oil.contains('berminyak') && oil.contains('kering')) {
+      return 'Kombinasi';
+    }
+    if (oil.contains('berminyak') || oil.contains('minyak')) {
+      return 'Berminyak';
+    }
+    if (oil.contains('kering')) return 'Kering';
+    final wash = widget.conditionAfterWash.toLowerCase();
+    if (wash.contains('kering')) return 'Kering';
+    if (wash.contains('berminyak') || wash.contains('minyak')) {
+      return 'Berminyak';
+    }
+    return 'Normal';
+  }
+
+  String get _acneRiskResult {
+    final oil = widget.oilCondition.toLowerCase();
+    final wash = widget.conditionAfterWash.toLowerCase();
+    final sens = widget.sensitivity.toLowerCase();
+    var score = 0;
+    if (oil.contains('berminyak') || oil.contains('minyak')) score += 2;
+    if (wash.contains('berminyak') || wash.contains('minyak')) score += 1;
+    if (sens.contains('sering')) score += 1;
+    if (sens.contains('kadang')) score += 1;
+    return score >= 3 ? 'Rentan' : 'Tidak Rentan';
+  }
+
+  /// Simpan jawaban skin check ke Firestore (bila sesi aktif) lalu buka hasil.
+  Future<void> _submitSkinCheck() async {
+    final skinType = _skinTypeResult;
+    final sensitivity = _sensitivityResult;
+    final acneRisk = _acneRiskResult;
+
+    if (Backend.useFirebase && AuthService.uid != null) {
+      final uid = AuthService.uid!;
+      try {
+        final profile = await AuthService.loadProfile();
+        await SkinService.saveSkinCheck(
+          uid: uid,
+          name: (profile?.name.isNotEmpty ?? false) ? profile!.name : uid,
+          answers: {
+            'age': widget.age,
+            'gender': widget.gender,
+            'conditionAfterWash': widget.conditionAfterWash,
+            'oilCondition': widget.oilCondition,
+            'sensitivity': widget.sensitivity,
+            'humidity': widget.humidity,
+            'temperature': _tempController.text.trim(),
+          },
+          resultSkinType: skinType,
+          resultSensitivity: sensitivity,
+          resultAcneRisk: acneRisk,
+        );
+      } catch (_) {
+        // hasil tetap ditampilkan bila penyimpanan gagal
+      }
+    }
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SkinCheckResultPage(
+          skinType: skinType,
+          sensitivity: sensitivity,
+          acneRisk: acneRisk,
+          onNavigateTab: widget.onNavigateTab,
+        ),
+      ),
+    );
   }
 
   @override
@@ -336,24 +419,7 @@ class _SkinCheckQuestion7PageState extends State<SkinCheckQuestion7Page> {
                               : SizedBox(
                                   height: 48,
                                   child: ElevatedButton(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              SkinCheckResultPage(
-                                            skinType: 'Normal',
-                                            sensitivity: widget.sensitivity
-                                                    .toLowerCase()
-                                                    .contains('sering')
-                                                ? 'Sangat Sensitif'
-                                                : 'Sensitif',
-                                            acneRisk: 'Tidak Rentan',
-                                            onNavigateTab: widget.onNavigateTab,
-                                          ),
-                                        ),
-                                      );
-                                    },
+                                    onPressed: _submitSkinCheck,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: primaryMaroon,
                                       foregroundColor: Colors.white,
