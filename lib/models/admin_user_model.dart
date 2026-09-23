@@ -16,6 +16,13 @@ class AdminUserModel {
   String gender;
   UserStatus status;
 
+  /// Firestore document id (== Firebase Auth uid when registered).
+  /// Falls back to [id] when backend is not active.
+  final String? fsDocId;
+
+  /// false => document still lives in `provisioned_accounts` (not registered yet).
+  final bool registered;
+
   AdminUserModel({
     required this.id,
     required this.name,
@@ -25,7 +32,12 @@ class AdminUserModel {
     required this.birthDate,
     required this.gender,
     this.status = UserStatus.aktif,
+    this.fsDocId,
+    this.registered = true,
   });
+
+  /// Document id used by the backend for updates/deletes.
+  String get backendId => fsDocId ?? id;
 
   AdminUserModel copyWith({
     String? id,
@@ -36,6 +48,8 @@ class AdminUserModel {
     String? birthDate,
     String? gender,
     UserStatus? status,
+    String? fsDocId,
+    bool? registered,
   }) {
     return AdminUserModel(
       id: id ?? this.id,
@@ -46,6 +60,8 @@ class AdminUserModel {
       birthDate: birthDate ?? this.birthDate,
       gender: gender ?? this.gender,
       status: status ?? this.status,
+      fsDocId: fsDocId ?? this.fsDocId,
+      registered: registered ?? this.registered,
     );
   }
 }
