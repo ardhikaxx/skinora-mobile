@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
+import '../../services/consultation_service.dart';
 import 'ruang_chat_dokter_page.dart';
 import 'riwayat_konsultasi_page.dart';
 
@@ -45,6 +48,9 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
 
   late List<ConsultationItemModel> _consultations;
 
+  // id Firestore -> data mentah untuk persist aksi status.
+  final Map<String, Map<String, dynamic>> _backendMeta = {};
+
   @override
   void initState() {
     super.initState();
@@ -81,9 +87,68 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
         status: 'Terjadwal',
       ),
     ];
+    _loadFromBackend();
+  }
+
+  String _labelStatus(String raw) {
+    switch (raw) {
+      case 'berlangsung':
+        return 'Berlangsung';
+      case 'selesai':
+        return 'Selesai';
+      case 'terjadwal':
+      default:
+        return 'Terjadwal';
+    }
+  }
+
+  /// Konsultasi aktif dokter dari Firestore. Tanpa Firebase, seed demo
+  /// tetap dipakai agar UI/tes tidak berubah.
+  Future<void> _loadFromBackend() async {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final items = await ConsultationService.listForDoctor(uid);
+      if (!mounted) return;
+      setState(() {
+        if (items.isEmpty) return;
+        _backendMeta.clear();
+        _consultations = items
+            .where((m) => ((m['status'] as String?) ?? '') != 'selesai')
+            .map((m) {
+          final id = (m['id'] as String?) ?? '';
+          _backendMeta[id] = m;
+          final date = (m['dateIso'] as String?) ?? '';
+          final time = ((m['timeStart'] as String?) ?? '').isNotEmpty
+              ? '${m['timeStart']} - ${m['timeEnd']}'
+              : (m['scheduleTime'] as String?) ?? '';
+          return ConsultationItemModel(
+            id: id,
+            patientName: (m['patientName'] as String?) ?? 'Pasien',
+            dateTime: date.isEmpty
+                ? ((m['scheduleDate'] as String?) ?? '')
+                : '$date • $time',
+            status: _labelStatus((m['status'] as String?) ?? 'terjadwal'),
+          );
+        }).toList();
+      });
+    } catch (_) {
+      // biarkan seed demo bila query gagal
+    }
   }
 
   Future<void> _handleConsultationAction(ConsultationItemModel item) async {
+    // Persist status "berlangsung" saat dokter membuka ruang chat.
+    if (Backend.useFirebase && _backendMeta.containsKey(item.id)) {
+      try {
+        await ConsultationService.markBerlangsung(item.id);
+      } catch (_) {
+        // lanjut ke ruang chat walau update status gagal
+      }
+      if (!mounted) return;
+    }
+
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
@@ -99,10 +164,33 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
 
     // If finished via Screen 3 "Ya, Selesai"
     if (result == true) {
+      // Persist selesai ke Firestore (dengan activity log).
+      if (Backend.useFirebase && _backendMeta.containsKey(item.id)) {
+        final uid = AuthService.uid ?? '';
+        try {
+          await ConsultationService.complete(
+            id: item.id,
+            doctorUid: uid,
+            doctorName: (_backendMeta[item.id]?['doctorName'] as String?) ??
+                'Dokter',
+            patientName: item.patientName,
+            diagnosis: '',
+            notes: '',
+          );
+          _backendMeta.remove(item.id);
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Gagal menyelesaikan konsultasi: $e')),
+            );
+          }
+          return;
+        }
+      }
       setState(() {
         _consultations.removeWhere((c) => c.id == item.id);
       });
-      // Masukkan ke riwayat konsultasi dokter
+      // Masukkan ke riwayat konsultasi dokter (seed lokal utk demo)
       DoctorConsultationStore().addCompletedConsultation(
         patientName: item.patientName,
         dateTime: item.dateTime,
