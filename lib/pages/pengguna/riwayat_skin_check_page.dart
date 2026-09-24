@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
@@ -207,14 +208,26 @@ class _RiwayatSkinCheckPageState extends State<RiwayatSkinCheckPage> {
 
             // Main scrollable list of skin check history
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                itemCount: _historyList.length,
-                itemBuilder: (context, index) {
-                  final item = _historyList[index];
-                  return _buildHistoryCard(item);
-                },
-              ),
+              child: _historyList.isEmpty
+                  ? EmptyStateWidget(
+                      icon: LucideIcons.stethoscope,
+                      title: 'Belum ada hasil Skin Check',
+                      description:
+                          'Cek kondisi kulit Anda untuk mengetahui tipe kulit, tingkat sensitivitas, dan risiko jerawat.',
+                      actionLabel: 'Mulai Skin Check',
+                      onAction: () {
+                        Navigator.popUntil(context, (route) => route.isFirst);
+                        widget.onNavigateTab?.call(1);
+                      },
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                      itemCount: _historyList.length,
+                      itemBuilder: (context, index) {
+                        final item = _historyList[index];
+                        return _buildHistoryCard(item);
+                      },
+                    ),
             ),
           ],
         ),
