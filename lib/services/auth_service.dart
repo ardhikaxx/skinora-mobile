@@ -27,7 +27,7 @@ class AuthService {
     required String password,
   }) {
     return _auth.signInWithEmailAndPassword(
-      email: email.trim(),
+      email: email.trim().toLowerCase(),
       password: password,
     );
   }
@@ -46,13 +46,17 @@ class AuthService {
     required String phone,
     required String password,
   }) async {
+    // Email selalu lowercase agar cocok dengan doc ID provision
+    // `provisioned_accounts/{token.email}` di Security Rules.
     final credential = await _auth.createUserWithEmailAndPassword(
-      email: email.trim(),
+      email: email.trim().toLowerCase(),
       password: password,
     );
     final uid = credential.user!.uid;
     try {
-      final blockReason = await UserService.registerBlockReason(email);
+      final blockReason = await UserService.registerBlockReason(
+        email.trim().toLowerCase(),
+      );
       if (blockReason != null) {
         await credential.user?.delete();
         throw FirebaseAuthException(
@@ -62,7 +66,7 @@ class AuthService {
       }
       await UserService.createProfileOnRegister(
         uid: uid,
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         name: name,
         phone: phone,
       );
