@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../services/activity_service.dart';
 import '../../services/backend.dart';
@@ -139,87 +140,96 @@ class _RiwayatAktivitasAdminPageState extends State<RiwayatAktivitasAdminPage> {
                 ),
                 children: [
                   // Timeline Card
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18.0,
-                      vertical: 16.0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: const Color(0xFFEEEEEE),
-                        width: 1.0,
+                  if (_activities.isEmpty)
+                    const EmptyStateWidget(
+                      icon: LucideIcons.history,
+                      title: 'Belum ada aktivitas sistem',
+                      description:
+                          'Log aktivitas admin, dokter, dan pengguna akan tercatat di sini.',
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18.0,
+                        vertical: 16.0,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.02),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: const Color(0xFFEEEEEE),
+                          width: 1.0,
                         ),
-                      ],
-                    ),
-                    child: Column(
-                      children: List.generate(_activities.length, (index) {
-                        final item = _activities[index];
-                        final isLast = index == _activities.length - 1;
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.02),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: List.generate(_activities.length, (index) {
+                          final item = _activities[index];
+                          final isLast = index == _activities.length - 1;
 
-                        return Column(
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                // Peach Clock Icon Box
-                                Container(
-                                  width: 42,
-                                  height: 42,
-                                  decoration: BoxDecoration(
-                                    color: orangeIconBg,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Center(
-                                    child: Icon(
-                                      LucideIcons.clock,
-                                      size: 20,
-                                      color: orangeIconColor,
+                          return Column(
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Peach Clock Icon Box
+                                  Container(
+                                    width: 42,
+                                    height: 42,
+                                    decoration: BoxDecoration(
+                                      color: orangeIconBg,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Center(
+                                      child: Icon(
+                                        LucideIcons.clock,
+                                        size: 20,
+                                        color: orangeIconColor,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 14),
+                                  const SizedBox(width: 14),
 
-                                // Title and Time
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        item.title,
-                                        style: const TextStyle(
-                                          fontSize: 14.0,
-                                          fontWeight: FontWeight.bold,
-                                          color: darkText,
-                                          height: 1.3,
+                                  // Title and Time
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          item.title,
+                                          style: const TextStyle(
+                                            fontSize: 14.0,
+                                            fontWeight: FontWeight.bold,
+                                            color: darkText,
+                                            height: 1.3,
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        item.time,
-                                        style: const TextStyle(
-                                          fontSize: 12.0,
-                                          color: subText,
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          item.time,
+                                          style: const TextStyle(
+                                            fontSize: 12.0,
+                                            color: subText,
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            if (!isLast) const SizedBox(height: 20),
-                          ],
-                        );
-                      }),
+                                ],
+                              ),
+                              if (!isLast) const SizedBox(height: 20),
+                            ],
+                          );
+                        }),
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
