@@ -10,6 +10,8 @@ class ActivityService {
   static CollectionReference<Map<String, dynamic>> get _col =>
       _db.collection('activities');
 
+  /// `actor` selalu diambil dari `users/{uid}.name` agar cocok dengan
+  /// Security Rules (`request.resource.data.actor == userData.name`).
   static Future<void> log({
     required String title,
     required String tag,
@@ -18,10 +20,19 @@ class ActivityService {
   }) async {
     if (!Backend.useFirebase) return;
     if (actorUid.isEmpty) return;
+    var resolved = actor.trim();
+    try {
+      final snap = await _db.collection('users').doc(actorUid).get();
+      final name = (snap.data()?['name'] as String?)?.trim();
+      if (name != null && name.isNotEmpty) resolved = name;
+    } catch (_) {
+      // fallback: actor yang dipass caller
+    }
+    if (resolved.isEmpty) return;
     await _col.add({
       'title': title,
       'tag': tag,
-      'actor': actor,
+      'actor': resolved,
       'actorUid': actorUid,
       'createdBy': actorUid,
       'createdAt': FieldValue.serverTimestamp(),
