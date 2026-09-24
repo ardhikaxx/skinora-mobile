@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
@@ -439,18 +440,24 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
 
             // Messages List
             Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 14.0,
-                ),
-                itemCount: _messages.length,
-                itemBuilder: (context, index) {
-                  final msg = _messages[index];
-                  return _buildMessageBubble(msg);
-                },
-              ),
+              child: _messages.isEmpty
+                  ? const ChatEmptyState(
+                      title: 'Belum ada pesan',
+                      description:
+                          'Mulai percakapan dengan pasien dengan mengirim pesan.',
+                    )
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 14.0,
+                      ),
+                      itemCount: _messages.length,
+                      itemBuilder: (context, index) {
+                        final msg = _messages[index];
+                        return _buildMessageBubble(msg);
+                      },
+                    ),
             ),
 
             // Input bar
