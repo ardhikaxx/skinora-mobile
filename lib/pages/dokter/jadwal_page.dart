@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
@@ -659,12 +660,24 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
                   const SizedBox(height: 18),
 
                   // 4. Grouped Schedule Cards (Days)
-                  ..._scheduleDays.map((dayGroup) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 18.0),
-                      child: _buildDayGroupCard(dayGroup),
-                    );
-                  }),
+                  if (_scheduleDays.isEmpty)
+                    EmptyStateWidget(
+                      icon: LucideIcons.calendarDays,
+                      title: 'Belum ada jadwal konsultasi',
+                      description:
+                          'Tambahkan slot jadwal agar pasien dapat memesan konsultasi dengan Anda.',
+                      actionLabel: 'Tambah Slot Baru',
+                      onAction: () {
+                        setState(() => _isFormOpen = true);
+                      },
+                    )
+                  else
+                    ..._scheduleDays.map((dayGroup) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 18.0),
+                        child: _buildDayGroupCard(dayGroup),
+                      );
+                    }),
 
                   const SizedBox(height: 16),
                 ],
