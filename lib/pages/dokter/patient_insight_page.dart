@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
@@ -246,12 +247,20 @@ class _PatientInsightPageState extends State<PatientInsightPage> {
                   const SizedBox(height: 18),
 
                   // Patient Cards
-                  ..._patients.map((patient) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12.0),
-                      child: _buildPatientCard(patient),
-                    );
-                  }),
+                  if (_patients.isEmpty)
+                    const EmptyStateWidget(
+                      icon: LucideIcons.users,
+                      title: 'Belum ada data pasien',
+                      description:
+                          'Data insight kulit pasien yang pernah berkonsultasi dengan Anda akan muncul di sini.',
+                    )
+                  else
+                    ..._patients.map((patient) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12.0),
+                        child: _buildPatientCard(patient),
+                      );
+                    }),
 
                   const SizedBox(height: 20),
                 ],
