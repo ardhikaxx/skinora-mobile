@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
 import '../../services/backend.dart';
 import 'riwayat_konsultasi_page.dart';
@@ -359,13 +360,11 @@ class DetailRiwayatKonsultasiPage extends StatelessWidget {
 
           // Empty state
           if (messages.isEmpty)
-            const Text(
-              'Belum ada riwayat chat',
-              style: TextStyle(
-                fontSize: 13.0,
-                color: Color(0xFF9CA3AF),
-                height: 1.35,
-              ),
+            const CompactEmptyState(
+              icon: LucideIcons.messageCircle,
+              title: 'Belum ada riwayat chat',
+              description:
+                  'Percakapan pada konsultasi ini akan tercatat di sini.',
             ),
 
           // Messages List
