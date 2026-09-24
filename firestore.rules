@@ -5,18 +5,39 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function userDoc(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function userExists(uid) {
+      return exists(userDoc(uid));
+    }
+
+    function userData(uid) {
+      return get(userDoc(uid)).data;
+    }
+
     function isOwner(uid) {
       return signedIn() && request.auth.uid == uid;
     }
 
+    // exists() singkat sebelum get() agar akun tanpa users/{uid} tidak error
+    // dan mematikan seluruh kondisi || (gagal register-time provision, dll).
     function isAdmin() {
       return signedIn()
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+        && userExists(request.auth.uid)
+        && userData(request.auth.uid).role == 'admin';
     }
 
     function isDoctor() {
       return signedIn()
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'dokter';
+        && userExists(request.auth.uid)
+        && userData(request.auth.uid).role == 'dokter';
+    }
+
+    function isVerifiedDoctor() {
+      return isDoctor()
+        && userData(request.auth.uid).status == 'terverifikasi';
     }
 
     function isParticipant(patientId, doctorId) {
@@ -29,45 +50,103 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read: if isAdmin() || isOwner(uid) || (signedIn() && resource.data.role == 'dokter');
-      // Client tidak boleh membuat role admin (admin di-seed / Admin SDK).
+      // Baca: admin, pemilik, atau daftar dokter (untuk konsultasi/booking).
+      allow read: if isAdmin() || isOwner(uid)
+        || (signedIn() && resource.data.role == 'dokter');
+
+      // Register: role admin mustahil dari client; role dokter hanya bila ada
+      // provision aktif untuk email token yang belum dikonsumsi.
       allow create: if isOwner(uid)
         && request.resource.data.uid == uid
-        && request.resource.data.role in ['pengguna', 'dokter'];
+        && request.resource.data.role in ['pengguna', 'dokter']
+        && (
+          request.resource.data.role == 'pengguna'
+          || (
+            request.resource.data.status in ['menunggu', 'terverifikasi', 'ditolak', 'ditangguhkan']
+            && userExists(uid) == false
+            && exists(/databases/$(database)/documents/provisioned_accounts/$(request.auth.token.email))
+            && get(/databases/$(database)/documents/provisioned_accounts/$(request.auth.token.email)).data.role == 'dokter'
+            && get(/databases/$(database)/documents/provisioned_accounts/$(request.auth.token.email)).data.consumedByUid == null
+            && get(/databases/$(database)/documents/provisioned_accounts/$(request.auth.token.email)).data.email == request.auth.token.email
+            && request.resource.data.status
+                 == get(/databases/$(database)/documents/provisioned_accounts/$(request.auth.token.email)).data.status
+          )
+        )
+        // Client register pengguna selalu berstatus aktif.
+        && (request.resource.data.role != 'pengguna' || request.resource.data.status == 'aktif');
+
+      // Owner: hanya field profil/pengaturan yang boleh berubah.
+      // role, uid, email, status, createdBy, createdAt dikunci.
       allow update: if isAdmin()
         || (isOwner(uid)
           && request.resource.data.role == resource.data.role
           && request.resource.data.uid == resource.data.uid
-          && request.resource.data.email == resource.data.email);
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name', 'phone', 'address', 'birthDate', 'gender',
+            'specialization', 'experience', 'str', 'bio', 'isAvailable',
+            'settings', 'updatedAt'
+          ]));
+
       allow delete: if isAdmin();
 
       match /skin_checks/{doc} {
-        allow read: if isAdmin() || isOwner(uid) || (isDoctor() && hasCareLink(uid, request.auth.uid));
-        allow create: if isOwner(uid) && request.resource.data.createdBy == uid;
+        allow read: if isAdmin() || isOwner(uid)
+          || (isVerifiedDoctor() && hasCareLink(uid, request.auth.uid));
+        allow create: if isOwner(uid)
+          && request.resource.data.createdBy == uid
+          && request.resource.data.createdAt == request.time;
         allow update, delete: if false;
       }
 
       match /skin_dailies/{doc} {
-        allow read: if isAdmin() || isOwner(uid) || (isDoctor() && hasCareLink(uid, request.auth.uid));
-        allow create: if isOwner(uid) && request.resource.data.createdBy == uid;
-        allow update, delete: if isOwner(uid);
+        allow read: if isAdmin() || isOwner(uid)
+          || (isVerifiedDoctor() && hasCareLink(uid, request.auth.uid));
+        allow create: if isOwner(uid)
+          && request.resource.data.createdBy == uid
+          && request.resource.data.createdAt == request.time;
+        allow update: if isOwner(uid)
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isOwner(uid);
       }
 
       match /skincare_logs/{doc} {
-        allow read: if isAdmin() || isOwner(uid) || (isDoctor() && hasCareLink(uid, request.auth.uid));
-        allow create: if isOwner(uid) && request.resource.data.createdBy == uid;
-        allow update: if isOwner(uid);
+        allow read: if isAdmin() || isOwner(uid)
+          || (isVerifiedDoctor() && hasCareLink(uid, request.auth.uid));
+        allow create: if isOwner(uid)
+          && request.resource.data.createdBy == uid
+          && request.resource.data.createdAt == request.time;
+        allow update: if isOwner(uid)
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.createdAt == resource.data.createdAt;
         allow delete: if false;
       }
 
       match /slots/{doc} {
-        allow read: if signedIn();
-        // Dokter: hanya slot miliknya; jangan hapus slot yang sudah dibooking.
-        allow create: if isOwner(uid) && request.resource.data.createdBy == uid;
+        // Baca: admin, dokter pemilik (semua slot miliknya), slot kosong,
+        // atau pasien yang sudah tercatat pada slot tersebut (privasi PII).
+        allow read: if isAdmin() || isOwner(uid)
+          || (signedIn() && resource.data.isBooked != true)
+          || (signedIn() && resource.data.patientId == request.auth.uid);
+
+        allow create: if isOwner(uid)
+          && request.resource.data.createdBy == uid
+          && request.resource.data.isBooked == false;
+
+        // Dokter ubah slot miliknya — tidak boleh me-unbook / pindah pasien
+        // pada slot yang sudah dibooking.
         allow delete: if isOwner(uid) && resource.data.isBooked != true;
-        // Dokter ubah slot sendiri; pasien hanya booking (isBooked false→true).
+
         allow update: if (isOwner(uid)
-            && request.resource.data.createdBy == resource.data.createdBy)
+            && request.resource.data.createdBy == resource.data.createdBy
+            && (
+              resource.data.isBooked != true
+              || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt'])
+            ))
           || (signedIn()
             && resource.data.isBooked == false
             && request.resource.data.isBooked == true
@@ -77,40 +156,63 @@ service cloud.firestore {
       }
     }
 
+    // Pre-provision admin: doc ID = email lowercase (dipakai saat register).
     match /provisioned_accounts/{doc} {
-      // Read: admin semua; pendaftar hanya provision email miliknya yang belum dipakai.
-      // (resource.data — bukan request.resource — untuk operasi read.)
       allow read: if isAdmin()
         || (signedIn()
           && resource.data.email == request.auth.token.email
           && resource.data.consumedByUid == null);
       allow create, delete: if isAdmin();
-      // Admin ubah bebas; pendaftar hanya menandai consumedByUid miliknya.
       allow update: if isAdmin()
         || (signedIn()
           && resource.data.email == request.auth.token.email
           && resource.data.consumedByUid == null
           && request.resource.data.consumedByUid == request.auth.uid
-          && request.resource.data.email == resource.data.email
-          && request.resource.data.role == resource.data.role);
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['consumedByUid', 'updatedAt']));
     }
 
     match /specializations/{doc} {
       allow read: if signedIn();
-      allow write: if isAdmin();
+      allow create, update: if isAdmin();
+      // Integrity: hard delete hanya admin — service memverifikasi referensi
+      // dokter di client; rules tidak punya query koleksi.
+      allow delete: if isAdmin();
     }
 
     match /articles/{doc} {
       allow read: if isAdmin()
         || (signedIn() && resource.data.status == 'diterbitkan');
-      allow write: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.status in ['draf', 'diterbitkan']
+        && request.resource.data.createdAt == request.time;
+      allow update: if isAdmin()
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.status in ['draf', 'diterbitkan']
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if isAdmin();
     }
 
     match /activities/{doc} {
-      allow read: if isAdmin() || (signedIn() && resource.data.actorUid == request.auth.uid);
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.actorUid == request.auth.uid);
       allow create: if signedIn()
         && request.resource.data.actorUid == request.auth.uid
-        && request.resource.data.createdBy == request.auth.uid;
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 200
+        && request.resource.data.tag in [
+          'Login', 'Skin Check', 'Skin Daily', 'Skincare', 'Booking',
+          'Konsultasi', 'Review', 'Verifikasi', 'Artikel', 'Profil',
+          'Pengguna', 'Dokter', 'Spesialisasi'
+        ]
+        && userExists(request.auth.uid)
+        && request.resource.data.actor == userData(request.auth.uid).name;
       allow update: if false;
       allow delete: if isAdmin();
     }
@@ -121,8 +223,37 @@ service cloud.firestore {
           resource.data.audience == 'user:' + request.auth.uid
           || (resource.data.audience == 'role:admin' && isAdmin())
         ));
-      allow create: if signedIn() && request.resource.data.createdBy == request.auth.uid;
-      // Penerima: hanya boleh ubah isUnread. Admin: bebas.
+
+      // Create: recipient diverifikasi via recipientUid.
+      // - audience role:admin: hanya admin (broadcast platform).
+      // - audience user:{uid}: ke diri sendiri, atau lewat care_link
+      //   (pasien→dokternya / dokter→pasiennya), atau oleh admin.
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 200
+        && request.resource.data.description is string
+        && request.resource.data.description.size() <= 1000
+        && request.resource.data.isUnread == true
+        && request.resource.data.createdAt == request.time
+        && (
+          (
+            request.resource.data.audience == 'role:admin'
+            && request.resource.data.recipientUid == ''
+            && isAdmin()
+          )
+          || (
+            request.resource.data.audience == 'user:' + request.resource.data.recipientUid
+            && (
+              request.resource.data.recipientUid == request.auth.uid
+              || isAdmin()
+              || hasCareLink(request.auth.uid, request.resource.data.recipientUid)
+              || hasCareLink(request.resource.data.recipientUid, request.auth.uid)
+            )
+          )
+        );
+
       allow update: if isAdmin()
         || (signedIn()
           && (
@@ -139,10 +270,12 @@ service cloud.firestore {
           resource.data.patientId == request.auth.uid
           || resource.data.doctorId == request.auth.uid
         ));
+      // Dibuat pasien saat booking; target harus dokter terverifikasi.
       allow create: if signedIn()
         && request.resource.data.patientId == request.auth.uid
         && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.doctorId is string;
+        && get(userDoc(request.resource.data.doctorId)).data.role == 'dokter'
+        && get(userDoc(request.resource.data.doctorId)).data.status == 'terverifikasi';
       allow update, delete: if isAdmin();
     }
 
@@ -152,14 +285,45 @@ service cloud.firestore {
           resource.data.patientId == request.auth.uid
           || resource.data.doctorId == request.auth.uid
         ));
+
+      // Create hanya oleh pasien yang sedang mem-book slot yang ada,
+      // berstatus terjadwal, tanpa diagnosis awal.
       allow create: if signedIn()
         && request.resource.data.patientId == request.auth.uid
-        && request.resource.data.createdBy == request.auth.uid;
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.status == 'terjadwal'
+        && request.resource.data.diagnosis == null
+        && request.resource.data.notes == null
+        && request.resource.data.slotId is string
+        && exists(/databases/$(database)/documents/users/$(request.resource.data.doctorId)/slots/$(request.resource.data.slotId))
+        && get(userDoc(request.resource.data.doctorId)).data.role == 'dokter'
+        && get(userDoc(request.resource.data.doctorId)).data.status == 'terverifikasi'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.patientName == userData(request.auth.uid).name
+        && (
+          // Saat transaksi booking: slot pre-state belum dipatient (null),
+          // atau sudah menjadi milik pembuat (setelah booking lain milik sendiri).
+          get(/databases/$(database)/documents/users/$(request.resource.data.doctorId)/slots/$(request.resource.data.slotId)).data.patientId == null
+          || get(/databases/$(database)/documents/users/$(request.resource.data.doctorId)/slots/$(request.resource.data.slotId)).data.patientId == request.auth.uid
+        );
+
+      // Update: hanya dokter terkait (atau admin) yang mengubah status/diagnosis.
+      // Pasien TIDAK boleh update konsultasi (termasuk menyetel selesai).
+      // Field identitas dikunci; status tidak boleh mundur dari selesai.
       allow update: if isAdmin()
-        || (signedIn() && (
-          resource.data.patientId == request.auth.uid
-          || resource.data.doctorId == request.auth.uid
-        ));
+        || (signedIn()
+          && request.auth.uid == resource.data.doctorId
+          && request.resource.data.patientId == resource.data.patientId
+          && request.resource.data.doctorId == resource.data.doctorId
+          && request.resource.data.patientName == resource.data.patientName
+          && request.resource.data.doctorName == resource.data.doctorName
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.slotId == resource.data.slotId
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['status', 'diagnosis', 'notes', 'updatedAt', 'completedAt'])
+          && resource.data.status != 'selesai'
+          && request.resource.data.status in ['terjadwal', 'berlangsung', 'selesai', 'dibatalkan']);
+
       allow delete: if isAdmin();
 
       match /messages/{msg} {
@@ -168,12 +332,27 @@ service cloud.firestore {
             get(/databases/$(database)/documents/consultations/$(id)).data.patientId,
             get(/databases/$(database)/documents/consultations/$(id)).data.doctorId
           ));
+
+        // Create: hanya partisipan; senderRole harus sesuai peran nyata
+        // (pasien tidak bisa mengirim sebagai dokter, dan sebaliknya).
         allow create: if signedIn()
           && request.resource.data.senderId == request.auth.uid
-          && isParticipant(
-            get(/databases/$(database)/documents/consultations/$(id)).data.patientId,
-            get(/databases/$(database)/documents/consultations/$(id)).data.doctorId
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 4000
+          && (
+            (
+              request.auth.uid == get(/databases/$(database)/documents/consultations/$(id)).data.patientId
+              && request.resource.data.senderRole == 'user'
+            )
+            || (
+              request.auth.uid == get(/databases/$(database)/documents/consultations/$(id)).data.doctorId
+              && request.resource.data.senderRole == 'dokter'
+            )
           );
+
+        // Transcript immutable — tidak ada update/delete oleh client.
         allow update, delete: if false;
       }
     }
