@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/consultation_service.dart';
 import '../../utils/app_dates.dart';
+import 'konsultasi_dokter_page.dart';
 import 'riwayat_ruang_konsultasi_page.dart';
 
 enum ConsultationStatus {
@@ -261,14 +263,32 @@ class _RiwayatKonsultasiPenggunaPageState
 
             // Consultation History List
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                itemCount: _historyList.length,
-                itemBuilder: (context, index) {
-                  final item = _historyList[index];
-                  return _buildHistoryCard(item);
-                },
-              ),
+              child: _historyList.isEmpty
+                  ? EmptyStateWidget(
+                      icon: LucideIcons.stethoscope,
+                      title: 'Belum ada riwayat konsultasi',
+                      description:
+                          'Temukan dokter spesialis kulit dan mulai konsultasi online untuk perawatan yang tepat.',
+                      actionLabel: 'Cari Dokter',
+                      onAction: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => KonsultasiDokterPenggunaPage(
+                              onNavigateTab: widget.onNavigateTab,
+                            ),
+                          ),
+                        );
+                      },
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                      itemCount: _historyList.length,
+                      itemBuilder: (context, index) {
+                        final item = _historyList[index];
+                        return _buildHistoryCard(item);
+                      },
+                    ),
             ),
           ],
         ),
