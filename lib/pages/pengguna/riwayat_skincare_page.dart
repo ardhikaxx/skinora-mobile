@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
@@ -233,17 +234,30 @@ class _RiwayatSkincarePageState extends State<RiwayatSkincarePage> {
 
             // Main List of History Cards
             Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 6.0),
-                itemCount: _entries.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 14),
-                itemBuilder: (context, index) {
-                  final entry = _entries[index];
-                  final isExpanded = _expandedIndices.contains(index);
+              child: _entries.isEmpty
+                  ? EmptyStateWidget(
+                      icon: LucideIcons.droplets,
+                      title: 'Belum ada rutinitas skincare',
+                      description:
+                          'Mulai catat rutinitas pagi dan malam Anda agar rutinitas skincare lebih konsisten.',
+                      actionLabel: 'Buka Skincare',
+                      onAction: () {
+                        Navigator.popUntil(context, (route) => route.isFirst);
+                        widget.onNavigateTab?.call(3);
+                      },
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20.0, vertical: 6.0),
+                      itemCount: _entries.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 14),
+                      itemBuilder: (context, index) {
+                        final entry = _entries[index];
+                        final isExpanded = _expandedIndices.contains(index);
 
-                  return _buildHistoryCard(entry, index, isExpanded);
-                },
-              ),
+                        return _buildHistoryCard(entry, index, isExpanded);
+                      },
+                    ),
             ),
           ],
         ),
