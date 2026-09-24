@@ -118,7 +118,7 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
     if (!Backend.useFirebase) return;
     final id = widget.consultationId;
     if (id == null || id.isEmpty) {
-      _messages = const <ChatBubbleModel>[];
+      _messages = <ChatBubbleModel>[];
       return;
     }
     _msgSub = ConsultationService.messageStream(id).listen(
@@ -145,7 +145,7 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
       },
       onError: (_) {
         if (!mounted) return;
-        setState(() => _messages = const <ChatBubbleModel>[]);
+        setState(() => _messages = <ChatBubbleModel>[]);
       },
     );
   }
