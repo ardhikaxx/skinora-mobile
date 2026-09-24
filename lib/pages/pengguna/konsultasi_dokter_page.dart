@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/backend.dart';
 import '../../services/user_service.dart';
@@ -307,7 +308,10 @@ class _KonsultasiDokterPenggunaPageState
                   const SizedBox(height: 16),
 
                   // 3. Doctor Cards List
-                  ...filteredList.map((doc) => _buildDoctorCard(doc)),
+                  if (filteredList.isEmpty)
+                    _buildDoctorsEmptyState()
+                  else
+                    ...filteredList.map((doc) => _buildDoctorCard(doc)),
 
                   const SizedBox(height: 16),
                 ],
@@ -325,6 +329,47 @@ class _KonsultasiDokterPenggunaPageState
           }
         },
       ),
+    );
+  }
+
+  Widget _buildDoctorsEmptyState() {
+    final query = _searchController.text.trim();
+    final hasSearch = query.isNotEmpty;
+    final hasFilter = _selectedCategory != 'Semua';
+
+    if (_allDoctors.isEmpty) {
+      return const EmptyStateWidget(
+        icon: LucideIcons.stethoscope,
+        title: 'Belum ada dokter terverifikasi',
+        description:
+            'Dokter spesialis kulit akan muncul di sini setelah diverifikasi oleh admin.',
+      );
+    }
+    if (hasSearch) {
+      return NoSearchResultWidget(
+        title: 'Dokter tidak ditemukan',
+        description: 'Tidak ada dokter yang cocok dengan "$query". Coba ubah kata kunci atau hapus pencarian.',
+        onAction: () {
+          _searchController.clear();
+          setState(() {});
+        },
+      );
+    }
+    if (hasFilter) {
+      return EmptyStateWidget(
+        icon: LucideIcons.filter,
+        title: 'Tidak ada dokter pada filter ini',
+        description: 'Belum ada dokter dengan kategori "$_selectedCategory".',
+        actionLabel: 'Tampilkan Semua',
+        onAction: () {
+          setState(() => _selectedCategory = 'Semua');
+        },
+      );
+    }
+    return const EmptyStateWidget(
+      icon: LucideIcons.stethoscope,
+      title: 'Belum ada dokter',
+      description: 'Dokter spesialis kulit akan muncul di sini.',
     );
   }
 
