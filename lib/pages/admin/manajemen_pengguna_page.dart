@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../models/admin_user_model.dart';
 import '../../services/backend.dart';
@@ -126,6 +127,27 @@ class _ManajemenPenggunaPageState extends State<ManajemenPenggunaPage> {
       return user.name.toLowerCase().contains(q) ||
           user.email.toLowerCase().contains(q);
     }).toList();
+  }
+
+  Widget _buildUsersEmptyState() {
+    if (_users.isEmpty) {
+      return EmptyStateWidget(
+        icon: LucideIcons.users,
+        title: 'Belum ada data pengguna',
+        description: 'Akun pengguna Skinora yang terdaftar akan muncul di sini.',
+        actionLabel: 'Tambah Pengguna',
+        onAction: _navigateToAddUser,
+      );
+    }
+    return NoSearchResultWidget(
+      title: 'Pengguna tidak ditemukan',
+      description:
+          'Tidak ada pengguna yang cocok dengan "$_searchQuery". Coba ubah kata kunci.',
+      onAction: () => setState(() {
+        _searchController.clear();
+        _searchQuery = '';
+      }),
+    );
   }
 
   Future<void> _navigateToAddUser() async {
@@ -308,15 +330,7 @@ class _ManajemenPenggunaPageState extends State<ManajemenPenggunaPage> {
             // Users List
             Expanded(
               child: _filteredUsers.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'Tidak ada data pengguna',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: subText,
-                        ),
-                      ),
-                    )
+                  ? _buildUsersEmptyState()
                   : ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 20.0),
                       itemCount: _filteredUsers.length,
