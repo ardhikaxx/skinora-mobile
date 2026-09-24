@@ -1,11 +1,22 @@
-const API_KEY = 'AIzaSyCJ9n6wWrcZmqh-6a5EBCPbEtUZeDHNouI';
+const API_KEY = process.env.FIREBASE_WEB_API_KEY || '';
 const ID = 'https://identitytoolkit.googleapis.com/v1';
-const PROJECT = 'skinora-app';
+const PROJECT = process.env.FIREBASE_PROJECT_ID || 'skinora-app';
 const FS = 'https://firestore.googleapis.com/v1/projects/' + PROJECT + '/databases/(default)/documents';
+
+// Password TIDAK boleh hardcode di repo — ambil dari environment.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const DOKTER_PASSWORD = process.env.DOKTER_PASSWORD;
+
+if (!API_KEY || !ADMIN_PASSWORD || !DOKTER_PASSWORD) {
+  console.error(
+    'Set FIREBASE_WEB_API_KEY, ADMIN_PASSWORD, DOKTER_PASSWORD di environment.',
+  );
+  process.exit(1);
+}
 
 const ADMIN = {
   email: 'admin@gmail.com',
-  password: 'Admin123!',
+  password: ADMIN_PASSWORD,
   role: 'admin',
   name: 'Admin Skinora',
   phone: '081111111111',
@@ -21,7 +32,7 @@ const OLD_DOCS = [
 const DOCTORS = [
   {
     email: 'anita.dewi@gmail.com',
-    password: 'Dokter123!',
+    password: DOKTER_PASSWORD,
     role: 'dokter',
     name: 'dr. Anita Dewi, Sp.KK',
     phone: '081222222221',
@@ -33,7 +44,7 @@ const DOCTORS = [
   },
   {
     email: 'andi.pratama@gmail.com',
-    password: 'Dokter123!',
+    password: DOKTER_PASSWORD,
     role: 'dokter',
     name: 'dr. Andi Pratama, Sp.KK',
     phone: '081222222222',
@@ -45,7 +56,7 @@ const DOCTORS = [
   },
   {
     email: 'sari.wulandari@gmail.com',
-    password: 'Dokter123!',
+    password: DOKTER_PASSWORD,
     role: 'dokter',
     name: 'dr. Sari Wulandari, Sp.KK',
     phone: '081222222223',
