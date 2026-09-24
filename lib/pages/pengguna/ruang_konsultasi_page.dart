@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
@@ -300,49 +301,11 @@ class _RuangKonsultasiPenggunaPageState
     );
   }
 
-  /// Empty state matching image copy 2.png
+  /// Empty state ringan di area chat.
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: const Color(0xFFEBEBEB),
-                width: 1.0,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.02),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: const Center(
-              child: Icon(
-                LucideIcons.messageCircle,
-                size: 26,
-                color: Color(0xFF6B5E5E),
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          const Text(
-            'Belum ada pesan',
-            style: TextStyle(
-              fontSize: 14.5,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF4A4A4A),
-            ),
-          ),
-        ],
-      ),
+    return const ChatEmptyState(
+      title: 'Belum ada pesan',
+      description: 'Mulai percakapan dengan dokter dengan mengirim pesan.',
     );
   }
 
