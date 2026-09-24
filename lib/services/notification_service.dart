@@ -4,6 +4,8 @@ import '../services/backend.dart';
 
 /// Koleksi `notifications`.
 /// audience: 'user:{uid}' | 'role:admin'
+/// recipientUid: uid penerima ('' untuk broadcast role:admin).
+/// rules memverifikasi recipientUid via care_link / self / admin.
 class NotificationService {
   NotificationService._();
 
@@ -25,6 +27,7 @@ class NotificationService {
     if (!Backend.useFirebase) return;
     await _col.add({
       'audience': userAudience(uid),
+      'recipientUid': uid,
       'title': title,
       'description': description,
       'iconKey': iconKey,
@@ -45,6 +48,7 @@ class NotificationService {
     if (!Backend.useFirebase) return;
     await _col.add({
       'audience': adminAudience,
+      'recipientUid': '',
       'title': title,
       'description': description,
       'iconKey': iconKey,
@@ -68,9 +72,30 @@ class NotificationService {
     return snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
   }
 
+  /// Stream notifikasi (realtime badge + daftar).
+  static Stream<List<Map<String, dynamic>>> streamAudience(
+    String audience, {
+    int? limit,
+  }) {
+    if (!Backend.useFirebase) return const Stream.empty();
+    var q = _col
+        .where('audience', isEqualTo: audience)
+        .orderBy('createdAt', descending: true);
+    if (limit != null) q = q.limit(limit);
+    return q
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList());
+  }
+
   static Future<int> countUnread(String audience) async {
     final items = await listAudience(audience);
     return items.where((n) => n['isUnread'] == true).length;
+  }
+
+  static Stream<int> unreadStream(String audience) {
+    return streamAudience(audience).map(
+      (items) => items.where((n) => n['isUnread'] == true).length,
+    );
   }
 
   /// Hanya field `isUnread` yang boleh diubah penerima.
