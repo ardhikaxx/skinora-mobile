@@ -41,8 +41,13 @@ class SpecializationService {
 
   static Future<void> create(String name) async {
     if (!Backend.useFirebase) return;
+    final trimmed = name.trim();
+    final dup = await _col.where('name', isEqualTo: trimmed).limit(1).get();
+    if (dup.docs.isNotEmpty) {
+      throw StateError('Spesialisasi "$trimmed" sudah ada.');
+    }
     await _col.add({
-      'name': name,
+      'name': trimmed,
       'isActive': true,
       'createdBy': 'admin',
       'createdAt': FieldValue.serverTimestamp(),
@@ -52,10 +57,36 @@ class SpecializationService {
 
   static Future<void> rename(String id, String name) async {
     if (!Backend.useFirebase) return;
+    final trimmed = name.trim();
+    final dup = await _col
+        .where('name', isEqualTo: trimmed)
+        .limit(1)
+        .get();
+    if (dup.docs.isNotEmpty && dup.docs.first.id != id) {
+      throw StateError('Spesialisasi "$trimmed" sudah ada.');
+    }
+    // Cascade: perbarui nama denormalisasi pada dokter bila rename.
+    final snap = await _col.doc(id).get();
+    final oldName = (snap.data()?['name'] as String?) ?? '';
     await _col.doc(id).update({
-      'name': name,
+      'name': trimmed,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+    if (oldName.isNotEmpty && oldName != trimmed && Backend.useFirebase) {
+      final doctors = await _db
+          .collection('users')
+          .where('role', isEqualTo: 'dokter')
+          .where('specialization', isEqualTo: oldName)
+          .get();
+      final batch = _db.batch();
+      for (final d in doctors.docs) {
+        batch.update(d.reference, {
+          'specialization': trimmed,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+      if (doctors.docs.isNotEmpty) await batch.commit();
+    }
   }
 
   static Future<void> setActive(String id, bool value) async {
@@ -66,8 +97,24 @@ class SpecializationService {
     });
   }
 
+  /// Hapus hanya bila tidak direferensikan dokter (integritas referensial).
   static Future<void> delete(String id) async {
     if (!Backend.useFirebase) return;
+    final snap = await _col.doc(id).get();
+    final name = (snap.data()?['name'] as String?) ?? '';
+    if (name.isNotEmpty) {
+      final doctors = await _db
+          .collection('users')
+          .where('role', isEqualTo: 'dokter')
+          .where('specialization', isEqualTo: name)
+          .limit(1)
+          .get();
+      if (doctors.docs.isNotEmpty) {
+        throw StateError(
+          'Spesialisasi "$name" masih digunakan dokter. Nonaktifkan saja.',
+        );
+      }
+    }
     await _col.doc(id).delete();
   }
 }
