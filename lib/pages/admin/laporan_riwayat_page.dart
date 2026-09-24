@@ -470,22 +470,22 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Text(
-                  '28 Agu 2026',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 11.0,
-                    fontWeight: FontWeight.w500,
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    AppDates.short(AppDates.nowWib()),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11.0,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -818,17 +818,6 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
                         fontSize: 22.0,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF1E1E1E),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Expanded(
-                      child: Text(
-                        '↗ 2 baru bulan ini',
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w600,
-                          color: primaryMaroon,
-                        ),
                       ),
                     ),
                   ],
