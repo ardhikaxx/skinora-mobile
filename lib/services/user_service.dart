@@ -101,6 +101,7 @@ class UserService {
   }
 
   /// Dijalankan tepat setelah `createUserWithEmailAndPassword` sukses.
+  /// Provision doc ID = email lowercase (cocok `request.auth.token.email`).
   static Future<void> createProfileOnRegister({
     required String uid,
     required String email,
@@ -108,30 +109,28 @@ class UserService {
     required String phone,
   }) async {
     if (!Backend.useFirebase) return;
-    final normalized = email.toLowerCase();
     final tokenEmail =
-        FirebaseAuth.instance.currentUser?.email?.toLowerCase() ?? normalized;
+        (FirebaseAuth.instance.currentUser?.email ?? email)
+            .trim()
+            .toLowerCase();
+    final normalized = email.trim().toLowerCase();
 
-    // Query email harus = token.email agar rules read provision terpenuhi.
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> provisionDocs = [];
+    Map<String, dynamic>? p;
     try {
-      final provisionQs = await _provisions
-          .where('email', isEqualTo: tokenEmail)
-          .where('consumedByUid', isEqualTo: null)
-          .limit(1)
-          .get();
-      provisionDocs = provisionQs.docs;
+      final provSnap = await _provisions.doc(tokenEmail).get();
+      if (provSnap.exists &&
+          (provSnap.data()?['consumedByUid'] == null) &&
+          provSnap.data()?['email'] == tokenEmail) {
+        p = provSnap.data();
+      }
     } on FirebaseException {
-      // Tidak bisa baca provision → tetap buat sebagai pengguna.
-      provisionDocs = [];
+      p = null;
     }
 
     final batch = _db.batch();
     final now = FieldValue.serverTimestamp();
 
-    if (provisionDocs.isNotEmpty) {
-      final prov = provisionDocs.first;
-      final p = prov.data();
+    if (p != null) {
       // Admin tidak boleh dibuat lewat register (admin sudah terdaftar pertama).
       final inheritedRole = (p['role'] as String?) ?? 'pengguna';
       final role = inheritedRole == 'admin' ? 'pengguna' : inheritedRole;
@@ -160,7 +159,7 @@ class UserService {
         'createdAt': now,
         'updatedAt': now,
       });
-      batch.update(_provisions.doc(prov.id), {
+      batch.update(_provisions.doc(tokenEmail), {
         'consumedByUid': uid,
         'updatedAt': now,
       });
@@ -187,32 +186,25 @@ class UserService {
 
   /// Alasan register ditolak untuk email ini, atau null bila boleh.
   /// Harus dipanggil SETELAH signed in (rules provision butuh sesi Auth).
-  /// - Provision role `admin` → ditolak (admin tidak mendaftar via register).
-  /// - Provision role `dokter` → boleh (aktivasi akun yang ditambahkan admin).
-  /// - Provision role `pengguna` / tanpa provision → boleh (jadi pengguna).
   static Future<String?> registerBlockReason(String email) async {
     if (!Backend.useFirebase) return null;
     final tokenEmail = FirebaseAuth.instance.currentUser?.email;
     if (tokenEmail == null) return null;
     final normalized = email.trim().toLowerCase();
-    // Query email harus = token.email agar rules read provision terpenuhi.
     if (normalized != tokenEmail.toLowerCase()) {
       return 'Email tidak sesuai sesi pendaftaran.';
     }
     try {
-      final qs = await _provisions
-          .where('email', isEqualTo: normalized)
-          .where('consumedByUid', isEqualTo: null)
-          .limit(1)
-          .get();
-      if (qs.docs.isEmpty) return null;
-      final role = (qs.docs.first.data()['role'] as String?) ?? 'pengguna';
+      final snap = await _provisions.doc(normalized).get();
+      if (!snap.exists) return null;
+      final data = snap.data() ?? const {};
+      if (data['consumedByUid'] != null) return null;
+      final role = (data['role'] as String?) ?? 'pengguna';
       if (role == 'admin') {
         return 'Akun admin tidak dapat mendaftar. Silakan gunakan menu Masuk.';
       }
       return null;
     } on FirebaseException {
-      // Provision tidak terbaca (mis. email belum ada) → anggap boleh.
       return null;
     }
   }
@@ -327,7 +319,9 @@ class UserService {
       });
       return u.copyWith(fsDocId: doc.id, registered: true, email: email);
     }
-    final ref = await _provisions.add({
+    // Doc ID = email (required rules register: exists(provisioned_accounts/{token.email})).
+    final ref = _provisions.doc(email);
+    await ref.set({
       'email': email,
       'name': u.name,
       'phone': u.phone,
@@ -369,7 +363,9 @@ class UserService {
       });
       return d.copyWith(fsDocId: doc.id, registered: true, email: email);
     }
-    final ref = await _provisions.add({
+    // Doc ID = email (required rules register path for role dokter).
+    final ref = _provisions.doc(email);
+    await ref.set({
       'email': email,
       'name': d.name,
       'phone': d.phone,
