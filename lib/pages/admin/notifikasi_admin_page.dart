@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../services/backend.dart';
 import '../../services/notification_service.dart';
@@ -183,17 +184,24 @@ class _NotifikasiAdminPageState extends State<NotifikasiAdminPage> {
 
             // Notification list
             Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 20.0, vertical: 4.0),
-                itemCount: _notifications.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 14),
-                itemBuilder: (context, index) {
-                  final item = _notifications[index];
-                  return _buildNotificationCard(item);
-                },
-              ),
+              child: _notifications.isEmpty
+                  ? const EmptyStateWidget(
+                      icon: LucideIcons.bell,
+                      title: 'Belum ada notifikasi',
+                      description:
+                          'Notifikasi booking, verifikasi dokter, dan aktivitas sistem akan muncul di sini.',
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20.0, vertical: 4.0),
+                      itemCount: _notifications.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 14),
+                      itemBuilder: (context, index) {
+                        final item = _notifications[index];
+                        return _buildNotificationCard(item);
+                      },
+                    ),
             ),
           ],
         ),
