@@ -4,6 +4,7 @@ import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/user_service.dart';
+import '../../utils/app_dates.dart';
 
 class PengaturanPenggunaPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
@@ -91,7 +92,7 @@ class _PengaturanPenggunaPageState extends State<PengaturanPenggunaPage> {
       final hour = picked.hour.toString().padLeft(2, '0');
       final minute = picked.minute.toString().padLeft(2, '0');
       setState(() {
-        controller.text = '$hour:$minute';
+        controller.text = AppDates.formatHm('$hour:$minute');
       });
     }
   }

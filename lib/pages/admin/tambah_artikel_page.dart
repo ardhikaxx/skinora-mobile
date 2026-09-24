@@ -4,6 +4,7 @@ import '../../components/navbottom/admin_navbottom.dart';
 import '../../models/admin_article_model.dart';
 import '../../services/article_service.dart';
 import '../../services/backend.dart';
+import '../../utils/app_dates.dart';
 
 class TambahArtikelPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
@@ -63,9 +64,7 @@ class _TambahArtikelPageState extends State<TambahArtikelPage> {
       return;
     }
 
-    final now = DateTime.now();
-    final dateStr =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final dateStr = AppDates.iso(AppDates.nowWib());
 
     var newArticle = AdminArticleModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),

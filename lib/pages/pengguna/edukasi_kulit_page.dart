@@ -143,7 +143,7 @@ class _EdukasiKulitPenggunaPageState extends State<EdukasiKulitPenggunaPage> {
                           : a.content),
                   date: a.date.isNotEmpty
                       ? a.date
-                      : AppDates.short(DateTime.now()),
+                      : AppDates.short(AppDates.nowWib()),
                   content: a.content,
                 ))
             .toList();
