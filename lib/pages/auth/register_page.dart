@@ -3,7 +3,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
-import '../../services/notification_service.dart';
 import '../dokter/dokter_main_page.dart';
 import '../pengguna/pengguna_main_page.dart';
 import 'login_page.dart';
@@ -85,13 +84,8 @@ class _RegisterPageState extends State<RegisterPage> {
         actor: name,
         actorUid: profile?.uid ?? '',
       );
-      await NotificationService.notifyAdmins(
-        title: 'User Baru',
-        description: '$name telah mendaftar sebagai pengguna baru',
-        iconKey: 'users',
-        type: 'user',
-        createdBy: profile?.uid ?? '',
-      );
+      // Notifikasi broadcast role:admin hanya boleh dibuat admin (rules).
+      // Pendaftar baru cukup tercatat di activity + muncul di daftar pengguna.
 
       if (!mounted) return;
       // Registrasi berhasil -> langsung masuk ke shell sesuai role
