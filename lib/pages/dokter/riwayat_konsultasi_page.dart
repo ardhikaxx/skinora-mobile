@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
@@ -331,14 +332,11 @@ class _RiwayatKonsultasiPageState extends State<RiwayatKonsultasiPage> {
             // Main scrollable list of history items matching image copy 3.png
             Expanded(
               child: _historyList.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'Belum ada riwayat konsultasi',
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          color: subText,
-                        ),
-                      ),
+                  ? const EmptyStateWidget(
+                      icon: LucideIcons.stethoscope,
+                      title: 'Belum ada riwayat konsultasi',
+                      description:
+                          'Riwayat konsultasi pasien yang selesai akan muncul di sini.',
                     )
                   : ListView.separated(
                       padding: const EdgeInsets.symmetric(horizontal: 20.0),
