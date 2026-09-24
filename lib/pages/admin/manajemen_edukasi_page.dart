@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../models/admin_article_model.dart';
 import '../../services/article_service.dart';
@@ -441,21 +443,36 @@ class _ManajemenEdukasiPageState extends State<ManajemenEdukasiPage> {
             // Articles List
             Expanded(
               child: filtered.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Text(
-                          _searchQuery.isEmpty
-                              ? 'Tidak ada artikel dalam status ini'
-                              : 'Tidak ditemukan artikel dengan kata kunci "$_searchQuery"',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 14.0,
-                            color: subText,
-                          ),
-                        ),
-                      ),
-                    )
+                  ? (_searchQuery.isNotEmpty
+                      ? NoSearchResultWidget(
+                          title: 'Artikel tidak ditemukan',
+                          description:
+                              'Tidak ada artikel yang cocok dengan "$_searchQuery". Coba ubah kata kunci.',
+                          onAction: () => setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                          }),
+                        )
+                      : EmptyStateWidget(
+                          icon: LucideIcons.bookOpen,
+                          title: _selectedFilter == 'Semua'
+                              ? 'Belum ada artikel'
+                              : 'Tidak ada artikel dalam status ini',
+                          description: _selectedFilter == 'Semua'
+                              ? 'Artikel edukasi kulit yang dibuat akan muncul di sini.'
+                              : 'Belum ada artikel dengan status "$_selectedFilter".',
+                          actionLabel: 'Tulis Artikel',
+                          onAction: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => TambahArtikelPage(
+                                  onNavigateTab: widget.onNavigateTab,
+                                ),
+                              ),
+                            );
+                          },
+                        ))
                   : ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 20.0),
                       itemCount: filtered.length,
