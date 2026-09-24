@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/consultation_service.dart';
@@ -244,33 +245,34 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
                 ),
               ),
             ),
-            // Red badge with unread count
-            Positioned(
-              top: -3,
-              right: -3,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(
-                  color: primaryMaroon,
-                  shape: BoxShape.circle,
-                ),
-                constraints: const BoxConstraints(
-                  minWidth: 18,
-                  minHeight: 18,
-                ),
-                child: Center(
-                  child: Text(
-                    '$_unreadNotif',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      height: 1.0,
+            // Red badge with unread count (only when unread > 0)
+            if (_unreadNotif > 0)
+              Positioned(
+                top: -3,
+                right: -3,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: primaryMaroon,
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 18,
+                    minHeight: 18,
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$_unreadNotif',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        height: 1.0,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
           ],
         ),
       ],
@@ -542,29 +544,37 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
           const SizedBox(height: 14),
 
           // Dynamic slots for today (demo seed when backend empty)
-          ..._todaySlots.asMap().entries.map((entry) {
-            final slot = entry.value;
-            final isBooked = slot['booked'] == 'true';
-            if (isBooked) {
+          if (_todaySlots.isEmpty)
+            const CompactEmptyState(
+              icon: LucideIcons.calendarDays,
+              title: 'Belum ada jadwal hari ini',
+              description:
+                  'Tambahkan slot jadwal agar pasien dapat memesan konsultasi hari ini.',
+            )
+          else
+            ..._todaySlots.asMap().entries.map((entry) {
+              final slot = entry.value;
+              final isBooked = slot['booked'] == 'true';
+              if (isBooked) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12.0),
+                  child: _buildBookedSlotCard(
+                    time: slot['time'] ?? '',
+                    bookedBy: slot['bookedBy'] ?? 'Dibooking oleh pasien',
+                    status: slot['status'] ?? 'Terjadwal',
+                    onTap: () => onNavigateTab?.call(2),
+                  ),
+                );
+              }
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12.0),
-                child: _buildBookedSlotCard(
+                child: _buildAvailableSlotCard(
                   time: slot['time'] ?? '',
-                  bookedBy: slot['bookedBy'] ?? 'Dibooking oleh pasien',
-                  status: slot['status'] ?? 'Terjadwal',
-                  onTap: () => onNavigateTab?.call(2),
+                  status: slot['status'] ?? 'Tersedia',
+                  badgeText: slot['badge'] ?? 'Kosong',
                 ),
               );
-            }
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12.0),
-              child: _buildAvailableSlotCard(
-                time: slot['time'] ?? '',
-                status: slot['status'] ?? 'Tersedia',
-                badgeText: slot['badge'] ?? 'Kosong',
-              ),
-            );
-          }),
+            }),
         ],
       ),
     );
