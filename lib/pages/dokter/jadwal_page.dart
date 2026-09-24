@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
@@ -62,8 +64,8 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
   late List<DayScheduleModel> _scheduleDays;
 
   // Slot asli dari Firestore (id dokumen) untuk persist hapus/availability.
-  final Map<String, String> _slotDocIds = {}; // 'dayIndex-slotIndex' -> fsId
   bool _backendLoaded = false;
+  StreamSubscription<List<SlotRecord>>? _slotSub;
 
   @override
   void initState() {
@@ -156,58 +158,54 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
     _loadFromBackend();
   }
 
-  /// Muat slot + status ketersediaan dari Firestore. Tanpa Firebase, seed
-  /// demo tetap dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil
-  /// backend selalu menggantikan seed — termasuk saat kosong.
-  Future<void> _loadFromBackend() async {
+  /// Stream slot realtime dokter (booking pasien langsung terlihat).
+  /// Tanpa Firebase, seed demo tetap dipakai agar UI/tes tidak berubah.
+  void _loadFromBackend() {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
     if (uid == null) return;
-    try {
-      final results = await Future.wait<Object?>([
-        ScheduleService.listSlots(uid),
-        UserService.loadByUid(uid),
-      ]);
-      final slots = results[0] as List<SlotRecord>?;
-      final profile = results[1] as dynamic;
-      if (!mounted) return;
+    _slotSub?.cancel();
+    _slotSub = ScheduleService.slotStream(uid).listen(
+      _applySlots,
+      onError: (_) {
+        if (!mounted) return;
+        setState(() {
+          _backendLoaded = true;
+          _scheduleDays = <DayScheduleModel>[];
+        });
+      },
+    );
+    UserService.loadByUid(uid).then((profile) {
+      if (!mounted || profile == null) return;
       setState(() {
-        final available = profile == null ? null : (profile.isAvailable as bool?);
-        if (available != null) _isReady = available;
-        _backendLoaded = true;
-        _slotDocIds.clear();
-        final grouped = <String, List<ScheduleSlotModel>>{};
-        for (final s in (slots ?? const <SlotRecord>[])) {
-          final day = grouped.putIfAbsent(s.date, () => []);
-          day.add(ScheduleSlotModel(
-            id: s.id,
-            time: AppDates.formatRange(s.time),
-            patientName: s.patientName,
-            isBooked: s.isBooked,
-          ));
-        }
-        _scheduleDays = grouped.entries
-            .map((e) => DayScheduleModel(date: e.key, slots: e.value))
-            .toList();
-        for (var d = 0; d < _scheduleDays.length; d++) {
-          for (var s = 0; s < _scheduleDays[d].slots.length; s++) {
-            _slotDocIds['$d-$s'] = _scheduleDays[d].slots[s].id;
-          }
-        }
+        _isReady = profile.isAvailable;
       });
-    } catch (_) {
-      // Query gagal → tampilkan kosong, jangan seed palsu di production.
-      if (!mounted) return;
-      setState(() {
-        _backendLoaded = true;
-        _slotDocIds.clear();
-        _scheduleDays = <DayScheduleModel>[];
-      });
-    }
+    }).catchError((_) {});
+  }
+
+  void _applySlots(List<SlotRecord> slots) {
+    if (!mounted) return;
+    setState(() {
+      _backendLoaded = true;
+      final grouped = <String, List<ScheduleSlotModel>>{};
+      for (final s in slots) {
+        final day = grouped.putIfAbsent(s.date, () => []);
+        day.add(ScheduleSlotModel(
+          id: s.id,
+          time: AppDates.formatRange(s.time),
+          patientName: s.patientName,
+          isBooked: s.isBooked,
+        ));
+      }
+      _scheduleDays = grouped.entries
+          .map((e) => DayScheduleModel(date: e.key, slots: e.value))
+          .toList();
+    });
   }
 
   @override
   void dispose() {
+    _slotSub?.cancel();
     _dateController.dispose();
     _startTimeController.dispose();
     _endTimeController.dispose();
@@ -270,6 +268,21 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
           return;
         }
       }
+      // Stream slot akan memperbarui daftar; tutup form saja.
+      if (!mounted) return;
+      setState(() {
+        _isFormOpen = false;
+        _startTimeController.clear();
+        _endTimeController.clear();
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Slot jadwal berhasil disimpan'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
     }
 
     final newSlot = ScheduleSlotModel(
@@ -430,10 +443,13 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
                               }
                             }
                             if (!mounted) return;
-                            setState(() {
-                              dayGroup.slots
-                                  .removeWhere((s) => s.id == slot.id);
-                            });
+                            if (!Backend.useFirebase) {
+                              setState(() {
+                                dayGroup.slots
+                                    .removeWhere((s) => s.id == slot.id);
+                              });
+                            }
+                            // Dengan Firebase, stream akan sinkronkan daftar.
                             _showDeleteSuccessDialog();
                           },
                           style: ElevatedButton.styleFrom(
