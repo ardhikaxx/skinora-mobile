@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../services/activity_service.dart';
 import '../../services/backend.dart';
 import '../../services/consultation_service.dart';
@@ -215,33 +216,34 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
                 ),
               ),
             ),
-            // Red badge with count
-            Positioned(
-              top: -3,
-              right: -3,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(
-                  color: primaryMaroon,
-                  shape: BoxShape.circle,
-                ),
-                constraints: const BoxConstraints(
-                  minWidth: 18,
-                  minHeight: 18,
-                ),
-                child: Center(
-                  child: Text(
-                    _unreadNotif,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      height: 1.0,
+            // Red badge with count (only when unread > 0)
+            if (_unreadNotif != '0' && _unreadNotif.isNotEmpty)
+              Positioned(
+                top: -3,
+                right: -3,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: primaryMaroon,
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 18,
+                    minHeight: 18,
+                  ),
+                  child: Center(
+                    child: Text(
+                      _unreadNotif,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        height: 1.0,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
           ],
         ),
       ],
@@ -584,19 +586,28 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
             ],
           ),
           const SizedBox(height: 16),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: activities.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 14),
-            itemBuilder: (context, index) {
-              final item = activities[index];
-              return _buildActivityItem(
-                title: item['title']!,
-                time: item['time']!,
-              );
-            },
-          ),
+          if (activities.isEmpty)
+            const CompactEmptyState(
+              icon: LucideIcons.history,
+              title: 'Belum ada aktivitas',
+              description:
+                  'Aktivitas admin, dokter, dan pengguna akan muncul di sini.',
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: activities.length,
+              separatorBuilder: (context, index) =>
+                  const SizedBox(height: 14),
+              itemBuilder: (context, index) {
+                final item = activities[index];
+                return _buildActivityItem(
+                  title: item['title']!,
+                  time: item['time']!,
+                );
+              },
+            ),
         ],
       ),
     );
