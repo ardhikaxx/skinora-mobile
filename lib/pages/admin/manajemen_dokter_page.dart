@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../models/admin_doctor_model.dart';
 import '../../services/backend.dart';
@@ -145,6 +146,37 @@ class _ManajemenDokterPageState extends State<ManajemenDokterPage> {
 
       return matchesFilter && matchesSearch;
     }).toList();
+  }
+
+  Widget _buildDoctorsEmptyState() {
+    if (_doctors.isEmpty) {
+      return EmptyStateWidget(
+        icon: LucideIcons.stethoscope,
+        title: 'Belum ada data dokter',
+        description:
+            'Dokter spesialis kulit yang didaftarkan akan muncul di sini.',
+        actionLabel: 'Tambah Dokter',
+        onAction: _navigateToAddDoctor,
+      );
+    }
+    if (_searchQuery.isNotEmpty) {
+      return NoSearchResultWidget(
+        title: 'Dokter tidak ditemukan',
+        description:
+            'Tidak ada dokter yang cocok dengan "$_searchQuery". Coba ubah kata kunci.',
+        onAction: () => setState(() {
+          _searchController.clear();
+          _searchQuery = '';
+        }),
+      );
+    }
+    return EmptyStateWidget(
+      icon: LucideIcons.filter,
+      title: 'Tidak ada dokter pada filter ini',
+      description: 'Belum ada dokter dengan status "$_selectedFilter".',
+      actionLabel: 'Tampilkan Semua',
+      onAction: () => setState(() => _selectedFilter = 'Semua'),
+    );
   }
 
   Future<void> _navigateToAddDoctor() async {
@@ -362,15 +394,7 @@ class _ManajemenDokterPageState extends State<ManajemenDokterPage> {
             // Doctors List
             Expanded(
               child: _filteredDoctors.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'Tidak ada data dokter',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: subText,
-                        ),
-                      ),
-                    )
+                  ? _buildDoctorsEmptyState()
                   : ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 20.0),
                       itemCount: _filteredDoctors.length,
