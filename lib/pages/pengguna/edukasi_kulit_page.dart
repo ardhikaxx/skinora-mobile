@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/article_service.dart';
 import '../../services/backend.dart';
@@ -304,7 +305,10 @@ class _EdukasiKulitPenggunaPageState extends State<EdukasiKulitPenggunaPage> {
                   const SizedBox(height: 16),
 
                   // 3. Article Cards List
-                  ...articles.map((item) => _buildArticleCard(item)),
+                  if (articles.isEmpty)
+                    _buildArticlesEmptyState()
+                  else
+                    ...articles.map((item) => _buildArticleCard(item)),
 
                   const SizedBox(height: 16),
                 ],
@@ -322,6 +326,43 @@ class _EdukasiKulitPenggunaPageState extends State<EdukasiKulitPenggunaPage> {
           }
         },
       ),
+    );
+  }
+
+  Widget _buildArticlesEmptyState() {
+    final query = _searchController.text.trim();
+    if (_allArticles.isEmpty) {
+      return const EmptyStateWidget(
+        icon: LucideIcons.bookOpen,
+        title: 'Belum ada artikel edukasi',
+        description:
+            'Artikel tentang perawatan kulit dari Skinora akan muncul di sini.',
+      );
+    }
+    if (query.isNotEmpty) {
+      return NoSearchResultWidget(
+        title: 'Artikel tidak ditemukan',
+        description:
+            'Tidak ada artikel yang cocok dengan "$query". Coba ubah kata kunci.',
+        onAction: () {
+          _searchController.clear();
+          setState(() {});
+        },
+      );
+    }
+    if (_selectedCategory != 'Semua') {
+      return EmptyStateWidget(
+        icon: LucideIcons.filter,
+        title: 'Tidak ada artikel pada kategori ini',
+        description: 'Belum ada artikel dengan kategori "$_selectedCategory".',
+        actionLabel: 'Tampilkan Semua',
+        onAction: () => setState(() => _selectedCategory = 'Semua'),
+      );
+    }
+    return const EmptyStateWidget(
+      icon: LucideIcons.bookOpen,
+      title: 'Belum ada artikel',
+      description: 'Artikel edukasi kulit akan muncul di sini.',
     );
   }
 
