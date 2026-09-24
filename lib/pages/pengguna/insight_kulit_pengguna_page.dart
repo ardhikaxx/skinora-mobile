@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
@@ -575,8 +576,15 @@ class _InsightKulitPenggunaPageState extends State<InsightKulitPenggunaPage> {
           ),
           const SizedBox(height: 14),
 
-          // List of 7 Days
-          ...List.generate(_history7Hari.length, (index) {
+          if (_history7Hari.isEmpty)
+            const CompactEmptyState(
+              icon: LucideIcons.chartLine,
+              title: 'Belum cukup data insight',
+              description:
+                  'Isi Skin Daily selama beberapa hari agar riwayat dan insight kulit 7 hari terbentuk.',
+            )
+          else
+            ...List.generate(_history7Hari.length, (index) {
             final item = _history7Hari[index];
             final isLast = index == _history7Hari.length - 1;
 
