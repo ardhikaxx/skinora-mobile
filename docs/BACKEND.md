@@ -54,7 +54,7 @@ users/{uid}/skin_checks/{id}
 users/{uid}/skin_dailies/{id}
 users/{uid}/skincare_logs/{id}
 users/{doctorUid}/slots/{id}
-provisioned_accounts/{id}            # admin pre-create tanpa password
+provisioned_accounts/{emailLowercase}   # doc ID = email lowercase (wajib utk rules)
 specializations/{id}
 articles/{id}
 activities/{id}                      # immutable log
@@ -77,6 +77,10 @@ Field detail: [`SYSTEM_MAP.md` §4](./SYSTEM_MAP.md).
 | `articles` | `status` ASC, `createdAt` DESC |
 | `consultations` | `doctorId` ASC, `createdAt` DESC |
 | `consultations` | `patientId` ASC, `createdAt` DESC |
+| `slots` (group) | `isBooked` ASC, `createdAt` ASC (bookable stream) |
+| `provisioned_accounts` | `role` ASC, `consumedByUid` ASC |
+| `users` | `role` ASC, `status` ASC |
+| `users` | `role` ASC, `specialization` ASC (cascade rename) |
 
 File: [`firestore.indexes.json`](../firestore.indexes.json).
 
