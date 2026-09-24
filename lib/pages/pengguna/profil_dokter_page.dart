@@ -181,7 +181,9 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
       return;
     }
     _slotSub?.cancel();
-    _slotSub = ScheduleService.slotStream(doctorId).listen(
+    // Pasien hanya boleh baca slot isBooked != true (rules) — pakai stream
+    // bookable agar query kompatibel dan slot terambil langsung hilang.
+    _slotSub = ScheduleService.bookableSlotStream(doctorId).listen(
       (slots) {
         if (!mounted) return;
         setState(() {
