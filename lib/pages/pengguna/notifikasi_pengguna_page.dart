@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
@@ -210,14 +211,21 @@ class _NotifikasiPenggunaPageState extends State<NotifikasiPenggunaPage> {
 
             // Notification List
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                itemCount: _notifications.length,
-                itemBuilder: (context, index) {
-                  final item = _notifications[index];
-                  return _buildNotificationCard(item);
-                },
-              ),
+              child: _notifications.isEmpty
+                  ? const EmptyStateWidget(
+                      icon: LucideIcons.bell,
+                      title: 'Belum ada notifikasi',
+                      description:
+                          'Notifikasi booking, konsultasi, dan pengingat Skin Daily akan muncul di sini.',
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                      itemCount: _notifications.length,
+                      itemBuilder: (context, index) {
+                        final item = _notifications[index];
+                        return _buildNotificationCard(item);
+                      },
+                    ),
             ),
           ],
         ),
