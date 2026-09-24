@@ -5,7 +5,13 @@ import '../services/activity_service.dart';
 import '../services/backend.dart';
 import '../services/notification_service.dart';
 
-/// Entity konsultasi + chat + booking (transaction/batch agar atomik).
+/// Entity konsultasi + chat + booking.
+///
+/// Booking dua fase agar kompatibel Security Rules (rules menilai get()
+/// terhadap state sebelum transaksi):
+/// 1) transaksi: book slot (anti double-book);
+/// 2) batch: buat consultation (id deterministik = slotId) + care_link;
+/// 3) bila (2) gagal → unbook slot (hanya bila consultation belum ada).
 class ConsultationService {
   ConsultationService._();
 
@@ -19,7 +25,7 @@ class ConsultationService {
       '${patientId}_$doctorId';
 
   // ---------------------------------------------------------------------------
-  // Booking (batch atomik: slot + konsultasi + care_link + activity + notif)
+  // Booking
   // ---------------------------------------------------------------------------
   static Future<String> book({
     required String doctorUid,
@@ -36,30 +42,39 @@ class ConsultationService {
     if (!Backend.useFirebase) {
       return 'demo-consultation';
     }
-    final consultationRef = _col.doc();
+    // ID deterministik: satu konsultasi per slot (mencegah double dokumen).
+    final consultationRef = _col.doc(slotId);
     final slotRef = _db
         .collection('users')
         .doc(doctorUid)
         .collection('slots')
         .doc(slotId);
+    final linkRef = _links.doc(linkId(patient.uid, doctorUid));
     final now = FieldValue.serverTimestamp();
 
-    // Transaksi: baca-cek-tulis atomik agar 2 pasien tidak double-book.
+    // Fase 1 — book slot secara atomik (tolak bila sudah diambil lain).
     await _db.runTransaction((tx) async {
       final slotSnap = await tx.get(slotRef);
       if (!slotSnap.exists ||
           ((slotSnap.data()?['isBooked'] as bool?) ?? false)) {
         throw StateError('Slot sudah dibooking oleh pasien lain.');
       }
-
+      if (slotSnap.data()?['patientId'] != null &&
+          slotSnap.data()?['patientId'] != patient.uid) {
+        throw StateError('Slot sudah dibooking oleh pasien lain.');
+      }
       tx.update(slotRef, {
         'isBooked': true,
         'patientId': patient.uid,
         'patientName': patient.name,
         'updatedAt': now,
       });
+    });
 
-      tx.set(consultationRef, {
+    // Fase 2 — consultation + care_link.
+    try {
+      final batch = _db.batch();
+      batch.set(consultationRef, {
         'patientId': patient.uid,
         'patientName': patient.name,
         'doctorId': doctorUid,
@@ -75,17 +90,34 @@ class ConsultationService {
         'notes': null,
         'slotId': slotId,
         'createdBy': patient.uid,
-        'createdAt': now,
-        'updatedAt': now,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
-
-      tx.set(_links.doc(linkId(patient.uid, doctorUid)), {
+      batch.set(linkRef, {
         'patientId': patient.uid,
         'doctorId': doctorUid,
+        'slotId': slotId,
         'createdBy': patient.uid,
-        'createdAt': now,
+        'createdAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-    });
+      await batch.commit();
+    } catch (_) {
+      // Kompensasi: lepas booking bila consultation gagal dibuat.
+      try {
+        final consultSnap = await consultationRef.get();
+        if (!consultSnap.exists) {
+          await slotRef.update({
+            'isBooked': false,
+            'patientId': FieldValue.delete(),
+            'patientName': FieldValue.delete(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (_) {
+        // best-effort
+      }
+      rethrow;
+    }
 
     await ActivityService.log(
       title: 'Booking konsultasi dengan $doctorName',
@@ -98,6 +130,15 @@ class ConsultationService {
       title: 'Booking Baru',
       description:
           '${patient.name} memesan konsultasi untuk jadwal $scheduleDate $scheduleTime',
+      iconKey: 'calendar',
+      type: 'booking',
+      createdBy: patient.uid,
+    );
+    await NotificationService.notifyUser(
+      uid: patient.uid,
+      title: 'Booking Berhasil',
+      description:
+          'Konsultasi dengan $doctorName pada $scheduleDate $scheduleTime telah dijadwalkan.',
       iconKey: 'calendar',
       type: 'booking',
       createdBy: patient.uid,
@@ -215,17 +256,27 @@ class ConsultationService {
   }
 
   // ---------------------------------------------------------------------------
-  // Status lifecycle
+  // Status lifecycle (hanya dokter — diverifikasi Security Rules)
   // ---------------------------------------------------------------------------
   static Future<void> markBerlangsung(String id) async {
     if (!Backend.useFirebase) return;
-    await _col.doc(id).update({
-      'status': 'berlangsung',
-      'updatedAt': FieldValue.serverTimestamp(),
+    final ref = _col.doc(id);
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) throw StateError('Konsultasi tidak ditemukan.');
+      final status = (snap.data()?['status'] as String?) ?? 'terjadwal';
+      if (status == 'selesai' || status == 'berlangsung') return;
+      if (status != 'terjadwal') {
+        throw StateError('Status konsultasi tidak valid untuk dimulai.');
+      }
+      tx.update(ref, {
+        'status': 'berlangsung',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
     });
   }
 
-  /// Menyelesaikan konsultasi (dokter) + activity log dalam satu batch.
+  /// Menyelesaikan konsultasi (dokter) + activity log.
   static Future<void> complete({
     required String id,
     required String doctorUid,
@@ -235,19 +286,36 @@ class ConsultationService {
     String? notes,
   }) async {
     if (!Backend.useFirebase) return;
-    final batch = _db.batch();
-    batch.update(_col.doc(id), {
-      'status': 'selesai',
-      'diagnosis': diagnosis ?? '',
-      'notes': notes ?? '',
-      'updatedAt': FieldValue.serverTimestamp(),
+    final ref = _col.doc(id);
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) throw StateError('Konsultasi tidak ditemukan.');
+      final status = (snap.data()?['status'] as String?) ?? 'terjadwal';
+      if (status == 'selesai') return;
+      if (status != 'berlangsung' && status != 'terjadwal') {
+        throw StateError('Status konsultasi tidak dapat diselesaikan.');
+      }
+      tx.update(ref, {
+        'status': 'selesai',
+        'diagnosis': diagnosis ?? '',
+        'notes': notes ?? '',
+        'updatedAt': FieldValue.serverTimestamp(),
+        'completedAt': FieldValue.serverTimestamp(),
+      });
     });
-    await batch.commit();
     await ActivityService.log(
       title: 'Konsultasi selesai dengan $patientName',
       tag: 'Konsultasi',
       actor: doctorName,
       actorUid: doctorUid,
+    );
+    await NotificationService.notifyUser(
+      uid: doctorUid,
+      title: 'Konsultasi Selesai',
+      description: 'Konsultasi dengan $patientName telah diselesaikan.',
+      iconKey: 'check',
+      type: 'konsultasi',
+      createdBy: doctorUid,
     );
   }
 
@@ -286,6 +354,7 @@ class ConsultationService {
   }) async {
     if (!Backend.useFirebase) return;
     await messages(consultationId).add({
+      'consultationId': consultationId,
       'senderId': senderId,
       'senderRole': senderRole,
       'text': text,
