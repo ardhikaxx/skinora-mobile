@@ -69,6 +69,7 @@ class SkinService {
     return 'Baik';
   }
 
+  /// Satu dokumen per user per tanggal (doc ID = dateIso) — anti-duplikat.
   static Future<void> saveSkinDaily({
     required String uid,
     required String name,
@@ -85,7 +86,8 @@ class SkinService {
     required bool skincareMalam,
   }) async {
     if (!Backend.useFirebase) return;
-    await _col(uid, 'skin_dailies').add({
+    final ref = _col(uid, 'skin_dailies').doc(dateIso);
+    final data = <String, dynamic>{
       'dateDisplay': dateDisplay,
       'dateIso': dateIso,
       'locations': locations,
@@ -99,9 +101,20 @@ class SkinService {
       'skincareMalam': skincareMalam,
       'status': deriveDailyStatus(symptoms),
       'createdBy': uid,
-      'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    };
+    final existing = await ref.get();
+    if (existing.exists) {
+      await ref.update({
+        ...data,
+        'createdAt': existing.data()?['createdAt'] ?? FieldValue.serverTimestamp(),
+      });
+    } else {
+      await ref.set({
+        ...data,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
     await ActivityService.log(
       title: 'Mencatat Skin Daily',
       tag: 'Skin Daily',
@@ -123,6 +136,8 @@ class SkinService {
   // ---------------------------------------------------------------------------
   // Skincare routine (upsert per tanggal)
   // ---------------------------------------------------------------------------
+  /// Satu dokumen per user per tanggal (doc ID = dateIso).
+  /// Morning dan night menulis ke dokumen yang sama (merge).
   static Future<void> saveSkincare({
     required String uid,
     required String name,
@@ -133,30 +148,27 @@ class SkinService {
     required bool isMorning,
   }) async {
     if (!Backend.useFirebase) return;
-    final col = _col(uid, 'skincare_logs');
-    final existing =
-        await col.where('dateIso', isEqualTo: dateIso).limit(1).get();
-    final now = FieldValue.serverTimestamp();
+    final ref = _col(uid, 'skincare_logs').doc(dateIso);
     final data = <String, dynamic>{
       'dateDisplay': dateDisplay,
       'dateIso': dateIso,
-      'updatedAt': now,
+      if (isMorning) 'morningSteps': morningSteps ?? <String>[],
+      if (!isMorning) 'nightSteps': nightSteps ?? <String>[],
+      'createdBy': uid,
+      'updatedAt': FieldValue.serverTimestamp(),
     };
-    if (isMorning) {
-      data['morningSteps'] = morningSteps ?? <String>[];
+    final existing = await ref.get();
+    if (existing.exists) {
+      await ref.update({
+        ...data,
+        'createdAt': existing.data()?['createdAt'] ?? FieldValue.serverTimestamp(),
+      });
     } else {
-      data['nightSteps'] = nightSteps ?? <String>[];
-    }
-
-    if (existing.docs.isNotEmpty) {
-      await col.doc(existing.docs.first.id).update(data);
-    } else {
-      await col.add({
+      await ref.set({
         ...data,
         if (isMorning) 'nightSteps': <String>[],
         if (!isMorning) 'morningSteps': <String>[],
-        'createdBy': uid,
-        'createdAt': now,
+        'createdAt': FieldValue.serverTimestamp(),
       });
     }
     await ActivityService.log(
