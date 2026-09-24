@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../services/backend.dart';
 import '../../services/specialization_service.dart';
@@ -181,12 +182,22 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
                   const SizedBox(height: 16),
 
                   // List of Specialization Cards
-                  ..._specializations.map((item) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 14.0),
-                      child: _buildSpecializationCard(item),
-                    );
-                  }),
+                  if (_specializations.isEmpty)
+                    EmptyStateWidget(
+                      icon: LucideIcons.tags,
+                      title: 'Belum ada spesialisasi',
+                      description:
+                          'Daftar spesialisasi dokter akan muncul di sini. Tambahkan untuk mengelompokkan dokter.',
+                      actionLabel: 'Tambah Spesialisasi',
+                      onAction: _onAddSpecialization,
+                    )
+                  else
+                    ..._specializations.map((item) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 14.0),
+                        child: _buildSpecializationCard(item),
+                      );
+                    }),
 
                   const SizedBox(height: 16),
                 ],
