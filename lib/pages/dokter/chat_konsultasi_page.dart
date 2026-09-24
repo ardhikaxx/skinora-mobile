@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
@@ -431,26 +432,11 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: const [
-          Icon(
-            LucideIcons.messageSquare,
-            size: 48,
-            color: Color(0xFFD1D5DB),
-          ),
-          SizedBox(height: 12),
-          Text(
-            'Tidak ada konsultasi aktif',
-            style: TextStyle(
-              fontSize: 14.5,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF6B7280),
-            ),
-          ),
-        ],
-      ),
+    return const EmptyStateWidget(
+      icon: LucideIcons.stethoscope,
+      title: 'Tidak ada konsultasi aktif',
+      description:
+          'Konsultasi yang dijadwalkan atau sedang berlangsung dengan pasien akan muncul di sini.',
     );
   }
 
