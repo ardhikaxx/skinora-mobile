@@ -158,7 +158,9 @@ createdBy: string, createdAt: Timestamp(server), updatedAt: Timestamp(server)
 Subcollection milik pengguna: `skin_checks`, `skin_dailies`, `skincare_logs`.
 Subcollection milik dokter: `slots`.
 
-**`provisioned_accounts/{autoId}`** — akun yang dibuat admin, belum punya Auth account.
+**`provisioned_accounts/{emailLowercase}`** — doc ID **wajib** = email lowercase
+(sama dengan `request.auth.token.email` di Security Rules). Akun dibuat admin,
+belum punya Auth account.
 ```
 email, name, phone, address, birthDate, gender, role, status,
 specialization?, experience?, str?, bio?,
@@ -176,24 +178,25 @@ createdBy, updatedBy, createdAt, updatedAt
 
 **`activities/{autoId}`** (immutable / write-only):
 ```
-title, tag ('Login'|'Skin Check'|'Skin Daily'|'Skincare'|'Booking'|'Konsultasi'|'Review'|'Verifikasi'|'Artikel'|'Profil'),
-actor (string nama), actorUid, createdBy, createdAt: Timestamp
+title, tag ('Login'|'Skin Check'|'Skin Daily'|'Skincare'|'Booking'|'Konsultasi'|'Review'|'Verifikasi'|'Artikel'|'Profil'|'Pengguna'|'Dokter'|'Spesialisasi'),
+actor (string — harus = users/{uid}.name, diverifikasi rules), actorUid, createdBy, createdAt: Timestamp
 // tampilan 'yyyy-MM-dd HH:mm' diturunkan client dari createdAt; ikon diturunkan dari tag.
 ```
 
 **`notifications/{autoId}`**:
 ```
 audience: 'user:{uid}' | 'role:admin',
+recipientUid: string ('' utk broadcast role:admin) — diverifikasi rules via care_link/self/admin,
 type: 'dokter'|'user'|'konsultasi'|'booking'|'jadwal'|'ringkas'|..., // menentukan aksi tap
 title, description, iconKey, isUnread: bool, createdBy, createdAt
 ```
 
 **`care_links/{patientUid_doctorId}`** — hubungan perawatan dibuat saat booking:
 ```
-patientId, doctorId, createdBy (patientId), createdAt
+patientId, doctorId, slotId?, createdBy (patientId), createdAt
 ```
 
-**`consultations/{autoId}`**:
+**`consultations/{slotId}`** — ID deterministik = slotId (anti double-book):
 ```
 patientId, patientName, doctorId, doctorName, specialization,
 scheduleDate (string tampil 'Jumat, 28 Agustus 2026'), dateIso ('yyyy-MM-dd'),
@@ -201,7 +204,7 @@ scheduleTime ('09:00 - 09:30'), timeStart, timeEnd,
 status: 'terjadwal'|'berlangsung'|'selesai',
 diagnosis: string?, notes: string?,
 slotId: string?, createdBy, createdAt, updatedAt
-// Subcollection: messages/{autoId}: senderId, senderRole ('dokter'|'pengguna'), text, time('HH:mm'), createdAt
+// Subcollection: messages/{autoId}: senderId, senderRole ('user'|'dokter'), text, time('HH:mm'), createdAt
 ```
 
 **`users/{uid}/skin_checks/{autoId}`**:
@@ -210,7 +213,7 @@ age, gender, conditionAfterWash, oilCondition, sensitivity, humidity, temperatur
 resultSkinType, resultSensitivity, resultAcneRisk, createdBy, createdAt
 ```
 
-**`users/{uid}/skin_dailies/{autoId}`**:
+**`users/{uid}/skin_dailies/{dateIso}`** — doc ID = dateIso (upsert per hari):
 ```
 dateDisplay ('Jumat, 28 Agustus 2026'), dateIso, locations[]: string, symptoms[]: string,
 kebiasaan, jamTidur, air, makanan, aktivitas,
@@ -218,7 +221,7 @@ skincarePagi: bool, skincareMalam: bool, status ('Baik'|'Sedang'|'Buruk' — tur
 createdBy, createdAt, updatedAt
 ```
 
-**`users/{uid}/skincare_logs/{autoId}`** (upsert per `dateIso`):
+**`users/{uid}/skincare_logs/{dateIso}`** — doc ID = dateIso (upsert per tanggal):
 ```
 dateDisplay, dateIso, morningSteps[]: string, nightSteps[]: string,
 createdBy, createdAt, updatedAt
