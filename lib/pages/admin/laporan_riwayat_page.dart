@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../models/admin_article_model.dart';
 import '../../services/activity_service.dart';
@@ -1065,13 +1066,26 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
 
         // List of Activities
         if (filtered.isEmpty)
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 28.0),
-            alignment: Alignment.center,
-            child: const Text(
-              'Tidak ada aktivitas yang sesuai.',
-              style: TextStyle(fontSize: 13.0, color: subText),
-            ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20.0),
+            child: _searchQuery.isNotEmpty
+                ? NoSearchResultWidget(
+                    compact: true,
+                    title: 'Aktivitas tidak ditemukan',
+                    description:
+                        'Tidak ada aktivitas yang cocok dengan "$_searchQuery".',
+                    onAction: () => setState(() {
+                      _searchController.clear();
+                      _searchQuery = '';
+                    }),
+                  )
+                : const EmptyStateWidget(
+                    compact: true,
+                    icon: LucideIcons.history,
+                    title: 'Belum ada aktivitas sistem',
+                    description:
+                        'Log aktivitas dokter, pengguna, dan artikel akan muncul di sini.',
+                  ),
           )
         else
           ListView.separated(
