@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/empty_state.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
@@ -176,75 +177,85 @@ class _RiwayatAktivitasPenggunaPageState
                         ),
                       ],
                     ),
-                    child: Column(
-                      children: activities.asMap().entries.map((entry) {
-                        final index = entry.key;
-                        final item = entry.value;
-                        final isLast = index == activities.length - 1;
+                    child: activities.isEmpty
+                        ? const CompactEmptyState(
+                            icon: LucideIcons.history,
+                            title: 'Belum ada aktivitas',
+                            description:
+                                'Aktivitas seperti Skin Check, Skin Daily, dan konsultasi akan tercatat di sini.',
+                          )
+                        : Column(
+                            children: activities.asMap().entries.map((entry) {
+                              final index = entry.key;
+                              final item = entry.value;
+                              final isLast = index == activities.length - 1;
 
-                        return Container(
-                          margin: EdgeInsets.only(bottom: isLast ? 0 : 10.0),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14.0,
-                            vertical: 12.0,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: itemBorder,
-                              width: 1.0,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              // Peach/Pink Square Icon Badge
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: iconBadgeBg,
-                                  borderRadius: BorderRadius.circular(12),
+                              return Container(
+                                margin:
+                                    EdgeInsets.only(bottom: isLast ? 0 : 10.0),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14.0,
+                                  vertical: 12.0,
                                 ),
-                                child: const Center(
-                                  child: Icon(
-                                    LucideIcons.clock,
-                                    size: 18,
-                                    color: iconColor,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: itemBorder,
+                                    width: 1.0,
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 14),
-
-                              // Title and Timestamp
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                child: Row(
                                   children: [
-                                    Text(
-                                      item.title,
-                                      style: const TextStyle(
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: darkText,
+                                    // Peach/Pink Square Icon Badge
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: iconBadgeBg,
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                      ),
+                                      child: const Center(
+                                        child: Icon(
+                                          LucideIcons.clock,
+                                          size: 18,
+                                          color: iconColor,
+                                        ),
                                       ),
                                     ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      item.timestamp,
-                                      style: const TextStyle(
-                                        fontSize: 11.5,
-                                        color: subText,
+                                    const SizedBox(width: 14),
+
+                                    // Title and Timestamp
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            item.title,
+                                            style: const TextStyle(
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: darkText,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            item.timestamp,
+                                            style: const TextStyle(
+                                              fontSize: 11.5,
+                                              color: subText,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                            ],
+                              );
+                            }).toList(),
                           ),
-                        );
-                      }).toList(),
-                    ),
                   ),
 
                   const SizedBox(height: 24),
