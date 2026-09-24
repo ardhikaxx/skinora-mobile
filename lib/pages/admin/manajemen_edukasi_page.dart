@@ -209,7 +209,11 @@ class _ManajemenEdukasiPageState extends State<ManajemenEdukasiPage> {
         : ArticleStatus.diterbitkan;
     if (Backend.useFirebase) {
       try {
-        await ArticleService.updateStatus(article.backendId, newStatus);
+        await ArticleService.updateStatus(
+          article.backendId,
+          newStatus,
+          title: article.title,
+        );
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -243,7 +247,10 @@ class _ManajemenEdukasiPageState extends State<ManajemenEdukasiPage> {
       onConfirm: () async {
         if (Backend.useFirebase) {
           try {
-            await ArticleService.delete(article.backendId);
+            await ArticleService.delete(
+              article.backendId,
+              title: article.title,
+            );
           } catch (e) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
