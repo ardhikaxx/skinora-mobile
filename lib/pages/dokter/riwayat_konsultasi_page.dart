@@ -5,6 +5,7 @@ import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/consultation_service.dart';
 import '../../services/user_service.dart';
+import '../../utils/app_dates.dart';
 import 'detail_riwayat_konsultasi_page.dart';
 
 class HistoryChatMessage {
@@ -234,9 +235,11 @@ class _RiwayatKonsultasiPageState extends State<RiwayatKonsultasiPage> {
           // chat kosong = tampil default UI
         }
         final date = (m['dateIso'] as String?) ?? '';
-        final time = ((m['timeStart'] as String?) ?? '').isNotEmpty
-            ? '${m['timeStart']} - ${m['timeEnd']}'
-            : (m['scheduleTime'] as String?) ?? '';
+        final ts = (m['timeStart'] as String?) ?? '';
+        final te = (m['timeEnd'] as String?) ?? '';
+        final time = ts.isNotEmpty
+            ? '${AppDates.formatHm(ts)} - ${AppDates.formatHm(te.isNotEmpty ? te : ts)}'
+            : AppDates.formatRange((m['scheduleTime'] as String?) ?? '');
         var patientName = (m['patientName'] as String?) ?? '';
         if (patientName.isEmpty) {
           final pid = (m['patientId'] as String?) ?? '';

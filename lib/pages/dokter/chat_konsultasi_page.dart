@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/consultation_service.dart';
+import '../../utils/app_dates.dart';
 import 'ruang_chat_dokter_page.dart';
 import 'riwayat_konsultasi_page.dart';
 
@@ -85,11 +88,18 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
 
   // id Firestore -> data mentah untuk persist aksi status.
   final Map<String, Map<String, dynamic>> _backendMeta = {};
+  StreamSubscription<List<Map<String, dynamic>>>? _sub;
 
   @override
   void initState() {
     super.initState();
     _loadFromBackend();
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
   }
 
   String _labelStatus(String raw) {
@@ -104,47 +114,51 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
     }
   }
 
-  /// Konsultasi aktif dokter dari Firestore. Tanpa Firebase, seed demo
-  /// tetap dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil
-  /// backend selalu menggantikan seed — termasuk saat kosong.
-  Future<void> _loadFromBackend() async {
+  /// Streaming konsultasi aktif dokter. Tanpa Firebase, seed demo
+  /// tetap dipakai agar UI/tes tidak berubah.
+  void _loadFromBackend() {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
     if (uid == null) return;
-    try {
-      final items = await ConsultationService.listForDoctor(uid);
-      if (!mounted) return;
-      setState(() {
-        _backendMeta.clear();
-        _consultations
-          ..clear()
-          ..addAll(items
-              .where((m) => ((m['status'] as String?) ?? '') != 'selesai')
-              .map((m) {
-        final id = (m['id'] as String?) ?? '';
-        _backendMeta[id] = m;
-        final date = (m['dateIso'] as String?) ?? '';
-        final time = ((m['timeStart'] as String?) ?? '').isNotEmpty
-            ? '${m['timeStart']} - ${m['timeEnd']}'
-            : (m['scheduleTime'] as String?) ?? '';
-        return ConsultationItemModel(
-          id: id,
-          patientName: (m['patientName'] as String?) ?? 'Pasien',
-          dateTime: date.isEmpty
-              ? ((m['scheduleDate'] as String?) ?? '')
-              : '$date • $time',
-          status: _labelStatus((m['status'] as String?) ?? 'terjadwal'),
-        );
-      }));
-      });
-    } catch (_) {
-      // Query gagal → tampilkan kosong, jangan seed palsu di production.
-      if (!mounted) return;
-      setState(() {
-        _backendMeta.clear();
-        _consultations.clear();
-      });
-    }
+    _sub = ConsultationService.streamForDoctor(uid).listen(
+      (items) {
+        if (!mounted) return;
+        setState(() {
+          _backendMeta.clear();
+          _consultations
+            ..clear()
+            ..addAll(items
+                .where((m) => ((m['status'] as String?) ?? '') != 'selesai')
+                .map((m) {
+              final id = (m['id'] as String?) ?? '';
+              _backendMeta[id] = m;
+              final date = (m['dateIso'] as String?) ?? '';
+              final ts = (m['timeStart'] as String?) ?? '';
+              final te = (m['timeEnd'] as String?) ?? '';
+              final time = ts.isNotEmpty
+                  ? '${AppDates.formatHm(ts)} - ${AppDates.formatHm(te.isNotEmpty ? te : ts)}'
+                  : AppDates.formatRange(
+                      (m['scheduleTime'] as String?) ?? '',
+                    );
+              return ConsultationItemModel(
+                id: id,
+                patientName: (m['patientName'] as String?) ?? 'Pasien',
+                dateTime: date.isEmpty
+                    ? ((m['scheduleDate'] as String?) ?? '')
+                    : '$date • $time',
+                status: _labelStatus((m['status'] as String?) ?? 'terjadwal'),
+              );
+            }));
+        });
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(() {
+          _backendMeta.clear();
+          _consultations.clear();
+        });
+      },
+    );
   }
 
   Future<void> _handleConsultationAction(ConsultationItemModel item) async {
@@ -152,12 +166,21 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
     if (Backend.useFirebase && _backendMeta.containsKey(item.id)) {
       try {
         await ConsultationService.markBerlangsung(item.id);
+        final m = _backendMeta[item.id];
+        if (m != null) {
+          m['status'] = 'berlangsung';
+        }
+        if (mounted) {
+          setState(() {
+            item.status = 'Berlangsung';
+          });
+        }
       } catch (_) {
         // lanjut ke ruang chat walau update status gagal
       }
-      if (!mounted) return;
     }
 
+    if (!mounted) return;
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(

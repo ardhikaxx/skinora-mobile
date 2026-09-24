@@ -29,7 +29,7 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
   static const Color cardBorder = Color(0xFFEEEEEE);
   static const Color innerBorder = Color(0xFFE5E5EA);
 
-  DateTime _selectedDate = DateTime(2026, 8, 30);
+  DateTime _selectedDate = AppDates.nowWib();
 
   final Set<String> _selectedLocations = {};
   final Set<String> _selectedSymptoms = {};

@@ -42,50 +42,50 @@ class ConsultationService {
         .doc(doctorUid)
         .collection('slots')
         .doc(slotId);
-    final slotSnap = await slotRef.get();
-    if (!slotSnap.exists ||
-        ((slotSnap.data()?['isBooked'] as bool?) ?? false)) {
-      throw StateError('Slot sudah dibooking oleh pasien lain.');
-    }
-
-    final batch = _db.batch();
     final now = FieldValue.serverTimestamp();
 
-    batch.update(slotRef, {
-      'isBooked': true,
-      'patientId': patient.uid,
-      'patientName': patient.name,
-      'updatedAt': now,
+    // Transaksi: baca-cek-tulis atomik agar 2 pasien tidak double-book.
+    await _db.runTransaction((tx) async {
+      final slotSnap = await tx.get(slotRef);
+      if (!slotSnap.exists ||
+          ((slotSnap.data()?['isBooked'] as bool?) ?? false)) {
+        throw StateError('Slot sudah dibooking oleh pasien lain.');
+      }
+
+      tx.update(slotRef, {
+        'isBooked': true,
+        'patientId': patient.uid,
+        'patientName': patient.name,
+        'updatedAt': now,
+      });
+
+      tx.set(consultationRef, {
+        'patientId': patient.uid,
+        'patientName': patient.name,
+        'doctorId': doctorUid,
+        'doctorName': doctorName,
+        'specialization': specialization,
+        'scheduleDate': scheduleDate,
+        'dateIso': dateIso,
+        'scheduleTime': scheduleTime,
+        'timeStart': timeStart,
+        'timeEnd': timeEnd,
+        'status': 'terjadwal',
+        'diagnosis': null,
+        'notes': null,
+        'slotId': slotId,
+        'createdBy': patient.uid,
+        'createdAt': now,
+        'updatedAt': now,
+      });
+
+      tx.set(_links.doc(linkId(patient.uid, doctorUid)), {
+        'patientId': patient.uid,
+        'doctorId': doctorUid,
+        'createdBy': patient.uid,
+        'createdAt': now,
+      }, SetOptions(merge: true));
     });
-
-    batch.set(consultationRef, {
-      'patientId': patient.uid,
-      'patientName': patient.name,
-      'doctorId': doctorUid,
-      'doctorName': doctorName,
-      'specialization': specialization,
-      'scheduleDate': scheduleDate,
-      'dateIso': dateIso,
-      'scheduleTime': scheduleTime,
-      'timeStart': timeStart,
-      'timeEnd': timeEnd,
-      'status': 'terjadwal',
-      'diagnosis': null,
-      'notes': null,
-      'slotId': slotId,
-      'createdBy': patient.uid,
-      'createdAt': now,
-      'updatedAt': now,
-    });
-
-    batch.set(_links.doc(linkId(patient.uid, doctorUid)), {
-      'patientId': patient.uid,
-      'doctorId': doctorUid,
-      'createdBy': patient.uid,
-      'createdAt': now,
-    }, SetOptions(merge: true));
-
-    await batch.commit();
 
     await ActivityService.log(
       title: 'Booking konsultasi dengan $doctorName',
@@ -133,6 +133,45 @@ class ConsultationService {
         .orderBy('createdAt', descending: true)
         .get();
     return snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+  }
+
+  /// Stream konsultasi aktif dokter (realtime — booking baru langsung muncul).
+  static Stream<List<Map<String, dynamic>>> streamForDoctor(String doctorUid) {
+    if (!Backend.useFirebase || doctorUid.isEmpty) {
+      return const Stream.empty();
+    }
+    return _col
+        .where('doctorId', isEqualTo: doctorUid)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map((d) => {'id': d.id, ...d.data()})
+              .where((m) => (m['status'] as String?) != 'selesai')
+              .toList(),
+        );
+  }
+
+  /// Stream konsultasi pasien (status terjadwal/berlangsung/selesai live).
+  static Stream<List<Map<String, dynamic>>> streamForPatient(
+    String patientUid,
+  ) {
+    if (!Backend.useFirebase || patientUid.isEmpty) {
+      return const Stream.empty();
+    }
+    return _col
+        .where('patientId', isEqualTo: patientUid)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList());
+  }
+
+  /// Stream 1 dokumen konsultasi (badge status live di ruang chat).
+  static Stream<Map<String, dynamic>?> streamById(String id) {
+    if (!Backend.useFirebase || id.isEmpty) return const Stream.empty();
+    return _col.doc(id).snapshots().map(
+          (s) => s.exists ? {'id': s.id, ...s.data()!} : null,
+        );
   }
 
   static Future<int> countAll() async {

@@ -6,6 +6,7 @@ import '../../components/navbottom/dokter_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/consultation_service.dart';
+import '../../utils/app_dates.dart';
 
 class ChatBubbleModel {
   final String id;
@@ -30,7 +31,7 @@ class RuangChatDokterPage extends StatefulWidget {
 
   const RuangChatDokterPage({
     super.key,
-    this.patientName = 'Leonita Yulyta Agustin',
+    this.patientName = '',
     this.consultationId,
     this.dateTime,
     this.onNavigateTab,
@@ -161,9 +162,7 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
 
-    final now = DateTime.now();
-    final timeStr =
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final timeStr = AppDates.hm(AppDates.nowWib());
 
     // Persist ke Firestore (stream akan update UI).
     if (Backend.useFirebase) {

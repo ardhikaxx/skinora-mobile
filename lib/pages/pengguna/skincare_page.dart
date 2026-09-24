@@ -29,7 +29,7 @@ class _SkincarePageState extends State<SkincarePage> {
   static const Color innerBorder = Color(0xFFE5E5EA);
   static const Color peachIconBg = Color(0xFFFFD5C8);
 
-  DateTime _selectedDate = DateTime(2026, 8, 28);
+  DateTime _selectedDate = AppDates.nowWib();
 
   final Set<String> _selectedMorning = {};
   final Set<String> _selectedNight = {};

@@ -18,6 +18,10 @@ class DokterMainPage extends StatefulWidget {
 class _DokterMainPageState extends State<DokterMainPage> {
   int _currentIndex = 0;
 
+  // Epoch per tab: naik saat tab aktif dipilih ulang → ValueKey berubah →
+  // child remount → initState/stream jalan ulang (refresh data Firestore).
+  final List<int> _tabEpoch = List<int>.filled(5, 0);
+
   @override
   void initState() {
     super.initState();
@@ -46,21 +50,42 @@ class _DokterMainPageState extends State<DokterMainPage> {
   }
 
   void _changeTab(int index) {
-    if (index >= 0 && index < 5) {
-      setState(() {
-        _currentIndex = index;
-      });
-    }
+    if (index < 0 || index >= 5) return;
+    final sameTab = index == _currentIndex;
+    setState(() {
+      _currentIndex = index;
+      if (sameTab) {
+        _tabEpoch[index] += 1;
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    // ValueKey per generasi remount: setiap kali tab aktif dipilih ulang,
+    // generasi naik sehingga IndexedStack rebuild child → initState jalan
+    // ulang dan stream/daftar di-refresh dari Firestore.
     final pages = [
-      BerandaDokterPage(onNavigateTab: _changeTab),
-      JadwalDokterPage(onNavigateTab: _changeTab),
-      ChatKonsultasiPage(onNavigateTab: _changeTab),
-      RiwayatKonsultasiPage(onNavigateTab: _changeTab),
-      ProfilDokterPage(onNavigateTab: _changeTab),
+      BerandaDokterPage(
+        key: ValueKey('beranda${_tabEpoch[0]}'),
+        onNavigateTab: _changeTab,
+      ),
+      JadwalDokterPage(
+        key: ValueKey('jadwal${_tabEpoch[1]}'),
+        onNavigateTab: _changeTab,
+      ),
+      ChatKonsultasiPage(
+        key: ValueKey('chat${_tabEpoch[2]}'),
+        onNavigateTab: _changeTab,
+      ),
+      RiwayatKonsultasiPage(
+        key: ValueKey('riwayat${_tabEpoch[3]}'),
+        onNavigateTab: _changeTab,
+      ),
+      ProfilDokterPage(
+        key: ValueKey('profil${_tabEpoch[4]}'),
+        onNavigateTab: _changeTab,
+      ),
     ];
 
     return Scaffold(

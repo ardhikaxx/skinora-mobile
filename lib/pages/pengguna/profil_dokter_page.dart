@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
@@ -6,6 +8,7 @@ import '../../services/backend.dart';
 import '../../services/consultation_service.dart';
 import '../../services/schedule_service.dart';
 import '../../services/user_service.dart';
+import '../../utils/app_dates.dart';
 import 'ruang_konsultasi_page.dart';
 
 class DoctorScheduleModel {
@@ -150,6 +153,7 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
 
   DoctorProfileDetailModel? _liveDoctor;
   List<SlotRecord> _availableSlots = const [];
+  StreamSubscription<List<SlotRecord>>? _slotSub;
 
   @override
   void initState() {
@@ -157,9 +161,14 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
     _loadFromBackend();
   }
 
-  /// Profil dokter + slot jadwal dari Firestore. Tanpa Firebase, seed demo
-  /// tetap dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil backend
-  /// selalu menggantikan seed — jadwal hanya dari slot live, bukan seed.
+  @override
+  void dispose() {
+    _slotSub?.cancel();
+    super.dispose();
+  }
+
+  /// Profil dokter sekali + stream slot realtime (slot yang diambil orang
+  /// lain langsung hilang dari daftar). Tanpa Firebase, seed demo dipakai.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     final doctorId = widget.doctorId;
@@ -171,32 +180,32 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
       });
       return;
     }
+    _slotSub?.cancel();
+    _slotSub = ScheduleService.slotStream(doctorId).listen(
+      (slots) {
+        if (!mounted) return;
+        setState(() {
+          _availableSlots = slots;
+          _applySlotsToDoctor(slots);
+        });
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(() {
+          _availableSlots = const [];
+          _applySlotsToDoctor(const []);
+        });
+      },
+    );
     try {
-      final results = await Future.wait<Object?>([
-        UserService.loadByUid(doctorId),
-        ScheduleService.listSlots(doctorId),
-      ]);
-      final profile = results[0] as dynamic;
-      final slots = (results[1] as List<SlotRecord>?) ?? const <SlotRecord>[];
+      final profile = await UserService.loadByUid(doctorId);
       if (!mounted) return;
       setState(() {
-        _availableSlots = slots;
-        final open = slots
-            .where((s) => !s.isBooked && s.date.isNotEmpty)
-            .toList();
-        final byDate = <String, List<String>>{};
-        final order = <String>[];
-        for (final s in open) {
-          final t = s.timeStart.isNotEmpty ? s.timeStart : s.time;
-          byDate.putIfAbsent(s.date, () {
-            order.add(s.date);
-            return <String>[];
-          }).add(t);
-        }
-        final name = ((profile?.name as String?) ?? '');
-        final specialization = ((profile?.specialization as String?) ?? '');
-        final experience = ((profile?.experience as String?) ?? '');
-        final bio = ((profile?.bio as String?) ?? '');
+        final name = profile?.name ?? '';
+        final specialization = profile?.specialization ?? '';
+        final experience = profile?.experience ?? '';
+        final bio = profile?.bio ?? '';
+        final currentSchedules = _liveDoctor?.schedules ?? const [];
         _liveDoctor = DoctorProfileDetailModel(
           id: doctorId,
           name: name.isNotEmpty
@@ -211,23 +220,48 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
                   : '-'),
           experience: experience.isNotEmpty ? 'Pengalaman: $experience' : '',
           bio: bio,
-          schedules: [
-            for (final date in order)
-              DoctorScheduleModel(
-                dayDate: date.toUpperCase(),
-                timeSlots: byDate[date]!,
-              ),
-          ],
+          schedules: currentSchedules,
         );
+        _applySlotsToDoctor(_availableSlots);
       });
     } catch (_) {
-      // Query gagal → reset ke placeholder kosong, jangan seed palsu.
       if (!mounted) return;
       setState(() {
         _liveDoctor = null;
         _availableSlots = const [];
       });
     }
+  }
+
+  /// Bangun jadwal tampil: hanya slot belum dibooking & belum lewat (WIB).
+  void _applySlotsToDoctor(List<SlotRecord> slots) {
+    final open = ScheduleService.bookableSlots(slots);
+    final byDate = <String, List<String>>{};
+    final order = <String>[];
+    for (final s in open) {
+      final t = AppDates.formatHm(
+        s.timeStart.isNotEmpty ? s.timeStart : s.time,
+      );
+      byDate.putIfAbsent(s.date, () {
+        order.add(s.date);
+        return <String>[];
+      }).add(t);
+    }
+    final base = _liveDoctor;
+    _liveDoctor = DoctorProfileDetailModel(
+      id: base?.id ?? widget.doctorId ?? '',
+      name: base?.name ?? widget.doctorName ?? '-',
+      specialization: base?.specialization ?? widget.specialization ?? '-',
+      experience: base?.experience ?? '',
+      bio: base?.bio ?? '',
+      schedules: [
+        for (final date in order)
+          DoctorScheduleModel(
+            dayDate: date.toUpperCase(),
+            timeSlots: byDate[date]!,
+          ),
+      ],
+    );
   }
 
   @override
@@ -524,8 +558,11 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
   ) async {
     SlotRecord? slot;
     for (final s in _availableSlots) {
+      if (s.isBooked) continue;
       final sDate = s.date.toUpperCase();
-      final sTime = s.timeStart.isNotEmpty ? s.timeStart : s.time;
+      final sTime = AppDates.formatHm(
+        s.timeStart.isNotEmpty ? s.timeStart : s.time,
+      );
       if (sDate == dayDate && sTime == time) {
         slot = s;
         break;
@@ -594,26 +631,39 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
 
     String? consultationId;
     String bookingError = '';
-    if (Backend.useFirebase && slot != null) {
-      try {
-        final patient = await AuthService.loadProfile();
-        if (patient == null || patient.uid.isEmpty) {
-          throw StateError('Sesi pengguna tidak ditemukan. Silakan login ulang.');
+    if (Backend.useFirebase) {
+      final nowBooked = slot == null || slot.isBooked;
+      if (nowBooked) {
+        bookingError =
+            'Slot sudah dibooking oleh pasien lain. Silakan pilih jadwal lain.';
+      } else {
+        try {
+          final patient = await AuthService.loadProfile();
+          if (patient == null || patient.uid.isEmpty) {
+            throw StateError(
+              'Sesi pengguna tidak ditemukan. Silakan login ulang.',
+            );
+          }
+          consultationId = await ConsultationService.book(
+            doctorUid: doctor.id,
+            doctorName: doctor.name,
+            specialization: doctor.specialization,
+            slotId: slot.id,
+            scheduleDate: slot.date,
+            scheduleTime: slot.time,
+            patient: patient,
+            dateIso: slot.dateIso,
+            timeStart: slot.timeStart,
+            timeEnd: slot.timeEnd,
+          );
+        } catch (e) {
+          final msg = e.toString();
+          bookingError = msg.contains('permission-denied') ||
+                  msg.toLowerCase().contains('already') ||
+                  msg.contains('dibooking')
+              ? 'Slot sudah dibooking oleh pasien lain. Silakan pilih jadwal lain.'
+              : 'Gagal booking: $msg';
         }
-        consultationId = await ConsultationService.book(
-          doctorUid: doctor.id,
-          doctorName: doctor.name,
-          specialization: doctor.specialization,
-          slotId: slot.id,
-          scheduleDate: slot.date,
-          scheduleTime: slot.time,
-          patient: patient,
-          dateIso: slot.dateIso,
-          timeStart: slot.timeStart,
-          timeEnd: slot.timeEnd,
-        );
-      } catch (e) {
-        bookingError = e.toString();
       }
     }
 
@@ -623,7 +673,17 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
 
     if (bookingError.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal booking: $bookingError')),
+        SnackBar(content: Text(bookingError)),
+      );
+      return;
+    }
+
+    if (Backend.useFirebase &&
+        (consultationId == null || consultationId.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gagal booking: slot tidak ditemukan.'),
+        ),
       );
       return;
     }

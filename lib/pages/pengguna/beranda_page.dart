@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
+import '../../services/consultation_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/skin_service.dart';
 import '../../services/user_service.dart';
+import '../../utils/app_dates.dart';
 import 'notifikasi_pengguna_page.dart';
 import 'konsultasi_dokter_page.dart';
 import 'edukasi_kulit_page.dart';
@@ -29,14 +32,23 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
   String _userName = Backend.useFirebase ? '' : 'Leonita Yulyta Agustin';
   int _unreadNotif = Backend.useFirebase ? 0 : 2;
 
+  // Ringkasan hari ini — seed hanya mode demo; Firebase → data asli / empty.
+  String _skinCheckValue = Backend.useFirebase ? 'Belum' : 'Kombinasi';
+  String _skinCheckSub = Backend.useFirebase ? '-' : '2026-08-28';
+  String _skinDailyValue = Backend.useFirebase ? 'Belum' : 'Terisi';
+  String _skinDailySub = Backend.useFirebase ? '-' : 'Baik';
+  String _skincareValue = Backend.useFirebase ? 'Belum' : 'Tercatat';
+  String _skincareSub = Backend.useFirebase ? '-' : '5 produk';
+  String _chatValue = Backend.useFirebase ? 'Belum' : 'Jadwal';
+  String _chatSub = Backend.useFirebase ? '-' : '2026-08-28';
+
   @override
   void initState() {
     super.initState();
     _loadFromBackend();
   }
 
-  /// Profil + unread notifikasi dari Firestore. Tanpa Firebase, seed demo
-  /// tetap dipakai agar UI/tes tidak berubah.
+  /// Profil + unread notifikasi + ringkasan hari ini dari Firestore.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
@@ -45,9 +57,110 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
       final results = await Future.wait<Object?>([
         UserService.loadByUid(uid),
         NotificationService.countUnread(NotificationService.userAudience(uid)),
+        SkinService.listSkinChecks(uid, limit: 5),
+        SkinService.listSkinDailies(uid),
+        SkinService.listSkincare(uid),
+        ConsultationService.listForPatient(uid),
       ]);
       final profile = results[0] as dynamic;
       final unread = results[1] as int?;
+      final checks = (results[2] as List<Map<String, dynamic>>?) ?? const [];
+      final dailies = (results[3] as List<Map<String, dynamic>>?) ?? const [];
+      final skincare = (results[4] as List<Map<String, dynamic>>?) ?? const [];
+      final consults = (results[5] as List<Map<String, dynamic>>?) ?? const [];
+
+      final todayIso = AppDates.todayIso();
+
+      // Skin Check: hasil terakhir (fallback hari ini)
+      if (checks.isNotEmpty) {
+        final latest = checks.first;
+        _skinCheckValue =
+            ((latest['resultSkinType'] as String?) ?? '').isEmpty
+                ? 'Belum'
+                : (latest['resultSkinType'] as String);
+        final ts = latest['createdAt'];
+        if (ts != null && ts.runtimeType.toString().contains('Timestamp')) {
+          // ignore: avoid_dynamic_calls
+          final dt = AppDates.toWib(
+            // ignore: avoid_dynamic_calls
+            (ts as dynamic).toDate() as DateTime,
+          );
+          _skinCheckSub = AppDates.iso(dt);
+        } else {
+          _skinCheckSub = todayIso;
+        }
+      } else {
+        _skinCheckValue = 'Belum';
+        _skinCheckSub = '-';
+      }
+
+      // Skin Daily: entri hari ini
+      final todayDaily = dailies.where((d) {
+        final di = (d['dateIso'] as String?) ?? '';
+        if (di.isNotEmpty) return di == todayIso;
+        final ts = d['createdAt'];
+        if (ts == null) return false;
+        try {
+          // ignore: avoid_dynamic_calls
+          final dt = AppDates.toWib(
+            // ignore: avoid_dynamic_calls
+            (ts as dynamic).toDate() as DateTime,
+          );
+          return AppDates.iso(dt) == todayIso;
+        } catch (_) {
+          return false;
+        }
+      }).toList();
+      if (todayDaily.isNotEmpty) {
+        _skinDailyValue = 'Terisi';
+        final symptoms = (todayDaily.first['symptoms'] as List?) ?? const [];
+        final symptomStr = symptoms
+            .map((s) => s.toString())
+            .where((s) => s.isNotEmpty)
+            .toList();
+        _skinDailySub = SkinService.deriveDailyStatus(symptomStr);
+      } else {
+        _skinDailyValue = 'Belum';
+        _skinDailySub = '-';
+      }
+
+      // Skincare: total produk tercatat minggu ini (atau entri terakhir)
+      if (skincare.isNotEmpty) {
+        _skincareValue = 'Tercatat';
+        var productCount = 0;
+        for (final entry in skincare) {
+          final morning = (entry['morning'] as List?) ?? const [];
+          final night = (entry['night'] as List?) ?? const [];
+          productCount += morning.length + night.length;
+        }
+        _skincareSub = productCount > 0 ? '$productCount produk' : 'Tercatat';
+      } else {
+        _skincareValue = 'Belum';
+        _skincareSub = '-';
+      }
+
+      // Chat / konsultasi: jadwal aktif berikutnya
+      final upcoming = consults
+          .where((c) {
+            final st = (c['status'] as String?) ?? '';
+            return st != 'selesai';
+          })
+          .toList();
+      if (upcoming.isNotEmpty) {
+        _chatValue = 'Jadwal';
+        final c = upcoming.first;
+        final di = (c['dateIso'] as String?) ?? '';
+        final ts = (c['timeStart'] as String?) ?? '';
+        if (di.isNotEmpty) {
+          _chatSub = ts.isEmpty ? di : '$di • ${AppDates.formatHm(ts)}';
+        } else {
+          _chatSub = ((c['scheduleDate'] as String?) ?? '-');
+        }
+      } else {
+        _chatValue = 'Belum';
+        _chatSub = '-';
+      }
+
       if (!mounted) return;
       setState(() {
         _userName = (profile?.name as String?) ?? '';
@@ -58,6 +171,14 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
       setState(() {
         _userName = '';
         _unreadNotif = 0;
+        _skinCheckValue = 'Belum';
+        _skinCheckSub = '-';
+        _skinDailyValue = 'Belum';
+        _skinDailySub = '-';
+        _skincareValue = 'Belum';
+        _skincareSub = '-';
+        _chatValue = 'Belum';
+        _chatSub = '-';
       });
     }
   }
@@ -138,9 +259,9 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Selamat pagi,',
-                style: TextStyle(
+              Text(
+                AppDates.greetingWib(),
+                style: const TextStyle(
                   fontSize: 13.0,
                   color: subText,
                 ),
@@ -262,8 +383,8 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
                 child: _buildSummaryItem(
                   icon: LucideIcons.stethoscope,
                   title: 'Skin Check',
-                  value: 'Kombinasi',
-                  subtitle: '2026-08-28',
+                  value: _skinCheckValue,
+                  subtitle: _skinCheckSub,
                   onTap: () => widget.onNavigateTab?.call(1),
                 ),
               ),
@@ -272,8 +393,8 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
                 child: _buildSummaryItem(
                   icon: LucideIcons.bookOpen,
                   title: 'Skin Daily',
-                  value: 'Terisi',
-                  subtitle: 'Baik',
+                  value: _skinDailyValue,
+                  subtitle: _skinDailySub,
                   onTap: () => widget.onNavigateTab?.call(2),
                 ),
               ),
@@ -288,8 +409,8 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
                 child: _buildSummaryItem(
                   icon: LucideIcons.droplets,
                   title: 'Skincare',
-                  value: 'Tercatat',
-                  subtitle: '5 produk',
+                  value: _skincareValue,
+                  subtitle: _skincareSub,
                   onTap: () => widget.onNavigateTab?.call(3),
                 ),
               ),
@@ -298,8 +419,8 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
                 child: _buildSummaryItem(
                   icon: LucideIcons.messageSquare,
                   title: 'Chat',
-                  value: 'Jadwal',
-                  subtitle: '2026-08-28',
+                  value: _chatValue,
+                  subtitle: _chatSub,
                   onTap: () {
                     Navigator.push(
                       context,

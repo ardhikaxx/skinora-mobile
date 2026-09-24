@@ -68,6 +68,31 @@ class ScheduleService {
     return snap.docs.map((d) => _from(doctorUid, d)).toList();
   }
 
+  /// Stream realtime slot dokter — daftar selalu sinkron antar klien.
+  static Stream<List<SlotRecord>> slotStream(String doctorUid) {
+    if (!Backend.useFirebase || doctorUid.isEmpty) {
+      return const Stream.empty();
+    }
+    return _slots(doctorUid).orderBy('createdAt').snapshots().map(
+          (snap) => snap.docs.map((d) => _from(doctorUid, d)).toList(),
+        );
+  }
+
+  /// Slot layak booking: belum diambil, punya tanggal, belum lewat (WIB).
+  static List<SlotRecord> bookableSlots(Iterable<SlotRecord> slots) =>
+      slots
+          .where(
+            (s) =>
+                !s.isBooked &&
+                s.date.isNotEmpty &&
+                !AppDates.isPastSlot(
+                  dateIso: s.dateIso,
+                  timeEnd: s.timeEnd,
+                  timeStart: s.timeStart,
+                ),
+          )
+          .toList();
+
   static Future<void> addSlot({
     required String doctorUid,
     required String date,

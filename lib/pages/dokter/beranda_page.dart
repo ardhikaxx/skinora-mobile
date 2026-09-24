@@ -104,7 +104,7 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
               .where((s) => s.dateIso == todayIso)
               .take(3)
               .map((s) => {
-                    'time': s.time,
+                    'time': AppDates.formatRange(s.time),
                     'status': s.isBooked ? 'Terjadwal' : 'Tersedia',
                     'badge': s.isBooked ? 'Terjadwal' : 'Kosong',
                     'booked': s.isBooked.toString(),
@@ -170,9 +170,9 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Selamat siang,',
-              style: TextStyle(
+            Text(
+              AppDates.greetingWib(),
+              style: const TextStyle(
                 fontSize: 13.5,
                 color: subText,
                 fontWeight: FontWeight.w400,

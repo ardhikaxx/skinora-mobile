@@ -18,7 +18,7 @@ class DetailRiwayatKonsultasiPage extends StatelessWidget {
     this.consultation,
     this.patientName = '',
     this.dateTime = '',
-    this.status = 'Selesai',
+    this.status = '',
     this.chatHistory,
     this.onNavigateTab,
     this.showBottomNav = true,

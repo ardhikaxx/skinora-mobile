@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../services/backend.dart';
 import 'edukasi_kulit_page.dart';
 
 class DetailEdukasiPenggunaPage extends StatelessWidget {
@@ -19,17 +20,92 @@ class DetailEdukasiPenggunaPage extends StatelessWidget {
   static const Color categoryBadgeBg = Color(0xFFFED0BB);
   static const Color bodyTextColor = Color(0xFF4A4A4A);
 
+  /// Fallback artikel demo HANYA mode tanpa Firebase (widget test).
+  /// Dengan Firebase, article==null → tampil empty state, bukan seed palsu.
+  static SkinEducationModel? _resolveArticle(SkinEducationModel? article) {
+    if (article != null) return article;
+    if (Backend.useFirebase) return null;
+    return const SkinEducationModel(
+      id: '1',
+      category: 'KULIT DASAR',
+      title: 'Mengenal Tipe Kulit Wajah Anda',
+      snippet:
+          'Pelajari cara mengenali tipe kulit wajah Anda untuk perawatan yang tepat.',
+      date: '1 Agustus 2026',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final currentArticle = article ??
-        const SkinEducationModel(
-          id: '1',
-          category: 'KULIT DASAR',
-          title: 'Mengenal Tipe Kulit Wajah Anda',
-          snippet:
-              'Pelajari cara mengenali tipe kulit wajah Anda untuk perawatan yang tepat.',
-          date: '1 Agustus 2026',
-        );
+    final currentArticle = _resolveArticle(article);
+
+    if (currentArticle == null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFFCFCFD),
+        body: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(
+                  left: 12.0,
+                  right: 20.0,
+                  top: 14.0,
+                  bottom: 10.0,
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(
+                        LucideIcons.chevronLeft,
+                        color: primaryMaroon,
+                        size: 22,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'Edukasi',
+                      style: TextStyle(
+                        fontFamily: 'serif',
+                        fontSize: 20.0,
+                        fontWeight: FontWeight.bold,
+                        color: darkText,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                height: 1,
+                color: const Color(0xFFF0F0F0),
+                margin: const EdgeInsets.only(bottom: 14.0),
+              ),
+              const Expanded(
+                child: Center(
+                  child: Text(
+                    'Artikel tidak ditemukan',
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      color: subText,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        bottomNavigationBar: PenggunaNavBottom(
+          currentIndex: -1,
+          onTap: (index) {
+            Navigator.popUntil(context, (route) => route.isFirst);
+            if (index != 0) {
+              onNavigateTab?.call(index);
+            }
+          },
+        ),
+      );
+    }
 
     final displayDate = currentArticle.date.contains('Agu')
         ? currentArticle.date.replaceAll('Agu', 'Agustus')
@@ -171,8 +247,11 @@ class DetailEdukasiPenggunaPage extends StatelessWidget {
   }
 
   Widget _buildArticleContentCard(SkinEducationModel article) {
-    // If article is "Mengenal Tipe Kulit Wajah Anda", match image copy 4.png exactly
-    if (article.id == '1' || article.title.contains('Tipe Kulit')) {
+    // Body asli dari Firestore — jangan ditimpa konten hardcode.
+    // Seed "Tipe Kulit" panjang hanya untuk mode demo (tanpa Firebase).
+    final isDemoSeed =
+        !Backend.useFirebase && (article.id == '1' || article.title.contains('Tipe Kulit'));
+    if (isDemoSeed) {
       return Container(
         padding: const EdgeInsets.all(18.0),
         decoration: BoxDecoration(

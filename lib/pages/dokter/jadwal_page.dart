@@ -5,6 +5,7 @@ import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/schedule_service.dart';
 import '../../services/user_service.dart';
+import '../../utils/app_dates.dart';
 
 class ScheduleSlotModel {
   final String id;
@@ -180,7 +181,7 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
           final day = grouped.putIfAbsent(s.date, () => []);
           day.add(ScheduleSlotModel(
             id: s.id,
-            time: s.time,
+            time: AppDates.formatRange(s.time),
             patientName: s.patientName,
             isBooked: s.isBooked,
           ));
@@ -839,7 +840,9 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
           const SizedBox(height: 6),
           _buildFormTextField(
             controller: _dateController,
-            hintText: 'Jumat, 28 Agustus 2026',
+            hintText: Backend.useFirebase
+                ? 'Contoh: Jumat, 28 Agustus 2026'
+                : 'Jumat, 28 Agustus 2026',
           ),
 
           const SizedBox(height: 14),
@@ -855,7 +858,7 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
                     const SizedBox(height: 6),
                     _buildFormTextField(
                       controller: _startTimeController,
-                      hintText: '09:00',
+                      hintText: Backend.useFirebase ? 'Contoh: 09.00' : '09:00',
                     ),
                   ],
                 ),
@@ -869,7 +872,7 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
                     const SizedBox(height: 6),
                     _buildFormTextField(
                       controller: _endTimeController,
-                      hintText: '09:30',
+                      hintText: Backend.useFirebase ? 'Contoh: 09.30' : '09:30',
                     ),
                   ],
                 ),

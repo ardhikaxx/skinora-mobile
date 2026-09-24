@@ -1589,12 +1589,8 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
             padding: const EdgeInsets.only(bottom: 12.0),
             child: _buildSkincareRoutineCard(
               date: date,
-              morningItems: morning.isEmpty
-                  ? ['Cleanser', 'Toner', 'Serum', 'Moisturizer', 'Sunscreen']
-                  : morning,
-              nightItems: night.isEmpty
-                  ? ['Cleanser', 'Toner', 'Serum', 'Moisturizer', 'Night Cream']
-                  : night,
+              morningItems: morning,
+              nightItems: night,
             ),
           );
         }).toList(),

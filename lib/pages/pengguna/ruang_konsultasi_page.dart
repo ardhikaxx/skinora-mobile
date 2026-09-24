@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/consultation_service.dart';
+import '../../utils/app_dates.dart';
 import 'riwayat_konsultasi_page.dart';
 
 class ChatMessageModel {
@@ -30,8 +33,8 @@ class RuangKonsultasiPenggunaPage extends StatefulWidget {
   const RuangKonsultasiPenggunaPage({
     super.key,
     this.doctorId,
-    this.doctorName = 'dr. Anita Dewi, Sp.KK',
-    this.status = 'Terjadwal',
+    this.doctorName = '',
+    this.status = '',
     this.consultationId,
     this.onNavigateTab,
   });
@@ -54,17 +57,19 @@ class _RuangKonsultasiPenggunaPageState
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessageModel> _messages = [];
-  Stream<List<Map<String, dynamic>>>? _msgSub;
+  StreamSubscription<List<Map<String, dynamic>>>? _msgSub;
+  StreamSubscription<Map<String, dynamic>?>? _statusSub;
+  String _statusLabel = '';
 
   @override
   void initState() {
     super.initState();
+    _statusLabel = widget.status;
     final consultationId = widget.consultationId;
     if (Backend.useFirebase &&
         consultationId != null &&
         consultationId.isNotEmpty) {
-      _msgSub = ConsultationService.messageStream(consultationId);
-      _msgSub!.listen(
+      _msgSub = ConsultationService.messageStream(consultationId).listen(
         (items) {
           if (!mounted) return;
           setState(() {
@@ -72,7 +77,9 @@ class _RuangKonsultasiPenggunaPageState
               ..clear()
               ..addAll(items.map((m) {
                 final senderRole = (m['senderRole'] as String?) ?? '';
-                final timeRaw = (m['time'] as String?) ?? '';
+                final timeRaw = AppDates.formatHm(
+                  (m['time'] as String?) ?? '',
+                );
                 return ChatMessageModel(
                   id: (m['id'] as String?) ?? '',
                   text: (m['text'] as String?) ?? '',
@@ -82,6 +89,22 @@ class _RuangKonsultasiPenggunaPageState
               }));
           });
           _scrollToBottom();
+        },
+        onError: (_) {},
+      );
+      // Badge status live: terjadwal → berlangsung → selesai.
+      _statusSub = ConsultationService.streamById(consultationId).listen(
+        (doc) {
+          if (!mounted || doc == null) return;
+          final raw = (doc['status'] as String?) ?? '';
+          final label = switch (raw) {
+            'berlangsung' => 'Berlangsung',
+            'selesai' => 'Selesai',
+            _ => 'Terjadwal',
+          };
+          if (label != _statusLabel) {
+            setState(() => _statusLabel = label);
+          }
         },
         onError: (_) {},
       );
@@ -102,6 +125,8 @@ class _RuangKonsultasiPenggunaPageState
 
   @override
   void dispose() {
+    _msgSub?.cancel();
+    _statusSub?.cancel();
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -111,9 +136,7 @@ class _RuangKonsultasiPenggunaPageState
     final text = _textController.text.trim();
     if (text.isEmpty) return;
 
-    final now = DateTime.now();
-    final timeStr =
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final timeStr = AppDates.hm(AppDates.nowWib());
 
     final consultationId = widget.consultationId;
     final uid = AuthService.uid;
@@ -229,7 +252,7 @@ class _RuangKonsultasiPenggunaPageState
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        widget.status,
+                        _statusLabel,
                         style: const TextStyle(
                           fontSize: 11.0,
                           fontWeight: FontWeight.w600,

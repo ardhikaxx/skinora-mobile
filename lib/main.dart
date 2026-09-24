@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
+import 'services/backend.dart';
 import 'pages/auth/login_page.dart';
 import 'pages/auth/register_page.dart';
 import 'pages/admin/admin_main_page.dart';
@@ -178,34 +179,39 @@ class _SkinoraAppState extends State<SkinoraApp> {
         '/admin/notifikasi': (context) => const NotifikasiAdminPage(),
         '/admin/spesialisasi': (context) => const MasterSpesialisasiPage(),
         '/admin/spesialisasi/tambah': (context) => const TambahSpesialisasiPage(),
-        '/admin/spesialisasi/edit': (context) => const EditSpesialisasiPage(initialName: 'Jerawat'),
+        '/admin/spesialisasi/edit': (context) => EditSpesialisasiPage(
+              initialName: Backend.useFirebase ? '' : 'Jerawat',
+            ),
         '/admin/dokter': (context) => const ManajemenDokterPage(showBottomNav: true),
         '/admin/dokter/tambah': (context) => const TambahDokterPage(),
         '/admin/dokter/detail': (context) => DetailDokterPage(
               doctor: AdminDoctorModel(
-                id: '1',
-                name: 'dr. Anita Dewi, Sp.KK',
-                email: 'anita@demo.com',
-                phone: '081234567800',
-                specialization: 'Estetika Kulit',
-                experience: '8 tahun',
-                str: 'STR-2018-12345',
-                bio:
-                    'Dokter spesialis kulit dan kelamin dengan pengalaman 8 tahun di bidang estetika kulit. Lulusan Fakultas Kedokteran Universitas Indonesia.',
-                status: DoctorStatus.terverifikasi,
+                id: Backend.useFirebase ? '' : '1',
+                name: Backend.useFirebase ? '' : 'dr. Anita Dewi, Sp.KK',
+                email: Backend.useFirebase ? '' : 'anita@demo.com',
+                phone: Backend.useFirebase ? '' : '081234567800',
+                specialization: Backend.useFirebase ? '' : 'Estetika Kulit',
+                experience: Backend.useFirebase ? '' : '8 tahun',
+                str: Backend.useFirebase ? '' : 'STR-2018-12345',
+                bio: Backend.useFirebase
+                    ? ''
+                    : 'Dokter spesialis kulit dan kelamin dengan pengalaman 8 tahun di bidang estetika kulit. Lulusan Fakultas Kedokteran Universitas Indonesia.',
+                status: Backend.useFirebase
+                    ? DoctorStatus.menunggu
+                    : DoctorStatus.terverifikasi,
               ),
             ),
         '/admin/pengguna': (context) => const ManajemenPenggunaPage(showBottomNav: true),
         '/admin/pengguna/tambah': (context) => const TambahPenggunaPage(),
         '/admin/pengguna/detail': (context) => DetailPenggunaPage(
               user: AdminUserModel(
-                id: '1',
-                name: 'Leonita Yulyta Agustin',
-                email: 'leonita@demo.com',
-                phone: '081234567890',
-                address: 'Jl. Sudirman No. 123, Jakarta',
-                birthDate: '1995-06-15',
-                gender: 'Perempuan',
+                id: Backend.useFirebase ? '' : '1',
+                name: Backend.useFirebase ? '' : 'Leonita Yulyta Agustin',
+                email: Backend.useFirebase ? '' : 'leonita@demo.com',
+                phone: Backend.useFirebase ? '' : '081234567890',
+                address: Backend.useFirebase ? '' : 'Jl. Sudirman No. 123, Jakarta',
+                birthDate: Backend.useFirebase ? '' : '1995-06-15',
+                gender: Backend.useFirebase ? '' : 'Perempuan',
                 status: UserStatus.aktif,
               ),
             ),
@@ -218,13 +224,16 @@ class _SkinoraAppState extends State<SkinoraApp> {
         '/admin/edukasi/tambah': (context) => const TambahArtikelPage(),
         '/admin/edukasi/edit': (context) => EditArtikelPage(
               article: AdminArticleModel(
-                id: '1',
-                title: 'Mengenal Tipe Kulit Wajah Anda',
-                category: 'Kulit Dasar',
-                date: '2026-08-01',
-                content:
-                    'Pelajari cara mengenali tipe kulit wajah Anda untuk perawatan yang lebih tepat.',
-                status: ArticleStatus.diterbitkan,
+                id: Backend.useFirebase ? '' : '1',
+                title: Backend.useFirebase ? '' : 'Mengenal Tipe Kulit Wajah Anda',
+                category: Backend.useFirebase ? '' : 'Kulit Dasar',
+                date: Backend.useFirebase ? '' : '2026-08-01',
+                content: Backend.useFirebase
+                    ? ''
+                    : 'Pelajari cara mengenali tipe kulit wajah Anda untuk perawatan yang lebih tepat.',
+                status: Backend.useFirebase
+                    ? ArticleStatus.draf
+                    : ArticleStatus.diterbitkan,
               ),
             ),
         '/admin/laporan': (context) => const LaporanRiwayatPage(),
@@ -254,12 +263,52 @@ class _SkinoraAppState extends State<SkinoraApp> {
         '/pengguna/edukasi': (context) => const EdukasiKulitPenggunaPage(),
         '/pengguna/detail-edukasi': (context) => const DetailEdukasiPenggunaPage(),
         '/pengguna/skin-check/pertanyaan-1': (context) => const SkinCheckQuestion1Page(),
-        '/pengguna/skin-check/pertanyaan-2': (context) => const SkinCheckQuestion2Page(age: '20'),
-        '/pengguna/skin-check/pertanyaan-3': (context) => const SkinCheckQuestion3Page(age: '20', gender: 'Perempuan'),
-        '/pengguna/skin-check/pertanyaan-4': (context) => const SkinCheckQuestion4Page(age: '20', gender: 'Perempuan', conditionAfterWash: 'Terasa cukup nyaman'),
-        '/pengguna/skin-check/pertanyaan-5': (context) => const SkinCheckQuestion5Page(age: '20', gender: 'Perempuan', conditionAfterWash: 'Terasa cukup nyaman', oilCondition: 'Sedikit berminyak, terutama di area tertentu'),
-        '/pengguna/skin-check/pertanyaan-6': (context) => const SkinCheckQuestion6Page(age: '20', gender: 'Perempuan', conditionAfterWash: 'Terasa cukup nyaman', oilCondition: 'Sedikit berminyak, terutama di area tertentu', sensitivity: 'Kadang mengalami kemerahan atau iritasi'),
-        '/pengguna/skin-check/pertanyaan-7': (context) => const SkinCheckQuestion7Page(age: '20', gender: 'Perempuan', conditionAfterWash: 'Terasa cukup nyaman', oilCondition: 'Sedikit berminyak, terutama di area tertentu', sensitivity: 'Kadang mengalami kemerahan atau iritasi', humidity: '74%'),
+        '/pengguna/skin-check/pertanyaan-2': (context) =>
+            SkinCheckQuestion2Page(age: Backend.useFirebase ? '' : '20'),
+        '/pengguna/skin-check/pertanyaan-3': (context) => SkinCheckQuestion3Page(
+              age: Backend.useFirebase ? '' : '20',
+              gender: Backend.useFirebase ? '' : 'Perempuan',
+            ),
+        '/pengguna/skin-check/pertanyaan-4': (context) => SkinCheckQuestion4Page(
+              age: Backend.useFirebase ? '' : '20',
+              gender: Backend.useFirebase ? '' : 'Perempuan',
+              conditionAfterWash:
+                  Backend.useFirebase ? '' : 'Terasa cukup nyaman',
+            ),
+        '/pengguna/skin-check/pertanyaan-5': (context) => SkinCheckQuestion5Page(
+              age: Backend.useFirebase ? '' : '20',
+              gender: Backend.useFirebase ? '' : 'Perempuan',
+              conditionAfterWash:
+                  Backend.useFirebase ? '' : 'Terasa cukup nyaman',
+              oilCondition: Backend.useFirebase
+                  ? ''
+                  : 'Sedikit berminyak, terutama di area tertentu',
+            ),
+        '/pengguna/skin-check/pertanyaan-6': (context) => SkinCheckQuestion6Page(
+              age: Backend.useFirebase ? '' : '20',
+              gender: Backend.useFirebase ? '' : 'Perempuan',
+              conditionAfterWash:
+                  Backend.useFirebase ? '' : 'Terasa cukup nyaman',
+              oilCondition: Backend.useFirebase
+                  ? ''
+                  : 'Sedikit berminyak, terutama di area tertentu',
+              sensitivity: Backend.useFirebase
+                  ? ''
+                  : 'Kadang mengalami kemerahan atau iritasi',
+            ),
+        '/pengguna/skin-check/pertanyaan-7': (context) => SkinCheckQuestion7Page(
+              age: Backend.useFirebase ? '' : '20',
+              gender: Backend.useFirebase ? '' : 'Perempuan',
+              conditionAfterWash:
+                  Backend.useFirebase ? '' : 'Terasa cukup nyaman',
+              oilCondition: Backend.useFirebase
+                  ? ''
+                  : 'Sedikit berminyak, terutama di area tertentu',
+              sensitivity: Backend.useFirebase
+                  ? ''
+                  : 'Kadang mengalami kemerahan atau iritasi',
+              humidity: Backend.useFirebase ? '' : '74%',
+            ),
         '/pengguna/skin-check/hasil': (context) => const SkinCheckResultPage(),
         '/pengguna/skin-check/riwayat': (context) => const RiwayatSkinCheckPage(),
         '/pengguna/edit-profil': (context) => const EditProfilPenggunaPage(),

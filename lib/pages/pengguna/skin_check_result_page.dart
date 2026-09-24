@@ -11,9 +11,9 @@ class SkinCheckResultPage extends StatelessWidget {
 
   const SkinCheckResultPage({
     super.key,
-    this.skinType = 'Normal',
-    this.sensitivity = 'Sensitif',
-    this.acneRisk = 'Tidak Rentan',
+    this.skinType = '',
+    this.sensitivity = '',
+    this.acneRisk = '',
     this.onNavigateTab,
   });
 
@@ -240,7 +240,7 @@ class SkinCheckResultPage extends StatelessWidget {
 
           // Big Skin Type: "Normal"
           Text(
-            skinType,
+            skinType.isEmpty ? '-' : skinType,
             style: const TextStyle(
               fontFamily: 'serif',
               fontSize: 26.0,
@@ -283,7 +283,7 @@ class SkinCheckResultPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        sensitivity,
+                        sensitivity.isEmpty ? '-' : sensitivity,
                         style: const TextStyle(
                           fontSize: 13.5,
                           fontWeight: FontWeight.bold,
@@ -306,14 +306,14 @@ class SkinCheckResultPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(
-                    children: const [
-                      Icon(
+                    children: [
+                      const Icon(
                         LucideIcons.triangleAlert,
                         size: 20,
                         color: primaryMaroon,
                       ),
-                      SizedBox(height: 6),
-                      Text(
+                      const SizedBox(height: 6),
+                      const Text(
                         'RISIKO JERAWAT',
                         style: TextStyle(
                           fontSize: 9.5,
@@ -322,10 +322,10 @@ class SkinCheckResultPage extends StatelessWidget {
                           letterSpacing: 0.5,
                         ),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
-                        'Tidak Rentan',
-                        style: TextStyle(
+                        acneRisk.isEmpty ? '-' : acneRisk,
+                        style: const TextStyle(
                           fontSize: 13.5,
                           fontWeight: FontWeight.bold,
                           color: primaryMaroon,

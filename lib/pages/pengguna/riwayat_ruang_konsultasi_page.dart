@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/consultation_service.dart';
+import '../../utils/app_dates.dart';
 
 class ConsultationChatMessage {
   final String id;
@@ -27,8 +30,8 @@ class RiwayatRuangKonsultasiPage extends StatefulWidget {
 
   const RiwayatRuangKonsultasiPage({
     super.key,
-    this.doctorName = 'dr. Anita Dewi, Sp.KK',
-    this.status = 'Terjadwal',
+    this.doctorName = '',
+    this.status = '',
     this.consultationId,
     this.onNavigateTab,
   });
@@ -50,6 +53,7 @@ class _RiwayatRuangKonsultasiPageState
 
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  StreamSubscription<List<Map<String, dynamic>>>? _msgSub;
 
   List<ConsultationChatMessage> _messages = Backend.useFirebase
       ? <ConsultationChatMessage>[]
@@ -116,40 +120,49 @@ class _RiwayatRuangKonsultasiPageState
     _loadFromBackend();
   }
 
-  /// Pesan konsultasi dari Firestore. Tanpa Firebase, seed demo tetap
-  /// dipakai agar UI/tes tidak berubah.
-  Future<void> _loadFromBackend() async {
+  /// Streaming pesan konsultasi dari Firestore. Tanpa Firebase, seed demo
+  /// tetap dipakai agar UI/tes tidak berubah.
+  void _loadFromBackend() {
     if (!Backend.useFirebase) return;
     final consultationId = widget.consultationId;
     if (consultationId == null ||
         consultationId.isEmpty ||
         consultationId.contains(RegExp(r'^\d+$'))) {
-      if (!mounted) return;
-      setState(() => _messages = <ConsultationChatMessage>[]);
+      _messages = const <ConsultationChatMessage>[];
       return;
     }
-    try {
-      final items = await ConsultationService.loadMessages(consultationId);
-      if (!mounted) return;
-      setState(() {
-        _messages = items.map((m) {
-          final senderRole = (m['senderRole'] as String?) ?? '';
-          return ConsultationChatMessage(
-            id: (m['id'] as String?) ?? '',
-            text: (m['text'] as String?) ?? '',
-            time: (m['time'] as String?) ?? '',
-            isFromUser: senderRole == 'user',
-          );
-        }).toList();
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _messages = <ConsultationChatMessage>[]);
-    }
+    _msgSub = ConsultationService.messageStream(consultationId).listen(
+      (items) {
+        if (!mounted) return;
+        setState(() {
+          _messages = items.map((m) {
+            final senderRole = (m['senderRole'] as String?) ?? '';
+            return ConsultationChatMessage(
+              id: (m['id'] as String?) ?? '',
+              text: (m['text'] as String?) ?? '',
+              time: (m['time'] as String?) ?? '',
+              isFromUser: senderRole == 'user',
+            );
+          }).toList();
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients) {
+            _scrollController.jumpTo(
+              _scrollController.position.maxScrollExtent,
+            );
+          }
+        });
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(() => _messages = const <ConsultationChatMessage>[]);
+      },
+    );
   }
 
   @override
   void dispose() {
+    _msgSub?.cancel();
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -159,9 +172,7 @@ class _RiwayatRuangKonsultasiPageState
     final text = _textController.text.trim();
     if (text.isEmpty) return;
 
-    final now = DateTime.now();
-    final timeStr =
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final timeStr = AppDates.hm(AppDates.nowWib());
 
     final consultationId = widget.consultationId;
     if (Backend.useFirebase &&
