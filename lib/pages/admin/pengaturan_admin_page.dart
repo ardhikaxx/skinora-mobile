@@ -4,6 +4,7 @@ import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
+import '../../services/notification_service.dart';
 import '../../services/user_service.dart';
 
 class PengaturanAdminPage extends StatefulWidget {
@@ -50,6 +51,10 @@ class _PengaturanAdminPageState extends State<PengaturanAdminPage> {
       try {
         await UserService.updateSettings(
           uid,
+          notificationsEnabled: _enableNotifications,
+        );
+        // Sinkronkan permission OS + state toggle notifikasi aplikasi.
+        await NotificationService.applyNotificationSettings(
           notificationsEnabled: _enableNotifications,
         );
       } catch (e) {
@@ -172,7 +177,7 @@ class _PengaturanAdminPageState extends State<PengaturanAdminPage> {
                         ),
                         Switch.adaptive(
                           value: _enableNotifications,
-                          activeColor: primaryMaroon,
+                          activeThumbColor: primaryMaroon,
                           onChanged: (val) {
                             setState(() {
                               _enableNotifications = val;

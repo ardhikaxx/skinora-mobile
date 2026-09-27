@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../services/backend.dart';
+import '../services/notification_payload.dart';
+import '../services/notification_service.dart';
 import '../utils/app_dates.dart';
 
 class SlotRecord {
@@ -164,6 +166,16 @@ class ScheduleService {
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
+    await NotificationService.notifyUser(
+      uid: doctorUid,
+      title: 'Jadwal Ditambahkan',
+      description: 'Slot $date $time berhasil ditambahkan ke jadwal praktik.',
+      iconKey: 'calendar',
+      type: NotificationType.scheduleCreated,
+      entityId: ref.id,
+      audienceRole: NotificationRole.dokter,
+      createdBy: doctorUid,
+    );
     return ref.id;
   }
 
@@ -183,7 +195,20 @@ class ScheduleService {
     if ((snap.data()?['isBooked'] as bool?) ?? false) {
       throw StateError('Slot sudah dibooking dan tidak dapat dihapus.');
     }
+    final m = snap.data() ?? const <String, dynamic>{};
+    final date = (m['date'] as String?) ?? '';
+    final time = (m['time'] as String?) ?? '';
     await ref.delete();
+    await NotificationService.notifyUser(
+      uid: doctorUid,
+      title: 'Jadwal Dihapus',
+      description: 'Slot $date $time dihapus dari jadwal praktik.',
+      iconKey: 'calendar',
+      type: NotificationType.scheduleCancelled,
+      entityId: slotId,
+      audienceRole: NotificationRole.dokter,
+      createdBy: doctorUid,
+    );
   }
 
   static Future<void> setAvailability(
@@ -195,5 +220,17 @@ class ScheduleService {
       'isAvailable': isAvailable,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+    await NotificationService.notifyUser(
+      uid: doctorUid,
+      title: isAvailable ? 'Praktik Dibuka' : 'Praktik Ditutup',
+      description: isAvailable
+          ? 'Ketersediaan jadwal diubah: praktik dibuka untuk booking.'
+          : 'Ketersediaan jadwal diubah: praktik ditutup untuk booking.',
+      iconKey: 'calendar',
+      type: NotificationType.scheduleChanged,
+      entityId: 'availability-${DateTime.now().millisecondsSinceEpoch}',
+      audienceRole: NotificationRole.dokter,
+      createdBy: doctorUid,
+    );
   }
 }

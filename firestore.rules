@@ -154,114 +154,61 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys()
                 .hasOnly(['isBooked', 'patientId', 'patientName', 'updatedAt']));
       }
-    }
 
-    // Pre-provision admin: doc ID = email lowercase (dipakai saat register).
-    match /provisioned_accounts/{doc} {
-      allow read: if isAdmin()
-        || (signedIn()
-          && resource.data.email == request.auth.token.email
-          && resource.data.consumedByUid == null);
-      allow create, delete: if isAdmin();
-      allow update: if isAdmin()
-        || (signedIn()
-          && resource.data.email == request.auth.token.email
-          && resource.data.consumedByUid == null
-          && request.resource.data.consumedByUid == request.auth.uid
-          && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['consumedByUid', 'updatedAt']));
-    }
+      // Registry token FCM per perangkat aktif (push notification).
+      // Satu dokumen per device_id sehingga token lama otomatis tergantikan.
+      match /devices/{deviceId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && request.resource.data.token is string
+          && request.resource.data.token.size() > 0
+          && request.resource.data.token.size() <= 4096
+          && request.resource.data.deviceId == deviceId
+          && request.resource.data.isActive is bool;
+        // Menonaktifkan perangkat saat logout / kehilangan device.
+        allow delete: if isOwner(uid) || isAdmin();
+      }
 
-    match /specializations/{doc} {
-      allow read: if signedIn();
-      allow create, update: if isAdmin();
-      // Integrity: hard delete hanya admin — service memverifikasi referensi
-      // dokter di client; rules tidak punya query koleksi.
-      allow delete: if isAdmin();
-    }
+      // Notification persisten milik satu user: users/{uid}/notifications/{id}.
+      // Tidak ada koleksi global → role lain tidak mungkin membaca isinya.
+      match /notifications/{doc} {
+        // Baca: hanya pemilik (atau admin untuk audit).
+        allow read: if isOwner(uid) || isAdmin();
 
-    match /articles/{doc} {
-      allow read: if isAdmin()
-        || (signedIn() && resource.data.status == 'diterbitkan');
-      allow create: if isAdmin()
-        && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.updatedBy == request.auth.uid
-        && request.resource.data.status in ['draf', 'diterbitkan']
-        && request.resource.data.createdAt == request.time;
-      allow update: if isAdmin()
-        && request.resource.data.createdBy == resource.data.createdBy
-        && request.resource.data.createdAt == resource.data.createdAt
-        && request.resource.data.status in ['draf', 'diterbitkan']
-        && request.resource.data.updatedBy == request.auth.uid;
-      allow delete: if isAdmin();
-    }
-
-    match /activities/{doc} {
-      allow read: if isAdmin()
-        || (signedIn() && resource.data.actorUid == request.auth.uid);
-      allow create: if signedIn()
-        && request.resource.data.actorUid == request.auth.uid
-        && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.createdAt == request.time
-        && request.resource.data.title is string
-        && request.resource.data.title.size() > 0
-        && request.resource.data.title.size() <= 200
-        && request.resource.data.tag in [
-          'Login', 'Skin Check', 'Skin Daily', 'Skincare', 'Booking',
-          'Konsultasi', 'Review', 'Verifikasi', 'Artikel', 'Profil',
-          'Pengguna', 'Dokter', 'Spesialisasi'
-        ]
-        && userExists(request.auth.uid)
-        && request.resource.data.actor == userData(request.auth.uid).name;
-      allow update: if false;
-      allow delete: if isAdmin();
-    }
-
-    match /notifications/{doc} {
-      allow read: if isAdmin()
-        || (signedIn() && (
-          resource.data.audience == 'user:' + request.auth.uid
-          || (resource.data.audience == 'role:admin' && isAdmin())
-        ));
-
-      // Create: recipient diverifikasi via recipientUid.
-      // - audience role:admin: hanya admin (broadcast platform).
-      // - audience user:{uid}: ke diri sendiri, atau lewat care_link
-      //   (pasien→dokternya / dokter→pasiennya), atau oleh admin.
-      allow create: if signedIn()
-        && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.title is string
-        && request.resource.data.title.size() > 0
-        && request.resource.data.title.size() <= 200
-        && request.resource.data.description is string
-        && request.resource.data.description.size() <= 1000
-        && request.resource.data.isUnread == true
-        && request.resource.data.createdAt == request.time
-        && (
-          (
-            request.resource.data.audience == 'role:admin'
-            && request.resource.data.recipientUid == ''
-            && isAdmin()
-          )
-          || (
-            request.resource.data.audience == 'user:' + request.resource.data.recipientUid
-            && (
-              request.resource.data.recipientUid == request.auth.uid
-              || isAdmin()
-              || hasCareLink(request.auth.uid, request.resource.data.recipientUid)
-              || hasCareLink(request.resource.data.recipientUid, request.auth.uid)
-            )
-          )
-        );
-
-      allow update: if isAdmin()
-        || (signedIn()
+        // Create: penulis boleh = pemilik, ATAU pihak yang punya care_link
+        // (pasien → dokternya, dokter → pasiennya), ATAU admin.
+        // Kolom {uid} di path wajib sama dengan recipientUid dokumen sehingga
+        // user tidak dapat menulis notifikasi ke dirinya sendiri atas nama
+        // orang lain.
+        allow create: if signedIn()
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.recipientUid == uid
+          && request.resource.data.audience == 'user:' + uid
+          && request.resource.data.title is string
+          && request.resource.data.title.size() > 0
+          && request.resource.data.title.size() <= 200
+          && request.resource.data.description is string
+          && request.resource.data.description.size() <= 1000
+          && request.resource.data.isUnread == true
+          && request.resource.data.createdAt == request.time
           && (
-            resource.data.audience == 'user:' + request.auth.uid
-            || (resource.data.audience == 'role:admin' && isAdmin())
-          )
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isUnread']));
-      allow delete: if isAdmin();
+            isAdmin()
+            || uid == request.auth.uid
+            || hasCareLink(request.auth.uid, uid)
+            || hasCareLink(uid, request.auth.uid)
+          );
+
+        // Update: pemilik hanya boleh mengubah status baca.
+        allow update: if isOwner(uid)
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.recipientUid == resource.data.recipientUid
+          && request.resource.data.audience == resource.data.audience
+          && request.resource.data.isUnread == false
+          && request.resource.data.isRead == true
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['isUnread', 'isRead', 'readAt']);
+        allow delete: if isAdmin();
+      }
     }
 
     match /care_links/{doc} {

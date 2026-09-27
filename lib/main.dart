@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
 import 'services/backend.dart';
+import 'services/notification_router.dart';
+import 'services/notification_service.dart';
 import 'pages/auth/login_page.dart';
 import 'pages/auth/register_page.dart';
 import 'pages/admin/admin_main_page.dart';
@@ -102,6 +104,12 @@ Future<void> main() async {
       debugPrint('Gagal mengaktifkan emulator: $e');
     }
   }
+
+  // Infrastruktur notifikasi diinisialisasi SETELAH Firebase.initializeApp
+  // dan SEBELUM runApp sehingga shell role sudah memiliki FCM, local
+  // notification channel, permission request, dan deep-link router.
+  NotificationRouter.configure(navigatorKey: rootNavigatorKey);
+  await NotificationService.init();
 
   runApp(const SkinoraApp());
 }

@@ -1,11 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/empty_state.dart';
 import '../../services/activity_service.dart';
+import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/consultation_service.dart';
-import '../../services/notification_service.dart';
+import '../../services/notification_controller.dart';
 import '../../services/user_service.dart';
 import '../../utils/app_dates.dart';
 import 'notifikasi_admin_page.dart';
@@ -40,6 +42,9 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
   String _statDokter = Backend.useFirebase ? '0' : '4';
   String _unreadNotif = Backend.useFirebase ? '0' : '2';
 
+  /// Badge lonceng realtime (shared listener — lihat NotificationController).
+  ValueListenable<int>? _unreadListenable;
+
   List<Map<String, String>> _activities = Backend.useFirebase
       ? const <Map<String, String>>[]
       : const <Map<String, String>>[
@@ -54,7 +59,33 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
   @override
   void initState() {
     super.initState();
+    _subscribeUnreadBadge();
     _loadFromBackend();
+  }
+
+  /// Badge notifikasi per-admin (`audience = user:{uid}`) agar state baca
+  /// per admin benar — bukan `role:admin` yang menjadi satu tumpukan bersama.
+  void _subscribeUnreadBadge() {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    final listenable =
+        NotificationController.unread(uid);
+    _unreadListenable = listenable;
+    listenable.addListener(_onUnreadChanged);
+    _unreadNotif = '${listenable.value}';
+  }
+
+  void _onUnreadChanged() {
+    final value = '${_unreadListenable?.value ?? 0}';
+    if (!mounted || value == _unreadNotif) return;
+    setState(() => _unreadNotif = value);
+  }
+
+  @override
+  void dispose() {
+    _unreadListenable?.removeListener(_onUnreadChanged);
+    super.dispose();
   }
 
   String _fmtTime(Object? ts) {
@@ -74,21 +105,18 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
         ConsultationService.countByStatus('terjadwal'),
         ConsultationService.countByStatus('selesai'),
         ActivityService.listAll(limit: 6),
-        NotificationService.countUnread(NotificationService.adminAudience),
       ]);
       final pengguna = results[0] as int?;
       final dokter = results[1] as int?;
       final terjadwal = results[2] as int?;
       final selesai = results[3] as int?;
       final acts = results[4] as List<Map<String, dynamic>>?;
-      final unread = results[5] as int?;
       if (!mounted) return;
       setState(() {
         if (pengguna != null) _statPengguna = '$pengguna';
         if (dokter != null) _statDokter = '$dokter';
         if (terjadwal != null) _statTerjadwal = '$terjadwal';
         if (selesai != null) _statSelesai = '$selesai';
-        if (unread != null) _unreadNotif = '$unread';
         _activities = acts
                 ?.map((a) => <String, String>{
                       'title': (a['title'] as String?) ?? '',
@@ -105,7 +133,6 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
         _statSelesai = '0';
         _statPengguna = '0';
         _statDokter = '0';
-        _unreadNotif = '0';
         _activities = <Map<String, String>>[];
       });
     }

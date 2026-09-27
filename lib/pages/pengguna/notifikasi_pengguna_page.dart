@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -5,6 +7,8 @@ import '../../components/empty_state.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
+import '../../services/notification_payload.dart';
+import '../../services/notification_router.dart';
 import '../../services/notification_service.dart';
 import '../../utils/app_dates.dart';
 
@@ -16,6 +20,10 @@ class PenggunaNotificationModel {
   final IconData icon;
   bool isUnread;
 
+  /// Salinan dokumen Firestore — dipakai NotificationRouter.open() ketika
+  /// user mengetuk notifikasi. Kosong untuk seed demo.
+  final Map<String, dynamic> raw;
+
   PenggunaNotificationModel({
     required this.id,
     required this.title,
@@ -23,6 +31,7 @@ class PenggunaNotificationModel {
     required this.time,
     required this.icon,
     required this.isUnread,
+    this.raw = const <String, dynamic>{},
   });
 }
 
@@ -85,7 +94,78 @@ class _NotifikasiPenggunaPageState extends State<NotifikasiPenggunaPage> {
   @override
   void initState() {
     super.initState();
-    _loadFromBackend();
+    _subscribeFeed();
+    _scroll.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _feedSub?.cancel();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  StreamSubscription<List<Map<String, dynamic>>>? _feedSub;
+  final ScrollController _scroll = ScrollController();
+  bool _loadingOlder = false;
+  bool _hasMore = true;
+
+  PenggunaNotificationModel _toModel(Map<String, dynamic> m) {
+    final title = (m['title'] as String?) ?? '';
+    return PenggunaNotificationModel(
+      id: (m['id'] as String?) ?? '',
+      title: title,
+      description: (m['description'] as String?) ?? '',
+      time: _fmtTime(m['createdAt']),
+      icon: _iconFor(title, (m['type'] as String?) ?? ''),
+      isUnread: m['isUnread'] == true || m['isRead'] == false,
+      raw: m,
+    );
+  }
+
+  /// Feed realtime halaman pertama (order createdAt desc).
+  void _subscribeFeed() {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    _feedSub =
+        NotificationService.streamForUser(uid)
+            .listen((items) {
+      if (!mounted) return;
+      setState(() {
+        _notifications
+          ..clear()
+          ..addAll(items.map(_toModel));
+        _hasMore = items.length >= NotificationService.pageSize;
+      });
+    }, onError: (_) {
+      // Stream gagal (mis. offline) → biarkan daftar terakhir, jangan hapus.
+    });
+  }
+
+  /// Pagination: muat halaman berikutnya saat mendekati akhir daftar.
+  void _onScroll() {
+    if (_loadingOlder || !_hasMore || _notifications.isEmpty) return;
+    if (_scroll.position.extentAfter > 240) return;
+    final uid = AuthService.uid;
+    if (!Backend.useFirebase || uid == null) return;
+    _loadingOlder = true;
+    NotificationService.loadOlderForUser(
+      uid,
+      limit: NotificationService.pageSize,
+      afterCreatedAt: _notifications.isNotEmpty
+          ? _notifications.last.raw['createdAt']
+          : null,
+    ).then((items) {
+      if (!mounted) return;
+      setState(() {
+        final known = _notifications.map((n) => n.id).toSet();
+        _notifications.addAll(
+          items.map(_toModel).where((n) => !known.contains(n.id)),
+        );
+        _hasMore = items.length >= NotificationService.pageSize;
+      });
+    }).whenComplete(() => _loadingOlder = false);
   }
 
   String _fmtTime(Object? ts) {
@@ -100,37 +180,8 @@ class _NotifikasiPenggunaPageState extends State<NotifikasiPenggunaPage> {
     return LucideIcons.bell;
   }
 
-  /// Notifikasi audience pengguna dari Firestore. Tanpa Firebase, seed demo
-  /// tetap dipakai agar UI/tes tidak berubah.
-  Future<void> _loadFromBackend() async {
-    if (!Backend.useFirebase) return;
-    final uid = AuthService.uid;
-    if (uid == null) return;
-    try {
-      final items = await NotificationService.listAudience(
-        NotificationService.userAudience(uid),
-      );
-      if (!mounted) return;
-      setState(() {
-        _notifications
-          ..clear()
-          ..addAll(items.map((m) {
-            final title = (m['title'] as String?) ?? '';
-            return PenggunaNotificationModel(
-              id: (m['id'] as String?) ?? '',
-              title: title,
-              description: (m['description'] as String?) ?? '',
-              time: _fmtTime(m['createdAt']),
-              icon: _iconFor(title, (m['type'] as String?) ?? ''),
-              isUnread: m['isUnread'] == true,
-            );
-          }));
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(_notifications.clear);
-    }
-  }
+  /// Notifikasi audience pengguna di-stream realtime oleh [_subscribeFeed].
+  /// Tanpa Firebase, seed demo tetap dipakai agar UI/tes tidak berubah.
 
   @override
   Widget build(BuildContext context) {
@@ -219,6 +270,7 @@ class _NotifikasiPenggunaPageState extends State<NotifikasiPenggunaPage> {
                           'Notifikasi booking, konsultasi, dan pengingat Skin Daily akan muncul di sini.',
                     )
                   : ListView.builder(
+                      controller: _scroll,
                       padding: const EdgeInsets.symmetric(horizontal: 20.0),
                       itemCount: _notifications.length,
                       itemBuilder: (context, index) {
@@ -270,8 +322,13 @@ class _NotifikasiPenggunaPageState extends State<NotifikasiPenggunaPage> {
                 item.isUnread = false;
               });
             }
-            if (Backend.useFirebase && !item.id.contains(RegExp(r'^\d+$'))) {
-              NotificationService.markRead(item.id).catchError((_) {});
+            final isDemoItem = item.id.contains(RegExp(r'^\d+$'));
+            if (Backend.useFirebase && !isDemoItem) {
+              NotificationService.markRead(AuthService.uid ?? '', item.id).catchError((_) {});
+              if (item.raw.isNotEmpty) {
+                NotificationRouter.open(AppNotification.fromMap(item.raw))
+                    .catchError((_) {});
+              }
             }
           },
           child: Padding(

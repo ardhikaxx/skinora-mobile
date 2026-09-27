@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_profile.dart';
 import '../services/activity_service.dart';
 import '../services/backend.dart';
+import '../services/notification_payload.dart';
 import '../services/notification_service.dart';
 
 /// Entity konsultasi + chat + booking.
@@ -131,7 +132,9 @@ class ConsultationService {
       description:
           '${patient.name} memesan konsultasi untuk jadwal $scheduleDate $scheduleTime',
       iconKey: 'calendar',
-      type: 'booking',
+      type: NotificationType.bookingCreated,
+      entityId: consultationRef.id,
+      audienceRole: NotificationRole.dokter,
       createdBy: patient.uid,
     );
     await NotificationService.notifyUser(
@@ -140,7 +143,20 @@ class ConsultationService {
       description:
           'Konsultasi dengan $doctorName pada $scheduleDate $scheduleTime telah dijadwalkan.',
       iconKey: 'calendar',
-      type: 'booking',
+      type: NotificationType.bookingCreated,
+      entityId: consultationRef.id,
+      route: NotificationPageRoute.penggunaRiwayatKonsultasi,
+      audienceRole: NotificationRole.pengguna,
+      createdBy: patient.uid,
+    );
+    // Admin dashboard: booking baru (satu dokumen per admin, idempoten).
+    await NotificationService.notifyAdmins(
+      title: 'Konsultasi Baru',
+      body: '${patient.name} memesan konsultasi dengan $doctorName '
+          'pada $scheduleDate $scheduleTime',
+      type: NotificationType.bookingCreated,
+      iconKey: 'calendar',
+      entityId: consultationRef.id,
       createdBy: patient.uid,
     );
     return consultationRef.id;
@@ -261,19 +277,39 @@ class ConsultationService {
   static Future<void> markBerlangsung(String id) async {
     if (!Backend.useFirebase) return;
     final ref = _col.doc(id);
-    await _db.runTransaction((tx) async {
+    String patientId = '';
+    String doctorId = '';
+    String doctorName = '';
+    final bool started = await _db.runTransaction((tx) async {
       final snap = await tx.get(ref);
       if (!snap.exists) throw StateError('Konsultasi tidak ditemukan.');
       final status = (snap.data()?['status'] as String?) ?? 'terjadwal';
-      if (status == 'selesai' || status == 'berlangsung') return;
+      if (status == 'selesai' || status == 'berlangsung') return false;
       if (status != 'terjadwal') {
         throw StateError('Status konsultasi tidak valid untuk dimulai.');
       }
+      patientId = (snap.data()?['patientId'] as String?) ?? '';
+      doctorId = (snap.data()?['doctorId'] as String?) ?? '';
+      doctorName = (snap.data()?['doctorName'] as String?) ?? '';
       tx.update(ref, {
         'status': 'berlangsung',
         'updatedAt': FieldValue.serverTimestamp(),
       });
+      return true;
     });
+    if (!started || patientId.isEmpty) return;
+    // Pemberitahuan ke pasien: konsultasi dimulai (actor = dokter).
+    await NotificationService.notifyUser(
+      uid: patientId,
+      title: 'Konsultasi Dimulai',
+      description:
+          'Konsultasi bersama $doctorName sudah dimulai. Silakan masuk ke ruang konsultasi.',
+      iconKey: 'messageSquare',
+      type: NotificationType.consultationStarted,
+      entityId: id,
+      audienceRole: NotificationRole.pengguna,
+      createdBy: doctorId,
+    );
   }
 
   /// Menyelesaikan konsultasi (dokter) + activity log.
@@ -287,11 +323,13 @@ class ConsultationService {
   }) async {
     if (!Backend.useFirebase) return;
     final ref = _col.doc(id);
-    await _db.runTransaction((tx) async {
+    String patientId = '';
+    final bool finished = await _db.runTransaction((tx) async {
       final snap = await tx.get(ref);
       if (!snap.exists) throw StateError('Konsultasi tidak ditemukan.');
       final status = (snap.data()?['status'] as String?) ?? 'terjadwal';
-      if (status == 'selesai') return;
+      patientId = (snap.data()?['patientId'] as String?) ?? '';
+      if (status == 'selesai') return false;
       if (status != 'berlangsung' && status != 'terjadwal') {
         throw StateError('Status konsultasi tidak dapat diselesaikan.');
       }
@@ -302,19 +340,41 @@ class ConsultationService {
         'updatedAt': FieldValue.serverTimestamp(),
         'completedAt': FieldValue.serverTimestamp(),
       });
+      return true;
     });
+    if (!finished) return;
     await ActivityService.log(
       title: 'Konsultasi selesai dengan $patientName',
       tag: 'Konsultasi',
       actor: doctorName,
       actorUid: doctorUid,
     );
+    // Pasien: konsultasi selesai + ajakan memberi rating (actor = dokter).
+    if (patientId.isNotEmpty) {
+      await NotificationService.notifyUser(
+        uid: patientId,
+        title: 'Konsultasi Selesai',
+        description:
+            'Konsultasi bersama $doctorName telah selesai. Berikan penilaian agar dokter dapat membantu lebih baik.',
+        iconKey: 'check',
+        type: NotificationType.consultationCompleted,
+        entityId: id,
+        route: NotificationPageRoute.penggunaRiwayatKonsultasi,
+        audienceRole: NotificationRole.pengguna,
+        createdBy: doctorUid,
+      );
+    }
+    // Dokter: ringkasan tindakan miliknya (actor = dokter sendiri, diizinkan
+    // Security Rules karena audience = dirinya sendiri).
     await NotificationService.notifyUser(
       uid: doctorUid,
       title: 'Konsultasi Selesai',
       description: 'Konsultasi dengan $patientName telah diselesaikan.',
       iconKey: 'check',
-      type: 'konsultasi',
+      type: NotificationType.consultationCompleted,
+      entityId: id,
+      route: NotificationPageRoute.dokterRiwayat,
+      audienceRole: NotificationRole.dokter,
       createdBy: doctorUid,
     );
   }
@@ -361,5 +421,35 @@ class ConsultationService {
       'time': time,
       'createdAt': FieldValue.serverTimestamp(),
     });
+
+    // Notifikasi ke lawan bicara. Isi pesan TIDAK pernah disertakan — cukup
+    // pemberitahuan generik agar privasi chat terjaga.
+    try {
+      final consult = await _col.doc(consultationId).get();
+      final data = consult.data();
+      if (data == null) return;
+      final patientId = (data['patientId'] as String?) ?? '';
+      final doctorId = (data['doctorId'] as String?) ?? '';
+      final doctorName = (data['doctorName'] as String?) ?? '';
+      final senderIsDoctor = senderRole == 'dokter';
+      final target = senderIsDoctor ? patientId : doctorId;
+      if (target.isEmpty || target == senderId) return;
+      await NotificationService.notifyUser(
+        uid: target,
+        title: 'Pesan Baru',
+        description: senderIsDoctor
+            ? 'Anda menerima pesan baru dari $doctorName.'
+            : 'Anda menerima pesan baru dari pasien.',
+        iconKey: 'messageSquare',
+        type: NotificationType.consultationMessage,
+        entityId: consultationId,
+        audienceRole: senderIsDoctor
+            ? NotificationRole.pengguna
+            : NotificationRole.dokter,
+        createdBy: senderId,
+      );
+    } catch (_) {
+      // Notifikasi chat bersifat best-effort — pesan tetap tersimpan.
+    }
   }
 }

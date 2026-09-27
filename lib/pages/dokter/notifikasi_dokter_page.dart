@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -5,6 +7,8 @@ import '../../components/empty_state.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
+import '../../services/notification_payload.dart';
+import '../../services/notification_router.dart';
 import '../../services/notification_service.dart';
 import '../../utils/app_dates.dart';
 
@@ -16,6 +20,9 @@ class DoctorNotificationModel {
   final IconData icon;
   bool isUnread;
 
+  /// Salinan dokumen Firestore untuk deep-link (kosong di mode demo).
+  final Map<String, dynamic> raw;
+
   DoctorNotificationModel({
     required this.id,
     required this.title,
@@ -23,6 +30,7 @@ class DoctorNotificationModel {
     required this.time,
     required this.icon,
     required this.isUnread,
+    this.raw = const <String, dynamic>{},
   });
 }
 
@@ -71,7 +79,75 @@ class _NotifikasiDokterPageState extends State<NotifikasiDokterPage> {
   @override
   void initState() {
     super.initState();
-    _loadFromBackend();
+    _subscribeFeed();
+    _scroll.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _feedSub?.cancel();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  StreamSubscription<List<Map<String, dynamic>>>? _feedSub;
+  final ScrollController _scroll = ScrollController();
+  bool _loadingOlder = false;
+  bool _hasMore = true;
+
+  DoctorNotificationModel _toModel(Map<String, dynamic> m) {
+    final title = (m['title'] as String?) ?? '';
+    return DoctorNotificationModel(
+      id: (m['id'] as String?) ?? '',
+      title: title,
+      description: (m['description'] as String?) ?? '',
+      time: _fmtTime(m['createdAt']),
+      icon: _iconFor(title, (m['type'] as String?) ?? ''),
+      isUnread: m['isUnread'] == true || m['isRead'] == false,
+      raw: m,
+    );
+  }
+
+  /// Feed realtime audience dokter (order createdAt desc, halaman pertama).
+  void _subscribeFeed() {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    _feedSub =
+        NotificationService.streamForUser(uid)
+            .listen((items) {
+      if (!mounted) return;
+      setState(() {
+        _notifications
+          ..clear()
+          ..addAll(items.map(_toModel));
+        _hasMore = items.length >= NotificationService.pageSize;
+      });
+    }, onError: (_) {
+      // Stream gagal (mis. offline) → pertahankan daftar terakhir.
+    });
+  }
+
+  void _onScroll() {
+    if (_loadingOlder || !_hasMore || _notifications.isEmpty) return;
+    if (_scroll.position.extentAfter > 240) return;
+    final uid = AuthService.uid;
+    if (!Backend.useFirebase || uid == null) return;
+    _loadingOlder = true;
+    NotificationService.loadOlderForUser(
+      uid,
+      limit: NotificationService.pageSize,
+      afterCreatedAt: _notifications.last.raw['createdAt'],
+    ).then((items) {
+      if (!mounted) return;
+      setState(() {
+        final known = _notifications.map((n) => n.id).toSet();
+        _notifications.addAll(
+          items.map(_toModel).where((n) => !known.contains(n.id)),
+        );
+        _hasMore = items.length >= NotificationService.pageSize;
+      });
+    }).whenComplete(() => _loadingOlder = false);
   }
 
   String _fmtTime(Object? ts) {
@@ -89,39 +165,8 @@ class _NotifikasiDokterPageState extends State<NotifikasiDokterPage> {
     return LucideIcons.bell;
   }
 
-  /// Notifikasi audience dokter dari Firestore. Tanpa Firebase, seed demo
-  /// tetap dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil backend
-  /// selalu menggantikan seed — termasuk saat kosong.
-  Future<void> _loadFromBackend() async {
-    if (!Backend.useFirebase) return;
-    final uid = AuthService.uid;
-    if (uid == null) return;
-    try {
-      final items = await NotificationService.listAudience(
-        NotificationService.userAudience(uid),
-      );
-      if (!mounted) return;
-      setState(() {
-        _notifications
-          ..clear()
-          ..addAll(items.map((m) {
-            final title = (m['title'] as String?) ?? '';
-            return DoctorNotificationModel(
-              id: (m['id'] as String?) ?? '',
-              title: title,
-              description: (m['description'] as String?) ?? '',
-              time: _fmtTime(m['createdAt']),
-              icon: _iconFor(title, (m['type'] as String?) ?? ''),
-              isUnread: m['isUnread'] == true,
-            );
-          }));
-      });
-    } catch (_) {
-      // Query gagal → tampilkan kosong, jangan seed palsu di production.
-      if (!mounted) return;
-      setState(_notifications.clear);
-    }
-  }
+  /// Feed notifikasi audience dokter di-stream realtime oleh [_subscribeFeed].
+  /// Tanpa Firebase, seed demo tetap dipakai agar UI/tes tidak berubah.
 
   @override
   Widget build(BuildContext context) {
@@ -207,6 +252,7 @@ class _NotifikasiDokterPageState extends State<NotifikasiDokterPage> {
                           'Notifikasi booking pasien dan pengingat jadwal konsultasi akan muncul di sini.',
                     )
                   : ListView.separated(
+                      controller: _scroll,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 20.0,
                         vertical: 4.0,
@@ -260,7 +306,7 @@ class _NotifikasiDokterPageState extends State<NotifikasiDokterPage> {
               item.isUnread = false;
             });
             if (Backend.useFirebase && !item.id.contains(RegExp(r'^\d+$'))) {
-              NotificationService.markRead(item.id).catchError((_) {});
+              NotificationService.markRead(AuthService.uid ?? '', item.id).catchError((_) {});
             }
             _handleNotificationAction(item);
           },
@@ -360,6 +406,13 @@ class _NotifikasiDokterPageState extends State<NotifikasiDokterPage> {
   }
 
   void _handleNotificationAction(DoctorNotificationModel item) {
+    // Deep-link berbasis type/route — utama dan tidak pernah menebak judul.
+    if (Backend.useFirebase && item.raw.isNotEmpty) {
+      NotificationRouter.open(AppNotification.fromMap(item.raw))
+          .catchError((_) {});
+      return;
+    }
+    // Fallback lama untuk seed demo (judul mengandung kata kunci).
     if (item.title.contains('Booking')) {
       Navigator.pop(context);
       widget.onNavigateTab?.call(1); // Go to Jadwal

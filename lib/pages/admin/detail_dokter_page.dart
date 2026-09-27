@@ -6,6 +6,8 @@ import '../../models/admin_doctor_model.dart';
 import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
+import '../../services/notification_payload.dart';
+import '../../services/notification_service.dart';
 import '../../services/user_service.dart';
 
 class DetailDokterPage extends StatefulWidget {
@@ -46,6 +48,53 @@ class _DetailDokterPageState extends State<DetailDokterPage> {
       actor: 'Admin',
       actorUid: AuthService.uid ?? 'admin',
     );
+    await _notifyDoctor(updated);
+  }
+
+  /// Beritahu dokter tentang perubahan status akunnya (actor = admin).
+  ///
+  /// Dokter yang belum mendaftar masih di `provisioned_accounts` — tanpa
+  /// akun Auth, ia tidak bisa menerima notifikasi, jadi dilewati.
+  Future<void> _notifyDoctor(AdminDoctorModel d) async {
+    if (!Backend.useFirebase || !d.registered) return;
+    final uid = d.fsDocId ?? d.id;
+    if (uid.isEmpty) return;
+
+    String title;
+    String body;
+    String type;
+    switch (d.status) {
+      case DoctorStatus.terverifikasi:
+        title = 'Akun Terverifikasi';
+        body = 'Selamat! Akun dokter Anda telah diverifikasi dan siap '
+            'menerima konsultasi.';
+        type = NotificationType.doctorVerified;
+      case DoctorStatus.ditolak:
+        title = 'Verifikasi Ditolak';
+        body = 'Mohon maaf, verifikasi dokter Anda ditolak. Silakan perbarui '
+            'data dan ajukan kembali.';
+        type = NotificationType.doctorRejected;
+      case DoctorStatus.ditangguhkan:
+        title = 'Akun Ditangguhkan';
+        body = 'Akun dokter Anda ditangguhkan oleh admin. Hubungi admin untuk '
+            'informasi lebih lanjut.';
+        type = NotificationType.doctorSuspended;
+      case DoctorStatus.menunggu:
+      case DoctorStatus.semua:
+        return;
+    }
+
+    await NotificationService.notifyUser(
+      uid: uid,
+      title: title,
+      description: body,
+      iconKey: 'shield',
+      type: type,
+      route: NotificationPageRoute.dokterShell,
+      targetTab: NotificationTab.dokterProfil,
+      audienceRole: NotificationRole.dokter,
+      createdBy: AuthService.uid ?? '',
+    ).catchError((_) {});
   }
 
   Future<void> _applyStatus({

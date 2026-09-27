@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/empty_state.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/consultation_service.dart';
-import '../../services/notification_service.dart';
+import '../../services/notification_controller.dart';
 import '../../services/schedule_service.dart';
 import '../../services/user_service.dart';
 import '../../utils/app_dates.dart';
@@ -37,6 +38,9 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
   String _specialization = Backend.useFirebase ? '' : 'Estetika Kulit';
   int _unreadNotif = 0;
 
+  /// Badge lonceng realtime (shared listener — lihat NotificationController).
+  ValueListenable<int>? _unreadListenable;
+
   String _statHariIni = Backend.useFirebase ? '0' : '2';
   String _statMenunggu = Backend.useFirebase ? '0' : '1';
   String _statSelesai = Backend.useFirebase ? '0' : '1';
@@ -54,7 +58,31 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
   @override
   void initState() {
     super.initState();
+    _subscribeUnreadBadge();
     _loadFromBackend();
+  }
+
+  void _subscribeUnreadBadge() {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    final listenable =
+        NotificationController.unread(uid);
+    _unreadListenable = listenable;
+    listenable.addListener(_onUnreadChanged);
+    _unreadNotif = listenable.value;
+  }
+
+  void _onUnreadChanged() {
+    final value = _unreadListenable?.value ?? 0;
+    if (!mounted || value == _unreadNotif) return;
+    setState(() => _unreadNotif = value);
+  }
+
+  @override
+  void dispose() {
+    _unreadListenable?.removeListener(_onUnreadChanged);
+    super.dispose();
   }
 
   Future<void> _loadFromBackend() async {
@@ -66,12 +94,10 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
         UserService.loadByUid(uid),
         ConsultationService.listForDoctor(uid),
         ScheduleService.listSlots(uid),
-        NotificationService.countUnread(NotificationService.userAudience(uid)),
       ]);
       final profile = results[0] as dynamic;
       final consults = results[1] as List<Map<String, dynamic>>?;
       final slots = results[2] as List<SlotRecord>?;
-      final unread = results[3] as int?;
 
       if (!mounted) return;
       setState(() {
@@ -79,7 +105,6 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
           _greetingName = (profile.name as String?) ?? '';
           _specialization = (profile.specialization as String?) ?? '';
         }
-        _unreadNotif = unread ?? 0;
         if (consults != null) {
           final todayIso = AppDates.todayIso();
           final todayCount = consults
@@ -121,7 +146,6 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
       setState(() {
         _greetingName = '';
         _specialization = '';
-        _unreadNotif = 0;
         _statHariIni = '0';
         _statMenunggu = '0';
         _statSelesai = '0';

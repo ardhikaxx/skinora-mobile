@@ -1077,7 +1077,7 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
                         _isSkincarePagi = val;
                       });
                     },
-                    activeColor: primaryMaroon,
+                    activeThumbColor: primaryMaroon,
                     activeTrackColor: primaryMaroon.withValues(alpha: 0.3),
                     inactiveThumbColor: Colors.white,
                     inactiveTrackColor: const Color(0xFFE5E5EA),
@@ -1123,7 +1123,7 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
                         _isSkincareMalam = val;
                       });
                     },
-                    activeColor: primaryMaroon,
+                    activeThumbColor: primaryMaroon,
                     activeTrackColor: primaryMaroon.withValues(alpha: 0.3),
                     inactiveThumbColor: Colors.white,
                     inactiveTrackColor: const Color(0xFFE5E5EA),

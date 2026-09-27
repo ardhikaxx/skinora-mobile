@@ -122,7 +122,7 @@ Notasi: **[L]** = lokal/setState saja ( kondisi awal ), **[F]** = target Firesto
 ### 3.7 Notifikasi, aktivitas, laporan
 | Fitur | Awal | Final |
 |---|---|---|
-| Notifikasi per role | 2–4 item statis, mark-read lokal | collection `notifications` (audience per-user / role:admin); update hanya `isUnread` |
+| Notifikasi per role | 2–4 item statis, mark-read lokal | subcollection `users/{uid}/notifications` (per penerima); update hanya `isUnread`/`isRead`/`readAt` |
 | Riwayat aktivitas per role | statis | collection `activities` (actorUid) |
 | Laporan admin | 12 entri statis + angka statis | agregat kueri `activities`/`consultations`/`users`/`articles` (tanpa counter tersimpan → bebas race) |
 | Statistik beranda | hardcoded | agregat kueri (`count` server-side) |
@@ -183,9 +183,9 @@ actor (string — harus = users/{uid}.name, diverifikasi rules), actorUid, creat
 // tampilan 'yyyy-MM-dd HH:mm' diturunkan client dari createdAt; ikon diturunkan dari tag.
 ```
 
-**`notifications/{autoId}`**:
+**`users/{uid}/notifications/{id}`**:
 ```
-audience: 'user:{uid}' | 'role:admin',
+recipientUid: string — wajib sama dengan {uid} path; audience: 'user:{uid}' (metadata), diverifikasi rules via owner/care_link/admin,
 recipientUid: string ('' utk broadcast role:admin) — diverifikasi rules via care_link/self/admin,
 type: 'dokter'|'user'|'konsultasi'|'booking'|'jadwal'|'ringkas'|..., // menentukan aksi tap
 title, description, iconKey, isUnread: bool, createdBy, createdAt
@@ -317,8 +317,8 @@ Ikon: R=Read, C=Create, U=Update, D=Delete. `owner` = `request.auth.uid` terkait
 | `specializations` | R | R | R,C,U,D | |
 | `articles` | R (terbit saja) | R (terbit saja) | R,C,U,D | list non-admin dibuktikan dengan filter `status == 'diterbitkan'` |
 | `activities` | R (actorUid sendiri), C (actorUid/createdBy == sendiri) | sama | R semua, C sendiri | immutable (U/D: hanya admin D bila perlu — default tanpa U) |
-| `notifications` `user:{uid}` | R,U (owner; U hanya `isUnread`) | C ke pasien (care_link) / ke diri | R | |
-| `notifications` `role:admin` | — | C? (tidak perlu) | R,U(`isUnread`), C oleh user terautentikasi saat registrasi (audience `role:admin`, `createdBy == uid`) | dibatasi field wajib |
+| `users/{uid}/notifications` | R,U (owner; U hanya `isUnread/isRead/readAt`) | C ke pasien (care_link) atau diri sendiri; admin bebas | R | fan-out admin per-uid |
+| (dihapus) koleksi global `notifications` | — | — | — | diganti subcollection per user |
 
 Prinsip: **setiap jalur diverifikasi di rules** — menyembunyikan tombol di UI tidak dianggap keamanan.
 Manipulasi `role`/`status`/`ownerId` dari client di blokir oleh field-immutability rules.
@@ -331,7 +331,7 @@ Manipulasi `role`/`status`/`ownerId` dari client di blokir oleh field-immutabili
 |---|---|---|
 | 1 | `activities.where(actorUid==).orderBy(createdAt desc)` | **komposit** `(actorUid ASC, createdAt DESC)` |
 | 2 | `activities.orderBy(createdAt desc)` (admin laporan) | single-field (bawaan) |
-| 3 | `notifications.where(audience==).orderBy(createdAt desc)` | **komposit** `(audience ASC, createdAt DESC)` |
+| 3 | `users/{uid}/notifications.orderBy(createdAt desc)` | single-field (bawaan, subcollection) |
 | 4 | `articles.where(status=='diterbitkan').orderBy(createdAt desc)` | **komposit** `(status ASC, createdAt DESC)` |
 | 5 | `consultations.where(doctorId==).orderBy(createdAt desc)` | **komposit** `(doctorId ASC, createdAt DESC)` |
 | 6 | `consultations.where(patientId==).orderBy(createdAt desc)` | **komposit** `(patientId ASC, createdAt DESC)` |

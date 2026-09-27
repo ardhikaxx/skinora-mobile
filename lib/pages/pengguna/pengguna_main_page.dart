@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
+import '../../services/notification_payload.dart';
+import '../../services/notification_router.dart';
 import 'beranda_page.dart';
 import 'skin_check_page.dart';
 import 'skin_daily_page.dart';
@@ -21,7 +23,26 @@ class _PenggunaMainPageState extends State<PenggunaMainPage> {
   @override
   void initState() {
     super.initState();
+    NotificationRouter.shellTabRequest.addListener(_onShellTabRequest);
     _ensureSignedIn();
+  }
+
+  /// Deep-link notifikasi: layar notifikasi/peringatan meminta shell beranda
+  /// pindah tab. Shell role lain mengabaikan request milik shell ini.
+  void _onShellTabRequest() {
+    final req = NotificationRouter.shellTabRequest.value;
+    if (req == null ||
+        req.shellRoute != NotificationPageRoute.penggunaShell ||
+        !mounted) {
+      return;
+    }
+    _changeTab(req.index);
+  }
+
+  @override
+  void dispose() {
+    NotificationRouter.shellTabRequest.removeListener(_onShellTabRequest);
+    super.dispose();
   }
 
   /// Guard: shell pengguna hanya boleh dibuka saat sesi Firebase Auth +

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Warna aksen notifikasi (brand maroon Skinora) — dipakai ikon notifikasi. -->
+    <color name="skinora_notification_color">#8B2B38</color>
+</resources>

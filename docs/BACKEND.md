@@ -58,7 +58,7 @@ provisioned_accounts/{emailLowercase}   # doc ID = email lowercase (wajib utk ru
 specializations/{id}
 articles/{id}
 activities/{id}                      # immutable log
-notifications/{id}                   # audience: user:{uid} | role:admin
+users/{uid}/notifications/{id}     # subcollection per penerima (bukan koleksi global)
 care_links/{patientId_doctorId}
 consultations/{id}
 consultations/{id}/messages/{id}
@@ -73,7 +73,6 @@ Field detail: [`SYSTEM_MAP.md` §4](./SYSTEM_MAP.md).
 | Collection | Fields |
 |---|---|
 | `activities` | `actorUid` ASC, `createdAt` DESC |
-| `notifications` | `audience` ASC, `createdAt` DESC |
 | `articles` | `status` ASC, `createdAt` DESC |
 | `consultations` | `doctorId` ASC, `createdAt` DESC |
 | `consultations` | `patientId` ASC, `createdAt` DESC |

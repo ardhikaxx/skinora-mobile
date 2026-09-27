@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/consultation_service.dart';
-import '../../services/notification_service.dart';
+import '../../services/notification_controller.dart';
 import '../../services/skin_service.dart';
 import '../../services/user_service.dart';
 import '../../utils/app_dates.dart';
@@ -32,6 +33,10 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
   String _userName = Backend.useFirebase ? '' : 'Leonita Yulyta Agustin';
   int _unreadNotif = Backend.useFirebase ? 0 : 2;
 
+  /// Badge lonceng realtime — satu listener bersama (lihat
+  /// NotificationController), bukan query ulang setiap halaman dibuka.
+  ValueListenable<int>? _unreadListenable;
+
   // Ringkasan hari ini — seed hanya mode demo; Firebase → data asli / empty.
   String _skinCheckValue = Backend.useFirebase ? 'Belum' : 'Kombinasi';
   String _skinCheckSub = Backend.useFirebase ? '-' : '2026-08-28';
@@ -45,10 +50,35 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
   @override
   void initState() {
     super.initState();
+    _subscribeUnreadBadge();
     _loadFromBackend();
   }
 
-  /// Profil + unread notifikasi + ringkasan hari ini dari Firestore.
+  /// Pasang listener unread realtime (dihapus otomatis di dispose).
+  void _subscribeUnreadBadge() {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    final listenable =
+        NotificationController.unread(uid);
+    _unreadListenable = listenable;
+    listenable.addListener(_onUnreadChanged);
+    _unreadNotif = listenable.value;
+  }
+
+  void _onUnreadChanged() {
+    final value = _unreadListenable?.value ?? 0;
+    if (!mounted || value == _unreadNotif) return;
+    setState(() => _unreadNotif = value);
+  }
+
+  @override
+  void dispose() {
+    _unreadListenable?.removeListener(_onUnreadChanged);
+    super.dispose();
+  }
+
+  /// Profil + ringkasan hari ini dari Firestore (badge di-handle stream).
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
@@ -56,18 +86,16 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
     try {
       final results = await Future.wait<Object?>([
         UserService.loadByUid(uid),
-        NotificationService.countUnread(NotificationService.userAudience(uid)),
         SkinService.listSkinChecks(uid, limit: 5),
         SkinService.listSkinDailies(uid),
         SkinService.listSkincare(uid),
         ConsultationService.listForPatient(uid),
       ]);
       final profile = results[0] as dynamic;
-      final unread = results[1] as int?;
-      final checks = (results[2] as List<Map<String, dynamic>>?) ?? const [];
-      final dailies = (results[3] as List<Map<String, dynamic>>?) ?? const [];
-      final skincare = (results[4] as List<Map<String, dynamic>>?) ?? const [];
-      final consults = (results[5] as List<Map<String, dynamic>>?) ?? const [];
+      final checks = (results[1] as List<Map<String, dynamic>>?) ?? const [];
+      final dailies = (results[2] as List<Map<String, dynamic>>?) ?? const [];
+      final skincare = (results[3] as List<Map<String, dynamic>>?) ?? const [];
+      final consults = (results[4] as List<Map<String, dynamic>>?) ?? const [];
 
       final todayIso = AppDates.todayIso();
 
@@ -164,13 +192,11 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
       if (!mounted) return;
       setState(() {
         _userName = (profile?.name as String?) ?? '';
-        _unreadNotif = unread ?? 0;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _userName = '';
-        _unreadNotif = 0;
         _skinCheckValue = 'Belum';
         _skinCheckSub = '-';
         _skinDailyValue = 'Belum';

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
+import '../../services/notification_payload.dart';
+import '../../services/notification_router.dart';
 import 'beranda_page.dart';
 import 'jadwal_page.dart';
 import 'chat_konsultasi_page.dart';
@@ -25,7 +27,26 @@ class _DokterMainPageState extends State<DokterMainPage> {
   @override
   void initState() {
     super.initState();
+    NotificationRouter.shellTabRequest.addListener(_onShellTabRequest);
     _ensureSignedIn();
+  }
+
+  /// Deep-link notifikasi: layar notifikasi/chat meminta shell dokter pindah
+  /// tab. Request milik shell lain diabaikan.
+  void _onShellTabRequest() {
+    final req = NotificationRouter.shellTabRequest.value;
+    if (req == null ||
+        req.shellRoute != NotificationPageRoute.dokterShell ||
+        !mounted) {
+      return;
+    }
+    _changeTab(req.index);
+  }
+
+  @override
+  void dispose() {
+    NotificationRouter.shellTabRequest.removeListener(_onShellTabRequest);
+    super.dispose();
   }
 
   /// Guard: shell dokter hanya boleh dibuka saat sesi Firebase Auth + role

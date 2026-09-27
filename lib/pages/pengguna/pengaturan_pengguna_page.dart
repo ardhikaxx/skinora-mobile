@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
+import '../../services/notification_service.dart';
 import '../../services/user_service.dart';
 import '../../utils/app_dates.dart';
 
@@ -102,6 +103,13 @@ class _PengaturanPenggunaPageState extends State<PengaturanPenggunaPage> {
       try {
         await UserService.updateSettings(
           AuthService.uid!,
+          notificationsEnabled: _notificationsEnabled,
+          morningReminder: _morningReminderController.text.trim(),
+          eveningReminder: _eveningReminderController.text.trim(),
+        );
+        // Sinkronkan permission OS + jadwal pengingat pagi/malam dari
+        // nilai yang baru saja disimpan (idempotent).
+        await NotificationService.applyNotificationSettings(
           notificationsEnabled: _notificationsEnabled,
           morningReminder: _morningReminderController.text.trim(),
           eveningReminder: _eveningReminderController.text.trim(),

@@ -441,6 +441,25 @@ class UserService {
     await _users.doc(uid).update(fields);
   }
 
+  /// UID seluruh admin — dipakai fan-out notifikasi platform ke admin.
+  ///
+  /// Hanya admin yang boleh menjalankan query ini (Security Rules menilai
+  /// `isAdmin()` per dokumen hasil), sehingga non-admin selalu menerima
+  /// `permission-denied` dan method ini melempar error.
+  static Future<List<String>> listAdminUids() async {
+    if (!Backend.useFirebase) return const [];
+    final snap = await _users.where('role', isEqualTo: 'admin').get();
+    return snap.docs.map((d) => d.id).where((id) => id.isNotEmpty).toList();
+  }
+
+  /// UID pengguna aktif yang terdaftar (fan-out artikel edukasi, dsb).
+  static Future<List<String>> listPenggunaUids({int limit = 500}) async {
+    if (!Backend.useFirebase) return const [];
+    final snap =
+        await _users.where('role', isEqualTo: 'pengguna').limit(limit).get();
+    return snap.docs.map((d) => d.id).where((id) => id.isNotEmpty).toList();
+  }
+
   // ---------------------------------------------------------------------------
   // Statistik dashboard (agregat kueri — tanpa counter tersimpan)
   // ---------------------------------------------------------------------------

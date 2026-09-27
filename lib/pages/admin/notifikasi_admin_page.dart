@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/empty_state.dart';
 import '../../components/navbottom/admin_navbottom.dart';
+import '../../services/auth_service.dart';
 import '../../services/backend.dart';
+import '../../services/notification_payload.dart';
+import '../../services/notification_router.dart';
 import '../../services/notification_service.dart';
 import '../../utils/app_dates.dart';
 
@@ -14,12 +19,16 @@ class NotificationModel {
   final String time;
   bool isUnread;
 
+  /// Salinan dokumen Firestore untuk deep-link (kosong di mode demo).
+  final Map<String, dynamic> raw;
+
   NotificationModel({
     required this.id,
     required this.title,
     required this.description,
     required this.time,
     required this.isUnread,
+    this.raw = const <String, dynamic>{},
   });
 }
 
@@ -73,41 +82,77 @@ class _NotifikasiAdminPageState extends State<NotifikasiAdminPage> {
   @override
   void initState() {
     super.initState();
-    _loadFromBackend();
+    _subscribeFeed();
+    _scroll.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _feedSub?.cancel();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  StreamSubscription<List<Map<String, dynamic>>>? _feedSub;
+  final ScrollController _scroll = ScrollController();
+  bool _loadingOlder = false;
+  bool _hasMore = true;
+
+  NotificationModel _toModel(Map<String, dynamic> m) => NotificationModel(
+        id: (m['id'] as String?) ?? '',
+        title: (m['title'] as String?) ?? '',
+        description: (m['description'] as String?) ?? '',
+        time: _fmtTime(m['createdAt']),
+        isUnread: m['isUnread'] == true || m['isRead'] == false,
+        raw: m,
+      );
+
+  /// Feed realtime **per-admin** (`audience = user:{uid}`) supaya status
+  /// baca/unread tidak berbagi antar admin.
+  void _subscribeFeed() {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    _feedSub =
+        NotificationService.streamForUser(uid)
+            .listen((items) {
+      if (!mounted) return;
+      setState(() {
+        _notifications
+          ..clear()
+          ..addAll(items.map(_toModel));
+        _hasMore = items.length >= NotificationService.pageSize;
+      });
+    }, onError: (_) {
+      // Stream gagal (mis. offline) → pertahankan daftar terakhir.
+    });
+  }
+
+  void _onScroll() {
+    if (_loadingOlder || !_hasMore || _notifications.isEmpty) return;
+    if (_scroll.position.extentAfter > 240) return;
+    final uid = AuthService.uid;
+    if (!Backend.useFirebase || uid == null) return;
+    _loadingOlder = true;
+    NotificationService.loadOlderForUser(
+      uid,
+      limit: NotificationService.pageSize,
+      afterCreatedAt: _notifications.last.raw['createdAt'],
+    ).then((items) {
+      if (!mounted) return;
+      setState(() {
+        final known = _notifications.map((n) => n.id).toSet();
+        _notifications.addAll(
+          items.map(_toModel).where((n) => !known.contains(n.id)),
+        );
+        _hasMore = items.length >= NotificationService.pageSize;
+      });
+    }).whenComplete(() => _loadingOlder = false);
   }
 
   String _fmtTime(Object? ts) {
     if (ts is Timestamp) return AppDates.dateTime(ts.toDate());
     return ts?.toString() ?? '';
-  }
-
-  /// Ambil notifikasi audience admin dari Firestore. Tanpa Firebase, data
-  /// demo tetap dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil
-  /// backend selalu menggantikan seed — termasuk saat daftar kosong.
-  Future<void> _loadFromBackend() async {
-    if (!Backend.useFirebase) return;
-    try {
-      final items = await NotificationService.listAudience(
-        NotificationService.adminAudience,
-      );
-      if (!mounted) return;
-      setState(() => _notifications
-        ..clear()
-        ..addAll(items.map((m) => NotificationModel(
-              id: (m['id'] as String?) ?? '',
-              title: (m['title'] as String?) ?? '',
-              description: (m['description'] as String?) ?? '',
-              time: _fmtTime(m['createdAt']),
-              isUnread: m['isUnread'] == true,
-            ))));
-    } catch (e) {
-      // Query gagal → tampilkan kosong, jangan seed palsu di production.
-      if (!mounted) return;
-      setState(_notifications.clear);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal memuat notifikasi: $e')),
-      );
-    }
   }
 
   @override
@@ -192,6 +237,7 @@ class _NotifikasiAdminPageState extends State<NotifikasiAdminPage> {
                           'Notifikasi booking, verifikasi dokter, dan aktivitas sistem akan muncul di sini.',
                     )
                   : ListView.separated(
+                      controller: _scroll,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20.0, vertical: 4.0),
                       itemCount: _notifications.length,
@@ -243,7 +289,7 @@ class _NotifikasiAdminPageState extends State<NotifikasiAdminPage> {
               item.isUnread = false;
             });
             if (Backend.useFirebase && item.id.isNotEmpty) {
-              NotificationService.markRead(item.id).catchError((Object _) =>
+              NotificationService.markRead(AuthService.uid ?? '', item.id).catchError((Object _) =>
                   Future<void>.value());
             }
             _handleNotificationAction(item);
@@ -344,6 +390,13 @@ class _NotifikasiAdminPageState extends State<NotifikasiAdminPage> {
   }
 
   void _handleNotificationAction(NotificationModel item) {
+    // Deep-link berbasis type/route — utama, tidak menebak dari judul.
+    if (Backend.useFirebase && item.raw.isNotEmpty) {
+      NotificationRouter.open(AppNotification.fromMap(item.raw))
+          .catchError((_) {});
+      return;
+    }
+    // Fallback lama untuk seed demo.
     if (item.title.contains('Dokter')) {
       Navigator.pop(context);
       widget.onNavigateTab?.call(1);

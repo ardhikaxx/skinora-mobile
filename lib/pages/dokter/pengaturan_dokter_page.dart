@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
+import '../../services/notification_service.dart';
 import '../../services/user_service.dart';
 
 class PengaturanDokterPage extends StatefulWidget {
@@ -55,6 +56,10 @@ class _PengaturanDokterPageState extends State<PengaturanDokterPage> {
         try {
           await UserService.updateSettings(
             uid,
+            notificationsEnabled: _isNotificationActive,
+          );
+          // Sinkronkan permission OS + batalkan pengingat yang tidak relevan.
+          await NotificationService.applyNotificationSettings(
             notificationsEnabled: _isNotificationActive,
           );
         } catch (e) {

@@ -4,6 +4,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/admin_article_model.dart';
 import '../services/activity_service.dart';
 import '../services/backend.dart';
+import '../services/notification_log.dart';
+import '../services/notification_payload.dart';
+import '../services/notification_repository.dart';
+import '../services/user_service.dart';
 
 /// Koleksi `articles` — admin menulis, pengguna membaca yang terbit.
 class ArticleService {
@@ -76,6 +80,7 @@ class ArticleService {
           : 'Membuat draf artikel "${a.title}"',
       uid,
     );
+    if (published) await _announcePublished(ref.id, a.title, uid);
     return a.copyWith(fsDocId: ref.id, id: ref.id);
   }
 
@@ -94,6 +99,7 @@ class ArticleService {
       'updatedAt': FieldValue.serverTimestamp(),
     });
     await _log('Mengedit artikel "${a.title}"', uid);
+    if (nowPublished) await _announcePublished(a.backendId, a.title, uid);
   }
 
   static Future<void> updateStatus(
@@ -115,6 +121,7 @@ class ArticleService {
       published ? 'Mempublikasikan $label' : 'Menolak terbit $label',
       uid,
     );
+    if (published) await _announcePublished(id, label, uid);
   }
 
   static Future<void> delete(String id, {String? title}) async {
@@ -141,6 +148,44 @@ class ArticleService {
       );
     } catch (_) {
       // Activity log tidak boleh menjatuhkan operasi utama.
+    }
+  }
+
+  /// Fan-out "Artikel Baru" ke seluruh pengguna.
+  ///
+  /// Dilakukan **setelah** dokumen artikel benar-benar tersimpan, oleh admin
+  /// yang sedang login (rules mengizinkan `isAdmin()` menulis ke subcollection
+  /// penerima). Idempoten berkat doc ID
+  /// `article_published__{penggunaUid}__{articleId}` — mengedit artikel
+  /// terbit ulang tidak pernah menggandakan notifikasi.
+  static Future<void> _announcePublished(
+    String articleId,
+    String title,
+    String uid,
+  ) async {
+    if (!Backend.useFirebase) return;
+    try {
+      final readers = await UserService.listPenggunaUids();
+      for (final readerUid in readers) {
+        await NotificationRepository.create(
+          AppNotification.forRecipient(
+            type: NotificationType.articlePublished,
+            recipientId: readerUid,
+            audienceRole: NotificationRole.pengguna,
+            title: 'Artikel Baru',
+            body: 'Artikel "$title" baru saja diterbitkan.',
+            entityId: articleId,
+            route: NotificationPageRoute.penggunaEdukasi,
+            iconKey: 'bell',
+            createdBy: uid,
+          ),
+        );
+      }
+      if (readers.isNotEmpty) {
+        NotificationLog.info('fan-out artikel -> ${readers.length} pengguna');
+      }
+    } catch (e) {
+      NotificationLog.error('fan-out artikel terbit', e);
     }
   }
 }

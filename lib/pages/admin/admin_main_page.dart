@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
+import '../../services/notification_payload.dart';
+import '../../services/notification_router.dart';
 import 'beranda_page.dart';
 import 'manajemen_dokter_page.dart';
 import 'manajemen_pengguna_page.dart';
@@ -21,7 +23,26 @@ class _AdminMainPageState extends State<AdminMainPage> {
   @override
   void initState() {
     super.initState();
+    NotificationRouter.shellTabRequest.addListener(_onShellTabRequest);
     _ensureSignedIn();
+  }
+
+  /// Deep-link notifikasi: layar notifikasi/manajemen meminta shell admin
+  /// pindah tab. Request milik shell lain diabaikan.
+  void _onShellTabRequest() {
+    final req = NotificationRouter.shellTabRequest.value;
+    if (req == null ||
+        req.shellRoute != NotificationPageRoute.adminShell ||
+        !mounted) {
+      return;
+    }
+    _changeTab(req.index);
+  }
+
+  @override
+  void dispose() {
+    NotificationRouter.shellTabRequest.removeListener(_onShellTabRequest);
+    super.dispose();
   }
 
   /// Guard: shell admin hanya boleh dibuka saat sesi Firebase Auth + role

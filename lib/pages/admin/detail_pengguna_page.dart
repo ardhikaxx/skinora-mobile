@@ -6,6 +6,8 @@ import '../../models/admin_user_model.dart';
 import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
+import '../../services/notification_payload.dart';
+import '../../services/notification_service.dart';
 import '../../services/user_service.dart';
 
 class DetailPenggunaPage extends StatefulWidget {
@@ -46,6 +48,34 @@ class _DetailPenggunaPageState extends State<DetailPenggunaPage> {
       actor: 'Admin',
       actorUid: AuthService.uid ?? 'admin',
     );
+    await _notifyUser(updated);
+  }
+
+  /// Beritahu pengguna tentang penangguhan / aktivasi kembali akunnya.
+  /// Pengguna yang belum mendaftar tidak punya akun Auth → dilewati.
+  Future<void> _notifyUser(AdminUserModel u) async {
+    if (!Backend.useFirebase || !u.registered) return;
+    final uid = u.fsDocId ?? u.id;
+    if (uid.isEmpty) return;
+
+    final suspended = u.status == UserStatus.ditangguhkan;
+    await NotificationService.notifyUser(
+      uid: uid,
+      title: suspended ? 'Akun Ditangguhkan' : 'Akun Diaktifkan Kembali',
+      description: suspended
+          ? 'Akun Anda ditangguhkan oleh admin. Bebatasan fitur akan berlaku '
+              'sampai akun diaktifkan kembali.'
+          : 'Akun Anda telah diaktifkan kembali. Anda dapat menggunakan '
+              'kembali seluruh fitur Skinora.',
+      iconKey: suspended ? 'shield' : 'check',
+      type: suspended
+          ? NotificationType.patientSuspended
+          : NotificationType.patientReactivated,
+      route: NotificationPageRoute.penggunaShell,
+      targetTab: NotificationTab.penggunaProfil,
+      audienceRole: NotificationRole.pengguna,
+      createdBy: AuthService.uid ?? '',
+    ).catchError((_) {});
   }
 
   void _onTangguhkan() {
