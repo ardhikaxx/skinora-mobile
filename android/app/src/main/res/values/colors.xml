@@ -2,4 +2,5 @@
 <resources>
     <!-- Warna aksen notifikasi (brand maroon Skinora) — dipakai ikon notifikasi. -->
     <color name="skinora_notification_color">#8B2B38</color>
+	<color name="ic_launcher_background">#FFFFFF</color>
 </resources>

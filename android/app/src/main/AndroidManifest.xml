@@ -8,7 +8,7 @@
          aplikasi di-update. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <application
-        android:label="skinora_app"
+        android:label="Skinora"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

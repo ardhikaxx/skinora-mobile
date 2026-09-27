@@ -62,6 +62,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: 0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -104,3 +105,18 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# --- Ikon aplikasi (launcher) ---
+# Sumber tunggal: assets/logo-skinora.png
+# Regenerate setelah mengganti logo:  dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo-skinora.png"
+  # iOS App Icon tidak boleh punya channel transparan.
+  remove_alpha_ios: true
+  # Adaptive icon Android (API 26+): logo sebagai foreground (inset 16%
+  # otomatis, aman dari mask launcher bulat/persegi) + latar putih solid.
+  # Key harus flat (bukan nested) sesuai flutter_launcher_icons 0.14.x.
+  adaptive_icon_foreground: "assets/logo-skinora.png"
+  adaptive_icon_background: "#FFFFFF"
