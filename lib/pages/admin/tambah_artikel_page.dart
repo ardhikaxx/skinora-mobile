@@ -88,6 +88,7 @@ class _TambahArtikelPageState extends State<TambahArtikelPage> {
     }
 
     if (!mounted) return;
+    // Dialog sukses ditampilkan pemanggil (ManajemenEdukasiPage) agar tunggal.
     Navigator.pop(context, newArticle);
   }
 
