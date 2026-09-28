@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../services/location_service.dart';
+import '../../services/weather_service.dart';
 import 'skin_check_question1_page.dart';
 import 'riwayat_skin_check_page.dart';
 
@@ -24,6 +26,33 @@ class _SkinCheckPageState extends State<SkinCheckPage> {
   static const Color subText = Color(0xFF757575);
   static const Color peachBg = Color(0xFFFFD5C3);
   static const Color peachIconBg = Color(0xFFFFD5C8);
+
+  /// Lokasi + cuaca device (geolokasi) untuk konteks skin check.
+  String _placeLabel = '';
+  WeatherReading? _weather;
+  bool _loadingWeather = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLocationWeather();
+  }
+
+  Future<void> _loadLocationWeather() async {
+    try {
+      final place = await LocationService.displayLocation();
+      final reading = await WeatherService.fetchCurrent();
+      if (!mounted) return;
+      setState(() {
+        _placeLabel = place;
+        _weather = reading;
+        _loadingWeather = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingWeather = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,6 +138,10 @@ class _SkinCheckPageState extends State<SkinCheckPage> {
                 children: [
                   // 2. Maroon Hero Banner
                   _buildHeroBanner(),
+                  const SizedBox(height: 18),
+
+                  // 2b. Lokasi + cuaca device (geolokasi)
+                  _buildLocationWeatherCard(),
                   const SizedBox(height: 18),
 
                   // 3. "YANG ANDA DAPATKAN" Card
@@ -207,6 +240,76 @@ class _SkinCheckPageState extends State<SkinCheckPage> {
           ),
         ],
       ),
+    );
+  }
+
+  /// 2b. Kartu lokasi + cuaca device (geolokasi) — konteks lingkungan kulit.
+  Widget _buildLocationWeatherCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 13.0),
+      decoration: BoxDecoration(
+        color: peachBg.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF4E2D8)),
+      ),
+      child: _loadingWeather
+          ? const Row(
+              children: [
+                Icon(
+                  LucideIcons.mapPin,
+                  size: 17,
+                  color: primaryMaroon,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  'Mendeteksi lokasi & cuaca...',
+                  style: TextStyle(fontSize: 12.5, color: subText),
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                const Icon(
+                  LucideIcons.mapPin,
+                  size: 17,
+                  color: primaryMaroon,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _placeLabel.isEmpty ? 'Lokasi Anda' : _placeLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: darkText,
+                    ),
+                  ),
+                ),
+                if (_weather != null) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9.0,
+                      vertical: 4.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${_weather!.temperatureLabel} • ${_weather!.humidityLabel}',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: primaryMaroon,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
     );
   }
 
