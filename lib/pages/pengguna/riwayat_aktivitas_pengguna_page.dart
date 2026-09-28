@@ -81,7 +81,7 @@ class _RiwayatAktivitasPenggunaPageState
   }
 
   String _fmtTime(Object? ts) {
-    if (ts is Timestamp) return AppDates.dateTime(ts.toDate());
+    if (ts is Timestamp) return AppDates.formatTimestampWib(ts.toDate());
     return ts?.toString() ?? '';
   }
 
