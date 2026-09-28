@@ -8,6 +8,7 @@ import '../../services/notification_controller.dart';
 import '../../services/skin_service.dart';
 import '../../services/user_service.dart';
 import '../../utils/app_dates.dart';
+import '../../components/realtime_wib_badge.dart';
 import 'notifikasi_pengguna_page.dart';
 import 'konsultasi_dokter_page.dart';
 import 'edukasi_kulit_page.dart';
@@ -304,6 +305,12 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
                   letterSpacing: -0.2,
                 ),
               ),
+              const SizedBox(height: 4),
+              const RealtimeWibBadge(
+                style: RealtimeWibStyle.minimal,
+                compact: true,
+                includeSeconds: false,
+              ),
             ],
           ),
         ),
@@ -392,14 +399,26 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'RINGKASAN HARI INI',
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.8,
-              color: darkText,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: const [
+              Text(
+                'RINGKASAN HARI INI',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                  color: darkText,
+                ),
+              ),
+              RealtimeWibBadge(
+                style: RealtimeWibStyle.pill,
+                compact: true,
+                includeSeconds: true,
+                backgroundColor: Colors.white,
+                borderColor: Color(0xFFFFD4D8),
+              ),
+            ],
           ),
           const SizedBox(height: 14),
 
