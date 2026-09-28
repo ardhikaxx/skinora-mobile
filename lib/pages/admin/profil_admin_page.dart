@@ -1,11 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/dialogs/logout_dialog.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/consultation_service.dart';
 import '../../services/user_service.dart';
+import '../../models/admin_doctor_model.dart';
 import 'edit_profil_admin_page.dart';
 import 'laporan_riwayat_page.dart';
 import 'pengaturan_admin_page.dart';
@@ -45,6 +47,11 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
   String _statDokter = Backend.useFirebase ? '0' : '4';
   String _statKonsultasi = Backend.useFirebase ? '0' : '13';
 
+  StreamSubscription<dynamic>? _profileSub;
+  StreamSubscription<dynamic>? _userSub;
+  StreamSubscription<dynamic>? _doctorSub;
+  StreamSubscription<dynamic>? _consultSub;
+
   // Helper to extract initials (e.g., Admin Skinora -> AS)
   String get _initials {
     final parts = _nama.trim().split(RegExp(r'\s+'));
@@ -58,7 +65,60 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
   @override
   void initState() {
     super.initState();
+    _subscribeProfileRealtime();
+    _subscribeStatsRealtime();
     _loadFromBackend();
+  }
+
+  /// Profil realtime: perubahan nama/telepon/alamat/tanggal lahir dari
+  /// halaman edit langsung tampil tanpa reload manual.
+  void _subscribeProfileRealtime() {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    _profileSub = UserService.streamByUid(uid).listen((profile) {
+      if (!mounted || profile == null) return;
+      setState(() {
+        _nama = _pick(profile.name, '');
+        _email = _pick(profile.email, _email);
+        _telepon = _pick(profile.phone, '-');
+        _alamat = _pick(profile.address, '-');
+        _tanggalLahir = _pick(profile.birthDate, '-');
+      });
+    }, onError: (_) {});
+  }
+
+  /// Ringkasan statistik platform realtime: pengguna, dokter aktif, dan konsultasi
+  /// langsung terupdate dari Firestore tanpa reload manual.
+  void _subscribeStatsRealtime() {
+    if (!Backend.useFirebase) return;
+    _userSub = UserService.streamPengguna().listen((users) {
+      if (!mounted) return;
+      setState(() => _statPengguna = '${users.length}');
+    }, onError: (_) {});
+
+    _doctorSub = UserService.streamDokter().listen((doctors) {
+      if (!mounted) return;
+      final aktif = doctors
+          .where((d) => d.status == DoctorStatus.terverifikasi)
+          .length;
+      setState(() => _statDokter = '$aktif');
+    }, onError: (_) {});
+
+    _consultSub =
+        ConsultationService.streamAllConsultations().listen((consults) {
+      if (!mounted) return;
+      setState(() => _statKonsultasi = '${consults.length}');
+    }, onError: (_) {});
+  }
+
+  @override
+  void dispose() {
+    _profileSub?.cancel();
+    _userSub?.cancel();
+    _doctorSub?.cancel();
+    _consultSub?.cancel();
+    super.dispose();
   }
 
   String _pick(Object? v, String fallback) {
@@ -658,16 +718,14 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
       ),
     );
 
+    // Dialog sukses sudah ditampilkan dari halaman edit — di sini cukup
+    // terapkan hasil + biarkan stream realtime menyinkronkan sisanya.
     if (result != null && mounted) {
       setState(() {
         _nama = result['nama'] ?? _nama;
         _telepon = result['telepon'] ?? _telepon;
         _alamat = result['alamat'] ?? _alamat;
       });
-      AdminSuccessDialog.show(
-        context,
-        message: 'Profil admin berhasil diperbarui',
-      );
     }
   }
 
