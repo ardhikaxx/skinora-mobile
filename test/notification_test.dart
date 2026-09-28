@@ -529,7 +529,7 @@ void main() {
         recipientId: 'patient-42',
         audienceRole: NotificationRole.pengguna,
         title: 'Konsultasi Dimulai',
-        body: 'Konsultasi bersama dr. Anita sudah dimulai. Silakan masuk ke ruang konsultasi.',
+        body: 'Konsultasi bersama dr. Anita sudah dimulai. Silahkan masuk ke ruang konsultasi.',
         entityId: 'consult-88',
         consultationId: 'consult-88',
         doctorId: 'doc-1',
