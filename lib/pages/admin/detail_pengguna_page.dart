@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
@@ -30,11 +32,42 @@ class _DetailPenggunaPageState extends State<DetailPenggunaPage> {
   static const Color subText = Color(0xFF6B7280);
 
   late AdminUserModel _user;
+  StreamSubscription<dynamic>? _profileSub;
 
   @override
   void initState() {
     super.initState();
     _user = widget.user;
+    final uid = _user.fsDocId ?? _user.id;
+    if (Backend.useFirebase && uid.isNotEmpty) {
+      _profileSub = UserService.streamByUid(uid).listen((profile) {
+        if (!mounted || profile == null) return;
+        setState(() {
+          _user = _user.copyWith(
+            name: profile.name.isNotEmpty ? profile.name : _user.name,
+            phone: profile.phone.isNotEmpty ? profile.phone : _user.phone,
+            address: profile.address.isNotEmpty
+                ? profile.address
+                : _user.address,
+            birthDate: profile.birthDate.isNotEmpty
+                ? profile.birthDate
+                : _user.birthDate,
+            gender: profile.gender.isNotEmpty
+                ? profile.gender
+                : _user.gender,
+            status: profile.status.toLowerCase() == 'ditangguhkan'
+                ? UserStatus.ditangguhkan
+                : UserStatus.aktif,
+          );
+        });
+      }, onError: (_) {});
+    }
+  }
+
+  @override
+  void dispose() {
+    _profileSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _persistStatus(AdminUserModel updated) async {
