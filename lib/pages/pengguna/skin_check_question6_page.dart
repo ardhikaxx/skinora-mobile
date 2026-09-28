@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../services/weather_service.dart';
+import '../../services/location_service.dart';
 import 'skin_check_question7_page.dart';
 
 class SkinCheckQuestion6Page extends StatefulWidget {
@@ -35,12 +37,14 @@ class _SkinCheckQuestion6PageState extends State<SkinCheckQuestion6Page> {
   static const Color iconColor = Color(0xFF8E8E93);
 
   late final TextEditingController _humidityController;
+  bool _checkingWeather = false;
+  String _weatherInfo = '';
 
   @override
   void initState() {
     super.initState();
     _humidityController =
-        TextEditingController(text: widget.initialHumidity ?? '74%');
+        TextEditingController(text: widget.initialHumidity ?? '');
   }
 
   @override
@@ -53,10 +57,32 @@ class _SkinCheckQuestion6PageState extends State<SkinCheckQuestion6Page> {
     Navigator.pop(context, _humidityController.text.trim());
   }
 
-  void _handleCek() {
+  /// Ambil kelembapan realtime dari API gratis Open-Meteo (Jakarta, WIB)
+  /// lalu inputkan otomatis ke kolom.
+  Future<void> _handleCek() async {
+    if (_checkingWeather) return;
     setState(() {
-      _humidityController.text = '74%';
+      _checkingWeather = true;
+      _weatherInfo = '';
     });
+    try {
+      final reading = await WeatherService.fetchCurrent();
+      final place = await LocationService.displayLocation();
+      if (!mounted) return;
+      setState(() {
+        _humidityController.text = reading.humidityLabel;
+        _weatherInfo =
+            'Realtime ${reading.humidityLabel} • ${reading.temperatureLabel} (WIB, $place)';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _weatherInfo = '');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memuat cuaca realtime: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _checkingWeather = false);
+    }
   }
 
   @override
@@ -242,30 +268,58 @@ class _SkinCheckQuestion6PageState extends State<SkinCheckQuestion6Page> {
                         ),
                         const SizedBox(width: 12),
 
-                        // Button "Cek"
+                        // Button "Cek" — realtime via API cuaca gratis.
                         GestureDetector(
-                          onTap: _handleCek,
+                          onTap: _checkingWeather ? null : _handleCek,
                           child: Container(
                             height: 48,
                             padding: const EdgeInsets.symmetric(horizontal: 20),
                             decoration: BoxDecoration(
-                              color: primaryMaroon,
+                              color: _checkingWeather
+                                  ? const Color(0xFFD89CA3)
+                                  : primaryMaroon,
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            child: const Center(
-                              child: Text(
-                                'Cek',
-                                style: TextStyle(
-                                  fontSize: 14.0,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
+                            child: Center(
+                              child: _checkingWeather
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Cek',
+                                      style: TextStyle(
+                                        fontSize: 14.0,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                             ),
                           ),
                         ),
                       ],
                     ),
+                    if (_weatherInfo.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          const Icon(LucideIcons.cloudSun,
+                              size: 14, color: Color(0xFF8E8E93)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              _weatherInfo,
+                              style: const TextStyle(
+                                  fontSize: 12, color: Color(0xFF8E8E93)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
 
                     const SizedBox(height: 24),
 
