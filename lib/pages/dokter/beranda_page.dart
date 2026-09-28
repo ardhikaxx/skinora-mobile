@@ -9,6 +9,7 @@ import '../../services/notification_controller.dart';
 import '../../services/schedule_service.dart';
 import '../../services/user_service.dart';
 import '../../utils/app_dates.dart';
+import '../../components/realtime_wib_badge.dart';
 import 'patient_insight_page.dart';
 import 'notifikasi_dokter_page.dart';
 
@@ -222,6 +223,12 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
                 color: subText,
                 fontWeight: FontWeight.w400,
               ),
+            ),
+            const SizedBox(height: 6),
+            const RealtimeWibBadge(
+              style: RealtimeWibStyle.pill,
+              compact: true,
+              includeSeconds: true,
             ),
           ],
         ),
