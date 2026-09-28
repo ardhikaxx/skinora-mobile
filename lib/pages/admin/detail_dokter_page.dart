@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
@@ -30,11 +32,55 @@ class _DetailDokterPageState extends State<DetailDokterPage> {
   static const Color subText = Color(0xFF6B7280);
 
   late AdminDoctorModel _doctor;
+  StreamSubscription<dynamic>? _profileSub;
+
+  DoctorStatus _parseStatus(String s) {
+    switch (s.toLowerCase()) {
+      case 'terverifikasi':
+        return DoctorStatus.terverifikasi;
+      case 'ditolak':
+        return DoctorStatus.ditolak;
+      case 'ditangguhkan':
+        return DoctorStatus.ditangguhkan;
+      case 'menunggu':
+      default:
+        return DoctorStatus.menunggu;
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _doctor = widget.doctor;
+    final uid = _doctor.fsDocId ?? _doctor.id;
+    if (Backend.useFirebase && uid.isNotEmpty) {
+      _profileSub = UserService.streamByUid(uid).listen((profile) {
+        if (!mounted || profile == null) return;
+        setState(() {
+          _doctor = _doctor.copyWith(
+            name: profile.name.isNotEmpty ? profile.name : _doctor.name,
+            phone: profile.phone.isNotEmpty ? profile.phone : _doctor.phone,
+            specialization: profile.specialization.isNotEmpty
+                ? profile.specialization
+                : _doctor.specialization,
+            experience: profile.experience.isNotEmpty
+                ? profile.experience
+                : _doctor.experience,
+            str: profile.str.isNotEmpty ? profile.str : _doctor.str,
+            bio: profile.bio.isNotEmpty ? profile.bio : _doctor.bio,
+            status: profile.status.isNotEmpty
+                ? _parseStatus(profile.status)
+                : _doctor.status,
+          );
+        });
+      }, onError: (_) {});
+    }
+  }
+
+  @override
+  void dispose() {
+    _profileSub?.cancel();
+    super.dispose();
   }
 
   // --- Actions ---
@@ -71,7 +117,7 @@ class _DetailDokterPageState extends State<DetailDokterPage> {
         type = NotificationType.doctorVerified;
       case DoctorStatus.ditolak:
         title = 'Verifikasi Ditolak';
-        body = 'Mohon maaf, verifikasi dokter Anda ditolak. Silakan perbarui '
+        body = 'Mohon maaf, verifikasi dokter Anda ditolak. Silahkan perbarui '
             'data dan ajukan kembali.';
         type = NotificationType.doctorRejected;
       case DoctorStatus.ditangguhkan:
