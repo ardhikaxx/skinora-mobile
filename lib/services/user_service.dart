@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -98,6 +99,16 @@ class UserService {
     final snap = await _users.doc(uid).get();
     if (!snap.exists) return null;
     return _profileFromDoc(snap.id, snap.data()!);
+  }
+
+  /// Stream profil realtime — perubahan profil langsung terpancar ke
+  /// halaman profil & beranda tanpa reload manual.
+  static Stream<UserProfile?> streamByUid(String uid) {
+    if (!Backend.useFirebase || uid.isEmpty) return const Stream.empty();
+    return _users.doc(uid).snapshots().map((snap) {
+      if (!snap.exists) return null;
+      return _profileFromDoc(snap.id, snap.data()!);
+    });
   }
 
   /// Dijalankan tepat setelah `createUserWithEmailAndPassword` sukses.
@@ -201,7 +212,7 @@ class UserService {
       if (data['consumedByUid'] != null) return null;
       final role = (data['role'] as String?) ?? 'pengguna';
       if (role == 'admin') {
-        return 'Akun admin tidak dapat mendaftar. Silakan gunakan menu Masuk.';
+        return 'Akun admin tidak dapat mendaftar. Silahkan gunakan menu Masuk.';
       }
       return null;
     } on FirebaseException {
@@ -267,6 +278,54 @@ class UserService {
     ];
   }
 
+  /// Stream daftar seluruh pengguna secara realtime.
+  static Stream<List<AdminUserModel>> streamPengguna() {
+    if (!Backend.useFirebase) return const Stream.empty();
+    late StreamController<List<AdminUserModel>> controller;
+    StreamSubscription? s1;
+    StreamSubscription? s2;
+    List<AdminUserModel> uList = [];
+    List<AdminUserModel> pList = [];
+
+    void emit() {
+      if (!controller.isClosed) {
+        controller.add([...uList, ...pList]);
+      }
+    }
+
+    controller = StreamController<List<AdminUserModel>>(
+      onListen: () {
+        s1 = _users.where('role', isEqualTo: 'pengguna').snapshots().listen(
+          (snap) {
+            uList = snap.docs
+                .map((d) => _adminUserFrom(d.id, d.data(), registered: true))
+                .toList();
+            emit();
+          },
+          onError: controller.addError,
+        );
+        s2 = _provisions
+            .where('role', isEqualTo: 'pengguna')
+            .where('consumedByUid', isEqualTo: null)
+            .snapshots()
+            .listen(
+          (snap) {
+            pList = snap.docs
+                .map((d) => _adminUserFrom(d.id, d.data(), registered: false))
+                .toList();
+            emit();
+          },
+          onError: controller.addError,
+        );
+      },
+      onCancel: () {
+        s1?.cancel();
+        s2?.cancel();
+      },
+    );
+    return controller.stream;
+  }
+
   static Future<List<AdminDoctorModel>> listDokter() async {
     if (!Backend.useFirebase) return const [];
     final users = await _users.where('role', isEqualTo: 'dokter').get();
@@ -282,6 +341,54 @@ class UserService {
     ];
   }
 
+  /// Stream daftar seluruh dokter secara realtime.
+  static Stream<List<AdminDoctorModel>> streamDokter() {
+    if (!Backend.useFirebase) return const Stream.empty();
+    late StreamController<List<AdminDoctorModel>> controller;
+    StreamSubscription? s1;
+    StreamSubscription? s2;
+    List<AdminDoctorModel> dList = [];
+    List<AdminDoctorModel> pList = [];
+
+    void emit() {
+      if (!controller.isClosed) {
+        controller.add([...dList, ...pList]);
+      }
+    }
+
+    controller = StreamController<List<AdminDoctorModel>>(
+      onListen: () {
+        s1 = _users.where('role', isEqualTo: 'dokter').snapshots().listen(
+          (snap) {
+            dList = snap.docs
+                .map((d) => _adminDoctorFrom(d.id, d.data(), registered: true))
+                .toList();
+            emit();
+          },
+          onError: controller.addError,
+        );
+        s2 = _provisions
+            .where('role', isEqualTo: 'dokter')
+            .where('consumedByUid', isEqualTo: null)
+            .snapshots()
+            .listen(
+          (snap) {
+            pList = snap.docs
+                .map((d) => _adminDoctorFrom(d.id, d.data(), registered: false))
+                .toList();
+            emit();
+          },
+          onError: controller.addError,
+        );
+      },
+      onCancel: () {
+        s1?.cancel();
+        s2?.cancel();
+      },
+    );
+    return controller.stream;
+  }
+
   /// Dokter terverifikasi untuk daftar konsultasi pengguna.
   static Future<List<AdminDoctorModel>> listVerifiedDokter() async {
     if (!Backend.useFirebase) return const [];
@@ -292,6 +399,18 @@ class UserService {
     return users.docs
         .map((d) => _adminDoctorFrom(d.id, d.data(), registered: true))
         .toList();
+  }
+
+  /// Stream daftar dokter terverifikasi secara realtime.
+  static Stream<List<AdminDoctorModel>> streamVerifiedDokter() {
+    if (!Backend.useFirebase) return const Stream.empty();
+    return _users
+        .where('role', isEqualTo: 'dokter')
+        .where('status', isEqualTo: 'terverifikasi')
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => _adminDoctorFrom(d.id, d.data(), registered: true))
+            .toList());
   }
 
   // ---------------------------------------------------------------------------
