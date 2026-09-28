@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/empty_state.dart';
@@ -140,45 +142,56 @@ class _RiwayatSkincarePageState extends State<RiwayatSkincarePage> {
     ),
   ];
 
+  StreamSubscription<List<Map<String, dynamic>>>? _sub;
+
   @override
   void initState() {
     super.initState();
     _loadFromBackend();
   }
 
-  /// Riwayat skincare milik pengguna dari Firestore. Tanpa Firebase, seed
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  /// Riwayat skincare milik pengguna dari Firestore secara realtime. Tanpa Firebase, seed
   /// demo tetap dipakai agar UI/tes tidak berubah.
-  Future<void> _loadFromBackend() async {
+  void _loadFromBackend() {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
     if (uid == null) return;
-    try {
-      final items = await SkinService.listSkincare(uid);
-      if (!mounted) return;
-      setState(() {
-        _entries = items.map((m) {
-          final pagi =
-              (m['morningSteps'] as List?)?.cast<String>() ?? const <String>[];
-          final malam =
-              (m['nightSteps'] as List?)?.cast<String>() ?? const <String>[];
-          return SkincareHistoryEntry(
-            date: (m['dateDisplay'] as String?) ?? '',
-            pagiCount: pagi.length,
-            malamCount: malam.length,
-            pagiItems: pagi,
-            malamItems: malam,
-          );
-        }).toList();
-        _expandedIndices.clear();
-        if (_entries.isNotEmpty) _expandedIndices.add(0);
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _entries = <SkincareHistoryEntry>[];
-        _expandedIndices.clear();
-      });
-    }
+    _sub?.cancel();
+    _sub = SkinService.streamSkincare(uid).listen(
+      (items) {
+        if (!mounted) return;
+        setState(() {
+          _entries = items.map((m) {
+            final pagi =
+                (m['morningSteps'] as List?)?.cast<String>() ?? const <String>[];
+            final malam =
+                (m['nightSteps'] as List?)?.cast<String>() ?? const <String>[];
+            return SkincareHistoryEntry(
+              date: (m['dateDisplay'] as String?) ?? '',
+              pagiCount: pagi.length,
+              malamCount: malam.length,
+              pagiItems: pagi,
+              malamItems: malam,
+            );
+          }).toList();
+          _expandedIndices.clear();
+          if (_entries.isNotEmpty) _expandedIndices.add(0);
+        });
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(() {
+          _entries = <SkincareHistoryEntry>[];
+          _expandedIndices.clear();
+        });
+      },
+    );
   }
 
   @override
