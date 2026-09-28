@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/user_profile.dart';
@@ -134,6 +136,7 @@ class ConsultationService {
       iconKey: 'calendar',
       type: NotificationType.bookingCreated,
       entityId: consultationRef.id,
+      consultationId: consultationRef.id,
       audienceRole: NotificationRole.dokter,
       createdBy: patient.uid,
     );
@@ -145,6 +148,7 @@ class ConsultationService {
       iconKey: 'calendar',
       type: NotificationType.bookingCreated,
       entityId: consultationRef.id,
+      consultationId: consultationRef.id,
       route: NotificationPageRoute.penggunaRiwayatKonsultasi,
       audienceRole: NotificationRole.pengguna,
       createdBy: patient.uid,
@@ -159,6 +163,8 @@ class ConsultationService {
       entityId: consultationRef.id,
       createdBy: patient.uid,
     );
+    // Refresh chat feed agar listener pesan aktif segera untuk konsultasi baru.
+    unawaited(NotificationService.refreshChatFeed());
     return consultationRef.id;
   }
 
@@ -307,9 +313,12 @@ class ConsultationService {
       iconKey: 'messageSquare',
       type: NotificationType.consultationStarted,
       entityId: id,
+      consultationId: id,
       audienceRole: NotificationRole.pengguna,
       createdBy: doctorId,
     );
+    // Refresh chat feed agar listener pesan aktif segera di sisi dokter & pasien.
+    unawaited(NotificationService.refreshChatFeed());
   }
 
   /// Menyelesaikan konsultasi (dokter) + activity log.
@@ -359,6 +368,7 @@ class ConsultationService {
         iconKey: 'check',
         type: NotificationType.consultationCompleted,
         entityId: id,
+        consultationId: id,
         route: NotificationPageRoute.penggunaRiwayatKonsultasi,
         audienceRole: NotificationRole.pengguna,
         createdBy: doctorUid,
@@ -373,6 +383,7 @@ class ConsultationService {
       iconKey: 'check',
       type: NotificationType.consultationCompleted,
       entityId: id,
+      consultationId: id,
       route: NotificationPageRoute.dokterRiwayat,
       audienceRole: NotificationRole.dokter,
       createdBy: doctorUid,
@@ -413,7 +424,10 @@ class ConsultationService {
     required String time,
   }) async {
     if (!Backend.useFirebase) return;
-    await messages(consultationId).add({
+    // ID dokumen pesan dipakai sebagai `eventId` notifikasi sehingga **setiap
+    // pesan** menghasilkan notifikasi sendiri (bukan hanya pesan pertama per
+    // konsultasi), sementara deep-link tetap memakai `consultationId`.
+    final messageRef = await messages(consultationId).add({
       'consultationId': consultationId,
       'senderId': senderId,
       'senderRole': senderRole,
@@ -430,19 +444,21 @@ class ConsultationService {
       if (data == null) return;
       final patientId = (data['patientId'] as String?) ?? '';
       final doctorId = (data['doctorId'] as String?) ?? '';
-      final doctorName = (data['doctorName'] as String?) ?? '';
+      final doctorName = (data['doctorName'] as String?) ?? 'Dokter';
+      final patientName = (data['patientName'] as String?) ?? 'Pasien';
       final senderIsDoctor = senderRole == 'dokter';
       final target = senderIsDoctor ? patientId : doctorId;
       if (target.isEmpty || target == senderId) return;
+      final senderName = senderIsDoctor ? doctorName : patientName;
       await NotificationService.notifyUser(
         uid: target,
-        title: 'Pesan Baru',
-        description: senderIsDoctor
-            ? 'Anda menerima pesan baru dari $doctorName.'
-            : 'Anda menerima pesan baru dari pasien.',
+        title: 'Pesan Baru dari $senderName',
+        description: 'Anda menerima pesan baru dari $senderName.',
         iconKey: 'messageSquare',
         type: NotificationType.consultationMessage,
         entityId: consultationId,
+        eventId: messageRef.id,
+        consultationId: consultationId,
         audienceRole: senderIsDoctor
             ? NotificationRole.pengguna
             : NotificationRole.dokter,
