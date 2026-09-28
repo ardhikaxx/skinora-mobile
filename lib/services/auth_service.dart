@@ -108,13 +108,13 @@ class AuthService {
           return 'Akun Anda telah dinonaktifkan.';
         case 'user-not-found':
         case 'no-user-record':
-          return 'Akun tidak ditemukan. Silakan daftar terlebih dahulu.';
+          return 'Akun tidak ditemukan. Silahkan daftar terlebih dahulu.';
         case 'wrong-password':
         case 'invalid-credential':
         case 'invalid-argument':
           return 'Email atau password salah.';
         case 'email-already-in-use':
-          return 'Email sudah terdaftar. Silakan gunakan menu Masuk.';
+          return 'Email sudah terdaftar. Silahkan gunakan menu Masuk.';
         case 'weak-password':
           return 'Password minimal 6 karakter.';
         case 'too-many-requests':
@@ -128,9 +128,9 @@ class AuthService {
         case 'configuration-not-found':
           return 'Konfigurasi Firebase belum lengkap.';
         default:
-          return 'Terjadi kesalahan. Silakan coba lagi.';
+          return 'Terjadi kesalahan. Silahkan coba lagi.';
       }
     }
-    return 'Terjadi kesalahan. Silakan coba lagi.';
+    return 'Terjadi kesalahan. Silahkan coba lagi.';
   }
 }
