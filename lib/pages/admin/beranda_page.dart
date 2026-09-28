@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/empty_state.dart';
+import '../../models/admin_doctor_model.dart';
 import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
@@ -45,6 +48,10 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
   /// Badge lonceng realtime (shared listener — lihat NotificationController).
   ValueListenable<int>? _unreadListenable;
 
+  /// Nama admin realtime (mirip pengguna/beranda_page.dart).
+  String _adminName = '';
+  StreamSubscription<dynamic>? _profileSub;
+
   List<Map<String, String>> _activities = Backend.useFirebase
       ? const <Map<String, String>>[]
       : const <Map<String, String>>[
@@ -60,7 +67,22 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
   void initState() {
     super.initState();
     _subscribeUnreadBadge();
+    _subscribeProfileRealtime();
     _loadFromBackend();
+  }
+
+  /// Profil realtime: perubahan nama admin langsung tampil di beranda.
+  void _subscribeProfileRealtime() {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    _profileSub = UserService.streamByUid(uid).listen((profile) {
+      if (!mounted || profile == null) return;
+      final name = (profile.name as String?) ?? '';
+      if (name.isNotEmpty && name != _adminName) {
+        setState(() => _adminName = name);
+      }
+    }, onError: (_) {});
   }
 
   /// Badge notifikasi per-admin (`audience = user:{uid}`) agar state baca
@@ -82,9 +104,19 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
     setState(() => _unreadNotif = value);
   }
 
+  StreamSubscription<dynamic>? _activitySub;
+  StreamSubscription<dynamic>? _userSub;
+  StreamSubscription<dynamic>? _doctorSub;
+  StreamSubscription<dynamic>? _consultSub;
+
   @override
   void dispose() {
     _unreadListenable?.removeListener(_onUnreadChanged);
+    _profileSub?.cancel();
+    _activitySub?.cancel();
+    _userSub?.cancel();
+    _doctorSub?.cancel();
+    _consultSub?.cancel();
     super.dispose();
   }
 
@@ -92,49 +124,51 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
     return AppDates.formatTimestampWib(ts);
   }
 
-  /// Ambil statistik + aktivitas terbaru dari Firestore. Tanpa Firebase
-  /// (test), seed demo tetap dipakai. Dengan Firebase, hasil backend selalu
-  /// menggantikan seed — termasuk saat kosong — agar UI sinkron data asli.
-  Future<void> _loadFromBackend() async {
+  /// Ambil statistik + aktivitas terbaru dari Firestore secara realtime.
+  void _loadFromBackend() {
     if (!Backend.useFirebase) return;
-    try {
-      final results = await Future.wait<Object?>([
-        UserService.countPengguna(),
-        UserService.countDokterAktif(),
-        ConsultationService.countByStatus('terjadwal'),
-        ConsultationService.countByStatus('selesai'),
-        ActivityService.listAll(limit: 6),
-      ]);
-      final pengguna = results[0] as int?;
-      final dokter = results[1] as int?;
-      final terjadwal = results[2] as int?;
-      final selesai = results[3] as int?;
-      final acts = results[4] as List<Map<String, dynamic>>?;
+    _activitySub?.cancel();
+    _activitySub = ActivityService.streamAll(limit: 6).listen(
+      (acts) {
+        if (!mounted) return;
+        setState(() {
+          _activities = acts
+              .map((a) => <String, String>{
+                    'title': (a['title'] as String?) ?? '',
+                    'time': _fmtTime(a['createdAt']),
+                  })
+              .toList();
+        });
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(() => _activities = <Map<String, String>>[]);
+      },
+    );
+
+    _userSub?.cancel();
+    _userSub = UserService.streamPengguna().listen((users) {
       if (!mounted) return;
-      setState(() {
-        if (pengguna != null) _statPengguna = '$pengguna';
-        if (dokter != null) _statDokter = '$dokter';
-        if (terjadwal != null) _statTerjadwal = '$terjadwal';
-        if (selesai != null) _statSelesai = '$selesai';
-        _activities = acts
-                ?.map((a) => <String, String>{
-                      'title': (a['title'] as String?) ?? '',
-                      'time': _fmtTime(a['createdAt']),
-                    })
-                .toList() ??
-            <Map<String, String>>[];
-      });
-    } catch (_) {
-      // Query gagal → reset angka '0' & aktivitas kosong, jangan seed palsu.
+      setState(() => _statPengguna = '${users.length}');
+    });
+
+    _doctorSub?.cancel();
+    _doctorSub = UserService.streamDokter().listen((doctors) {
       if (!mounted) return;
+      final aktif = doctors.where((d) => d.status == DoctorStatus.terverifikasi).length;
+      setState(() => _statDokter = '$aktif');
+    });
+
+    _consultSub?.cancel();
+    _consultSub = ConsultationService.streamAllConsultations().listen((consults) {
+      if (!mounted) return;
+      final terjadwal = consults.where((c) => c['status'] == 'terjadwal').length;
+      final selesai = consults.where((c) => c['status'] == 'selesai').length;
       setState(() {
-        _statTerjadwal = '0';
-        _statSelesai = '0';
-        _statPengguna = '0';
-        _statDokter = '0';
-        _activities = <Map<String, String>>[];
+        _statTerjadwal = '$terjadwal';
+        _statSelesai = '$selesai';
       });
-    }
+    });
   }
 
   @override
@@ -177,8 +211,8 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text(
+          children: [
+            const Text(
               'Admin Dashboard',
               style: TextStyle(
                 fontFamily: 'serif',
@@ -188,17 +222,19 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
                 letterSpacing: -0.3,
               ),
             ),
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             Text(
-              'Kelola aplikasi Skinora',
-              style: TextStyle(
+              _adminName.isEmpty
+                  ? 'Kelola aplikasi Skinora'
+                  : 'Halo, $_adminName',
+              style: const TextStyle(
                 fontSize: 13.5,
                 color: subText,
                 fontWeight: FontWeight.w400,
               ),
             ),
-            SizedBox(height: 6),
-            RealtimeWibBadge(
+            const SizedBox(height: 6),
+            const RealtimeWibBadge(
               style: RealtimeWibStyle.pill,
               compact: true,
               includeSeconds: true,
