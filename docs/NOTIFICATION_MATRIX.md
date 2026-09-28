@@ -13,13 +13,15 @@ Aturan dasar:
 - **Ditulis client.** Tidak ada Cloud Functions (project tetap di Spark/free
   tier). Actor yang melakukan bisnis operasi (booking, chat, verifikasi, jadwal)
   menulis notifikasi penerimanya sendiri dengan `createdBy == request.auth.uid`.
-- **Satu doc ID per event.** `NotificationEventKey.build(type, recipient, entity)`
-  → `{type}__{recipient}__{entity}` sehingga retry/fan-out tidak pernah
-  menghasilkan dokumen ganda.
+- **Satu doc ID per event.** `NotificationEventKey.build(type, recipient, entity, eventId)`
+  → `{type}__{recipient}__{entity}` (atau `...--{eventId}`) sehingga retry/fan-out
+  tidak pernah menghasilkan dokumen ganda. Event berulang pada entity yang sama
+  — tiap pesan chat — memakai `eventId` = ID dokumen pesan, jadi setiap pesan
+  tetap menghasilkan notifikasi baru sementara deep-link tetap ke `entityId`.
 - **Anti-spam.** `SeenCache` menjamin satu `notificationId` hanya ditampilkan
   sekali walau datang dari dua jalur. Pesan chat di ruang yang sedang dibuka
-  (`ActiveChatRegistry`) tidak menampilkan native notification, tetapi tetap
-  tersimpan di Firestore.
+  (`ActiveChatRegistry.open/close` dipanggil halaman ruang) tidak menampilkan
+  native notification, tetapi tetap tersimpan di Firestore.
 - **Privasi chat.** Notifikasi chat tidak pernah membawa isi pesan — hanya
   pemberitahuan generik.
 
@@ -28,8 +30,19 @@ Aturan dasar:
 | Kondisi | Jalur | Catatan |
 | --- | --- | --- |
 | Foreground | `FirebaseMessaging.onMessage` + stream Firestore `users/{uid}/notifications` → `flutter_local_notifications` | satu native notification, tanpa duplikat |
-| Background / terminated / layar mati | **Belum ada pengirim FCM** (lihat "Status dispatcher" di bawah) | payload data-only + token device sudah disiapkan, tinggal butuh penerima |
+| Aplikasi masih hidup (background) | stream Firestore yang sama (proses belum dibunuh OS / force-stop) | pesan chat & booking baru tetap memunculkan native notification |
+| Terminated / force-stopped | **Belum ada pengirim FCM** (lihat "Status dispatcher" di bawah) | dokumen tetap tersimpan → badge & daftar langsung lengkap saat dibuka |
 | Pengingat pagi/malam | `flutter_local_notifications` + `timezone` (jadwal lokal, selamat dari reboot) | tidak bergantung aplikasi terbuka |
+
+> Dokumen yang lebih tua dari ±5 menit (`NotificationService._freshWindow`)
+> tidak ditampilkan sebagai native notification walaupun baru tersinkron saat
+> aplikasi dibuka, supaya tidak muncul belasan notifikasi lama sekaligus —
+> badge & daftar tetap diperbarui dari stream yang sama.
+>
+> Tap notifikasi saat aplikasi terminated membawa deep-link lewat
+> `getNotificationAppLaunchDetails`; callback tap di background isolate juga
+> menulis payload ke SharedPreferences (`NotificationService.persistPendingIntent`)
+> sebagai cadangan karena state tidak dibagi antar-isolate.
 
 ## Siapa menulis dokumen
 
@@ -53,7 +66,7 @@ Aturan dasar:
 | 4 | `booking_confirmed` | Pasien | — (reserved, belum ada aksi konfirmasi) | Booking Dikonfirmasi | page `/pengguna/riwayat-konsultasi` |
 | 5 | `booking_cancelled` | Pasien + dokter | — (reserved, belum ada aksi pembatalan) | Booking Dibatalkan | riwayat / tab Jadwal |
 | 6 | `consultation_started` | Pasien | Client — `ConsultationService.markBerlangsung` | Konsultasi Dimulai | **room** ruang konsultasi (`entityId`) |
-| 7 | `consultation_message` | Lawan bicara | Client — `ConsultationService.sendMessage` | Pesan Baru | **room** ruang chat/konsultasi (`entityId`) |
+| 7 | `consultation_message` | Lawan bicara (pasien ↔ dokter) | Client — `ConsultationService.sendMessage` | Pesan Baru | **room** ruang chat/konsultasi (`entityId` = `consultationId`, `eventId` = ID pesan) |
 | 8 | `consultation_completed` | Pasien | Client — `ConsultationService.complete` | Konsultasi Selesai | page `/pengguna/riwayat-konsultasi` |
 | 9 | `consultation_completed` | Dokter | Client — `ConsultationService.complete` | Konsultasi Selesai | page `/dokter/riwayat` |
 | 10 | `doctor_verification_pending` | Semua admin | Client admin — `NotificationService._syncPendingDoctorVerifications` (saat login admin) | Dokter Menunggu Verifikasi | shell Admin → tab **Dokter** |
@@ -82,9 +95,11 @@ panggil `NotificationService.notifyUser(..., type: NotificationType.bookingCance
   ada koleksi global. Rules hanya mengizinkan `read` pemilik (`isOwner`) atau
   admin.
 - `create` mensyaratkan `recipientUid == {uid}` (kolom path) dan
-  `createdBy == request.auth.uid`, lalu salah satu dari: pemilik, admin, atau
-  pasangan `care_links` (pasien ↔ dokter). Artinya user **tidak** bisa menulis
-  ke koleksi orang lain kecuali memang terhubung lewat booking.
+  `createdBy == request.auth.uid`, lalu salah satu dari: pemilik, admin,
+  pasangan `care_links` (pasien ↔ dokter), **atau** partisipan konsultasi yang
+  ditunjuk field `consultationId` (menjaga notifikasi chat tetap terkirim
+  walau `care_links` belum/tidak ada). Artinya user **tidak** bisa menulis ke
+  koleksi orang lain kecuali memang terhubung lewat booking/konsultasi.
 - Field `audience = user:{uid}` tetap disimpan sebagai metadata; `role:admin`
   tidak lagi ditulis (fan-out admin memakai uid per admin).
 - `update` hanya mengenai `isUnread` / `isRead` / `readAt` — tombol "tandai
@@ -104,6 +119,10 @@ background), stream Firestore `users/{uid}/notifications` memicu
 **Ketika aplikasi force-stopped atau di-background panjang**, native
 notification tidak muncul sampai ada pengirim FCM — dokumennya tetap tersimpan
 dan badge/daftar langsung lengkap saat aplikasi dibuka.
+
+> Prasyarat seluruh jalur di atas: **izin notifikasi OS aktif**. Bila belum,
+> aplikasi meminta izin lewat gate setelah login dan menampilkan statusnya di
+> halaman Pengaturan (lihat bagian "Izin notifikasi").
 
 Untuk mengaktifkan push penuh tanpa mengubah struktur: tulis satu layanan
 kecil (mis. Cloudflare Worker gratis, atau Cloud Functions setelah plan Blaze
@@ -135,6 +154,30 @@ mendaftarkan token miliknya sendiri.
   sehingga isolate background FCM menghormatinya).
 - `morningReminder` / `eveningReminder` — `HH:mm`, dijadwalkan ulang oleh
   `ReminderScheduler.sync` setiap kali pengaturan disimpan.
+
+## Izin notifikasi (OS permission)
+
+Tanpa izin OS, semua presentasi native diblokir sistem — ini penyebab paling
+umum "notifikasi tidak muncul" di Android 13+.
+
+| Jalur | Kapan | Komponen |
+| --- | --- | --- |
+| Dialog perizinan | Sekali per perangkat, setelah user punya sesi (login baru / sesi berlanjut) | `NotificationPermissionGate` (dipasang sebagai `MaterialApp.builder`) |
+| Tombol "Izinkan" ulang | Halaman Pengaturan ketiga role, tampil hanya bila izin belum aktif | `SystemNotificationPermissionTile` |
+| Prompt OS sesungguhnya | Dipicu `NotificationService.requestPermission(force: ...)` → `AndroidFlutterLocalNotificationsPlugin.requestNotificationsPermission()` (Android 13+) / `IOSFlutterLocalNotificationsPlugin.requestPermissions()` | service |
+| Status realtime | `areNotificationsEnabled()` (Android) / `checkPermissions()` (iOS), disegerakan saat app `resumed` | `NotificationService.refreshPermissionStatus()` → `permissionGranted` (`ValueNotifier`) |
+
+Catatan:
+
+- Permintaan izin di `main()` **sebelum frame pertama** boleh tetap ada, tetapi
+  tidak diandalkan: OS dapat mengabaikannya tanpa dialog. Jalur utama adalah
+  gate di atas; flag `skinora.notification_permission_asked` mencegah dialog
+  aplikasi muncul berulang.
+- Bila izin permanen ditolak, Android tidak menampilkan dialog lagi → aplikasi
+  menampilkan panduan manual (`showNotificationSettingsGuide`).
+- Preferensi aplikasi (`settings.notificationsEnabled`) tetap terpisah: itu
+  mematikan push + pengingat, sedangkan izin OS mengatur apakah sistem boleh
+  menampilkan notifikasi sama sekali.
 
 ## Deploy
 
