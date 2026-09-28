@@ -65,7 +65,14 @@ class NotificationRepository {
         return;
       }
     } on FirebaseException catch (e) {
-      NotificationLog.error('cek duplikat ${notification.id}', e.code);
+      // Penulis lintas user (dokter → pasien, admin → user) memang tidak
+      // berhak membaca subcollection penerima; lanjutkan ke `set` karena
+      // keunikan tetap dijamin doc ID deterministik.
+      if (e.code == 'permission-denied') {
+        NotificationLog.info('cek duplikat dilewati (rules): ${notification.id}');
+      } else {
+        NotificationLog.error('cek duplikat ${notification.id}', e.code);
+      }
     }
 
     final data = notification.toFirestore();
