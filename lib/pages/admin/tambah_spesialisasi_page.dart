@@ -45,6 +45,7 @@ class _TambahSpesialisasiPageState extends State<TambahSpesialisasiPage> {
       );
       return;
     }
+    // Dialog sukses ditampilkan pemanggil (MasterSpesialisasiPage) agar tunggal.
     Navigator.pop(context, text);
   }
 
