@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
+import '../../models/user_profile.dart';
 import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
@@ -42,13 +43,19 @@ class _LoginPageState extends State<LoginPage> {
     if (!Backend.useFirebase) return;
     final user = AuthService.currentUser;
     if (user == null) return;
-    final profile = await AuthService.loadProfile();
-    if (!mounted) return;
-    if (profile == null || !profile.canLogin) {
-      await AuthService.signOut();
-      return;
+    try {
+      final profile = await AuthService.loadProfile();
+      if (!mounted) return;
+      if (profile == null || !profile.canLogin) {
+        await AuthService.signOut();
+        return;
+      }
+      _routeToHome(profile.role);
+    } catch (e) {
+      debugPrint('[LOGIN] restoreSession gagal: $e');
+      // Gagal baca profil — biarkan user di halaman login.
+      try { await AuthService.signOut(); } catch (_) {}
     }
-    _routeToHome(profile.role);
   }
 
   void _routeToHome(String role) {
@@ -99,39 +106,66 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     setState(() => _busy = true);
+
+    // ── Tahap 1: Firebase Authentication ──
     try {
       await AuthService.signIn(email: email, password: password);
-      final profile = await AuthService.loadProfile();
-      if (profile == null) {
-        await AuthService.signOut();
-        setState(() {
-          _errorMessage = 'Akun tidak terdaftar. Silahkan daftar terlebih dahulu.';
-          _busy = false;
-        });
-        return;
-      }
-      if (!profile.canLogin) {
-        await AuthService.signOut();
-        setState(() {
-          _errorMessage = 'Akun Anda ditangguhkan. Hubungi administrator.';
-          _busy = false;
-        });
-        return;
-      }
-      // Log aktivitas login (Firestore) — hanya bila backend aktif.
+    } catch (e) {
+      debugPrint('[LOGIN] signIn gagal: ${e.runtimeType} → $e');
+      setState(() {
+        _errorMessage = AuthService.describeAuthError(e);
+        _busy = false;
+      });
+      return;
+    }
+
+    // ── Tahap 2: Baca profil dari Firestore ──
+    UserProfile? profile;
+    try {
+      profile = await AuthService.loadProfile();
+    } catch (e) {
+      debugPrint('[LOGIN] loadProfile gagal: ${e.runtimeType} → $e');
+      // Auth sudah berhasil tapi Firestore gagal — sign out agar konsisten.
+      await AuthService.signOut();
+      setState(() {
+        _errorMessage = AuthService.describeAuthError(e);
+        _busy = false;
+      });
+      return;
+    }
+
+    if (profile == null) {
+      await AuthService.signOut();
+      setState(() {
+        _errorMessage = 'Akun tidak terdaftar. Silahkan daftar terlebih dahulu.';
+        _busy = false;
+      });
+      return;
+    }
+    if (!profile.canLogin) {
+      await AuthService.signOut();
+      setState(() {
+        _errorMessage = 'Akun Anda ditangguhkan. Hubungi administrator.';
+        _busy = false;
+      });
+      return;
+    }
+
+    // ── Tahap 3: Log aktivitas (non-blocking — gagal tidak menghalangi login) ──
+    try {
       await ActivityService.log(
         title: 'Login berhasil',
         tag: 'Login',
         actor: profile.name,
         actorUid: profile.uid,
       );
-      _routeToHome(profile.role);
     } catch (e) {
-      setState(() {
-        _errorMessage = AuthService.describeAuthError(e);
-        _busy = false;
-      });
+      debugPrint('[LOGIN] ActivityService.log gagal (diabaikan): $e');
     }
+
+    // ── Tahap 4: Navigasi ke halaman sesuai role ──
+    if (!mounted) return;
+    _routeToHome(profile.role);
   }
 
   void _handleForgotPassword() {
