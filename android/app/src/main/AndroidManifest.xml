@@ -7,6 +7,12 @@
     <!-- flutter_local_notifications: reschedule reminder saat perangkat reboot /
          aplikasi di-update. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- Full-screen intent untuk notifikasi chat/konsultasi agar tampil di lock screen. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+    <!-- Wake lock agar notifikasi bisa tampil saat perangkat idle. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- Android 12+ (API 31+): izin jadwal alarm eksak untuk reminder pagi/malam. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <application
         android:label="Skinora"
         android:name="${applicationName}"
