@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/empty_state.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../models/admin_doctor_model.dart';
 import '../../services/backend.dart';
 import '../../services/user_service.dart';
 import 'riwayat_konsultasi_page.dart';
@@ -81,52 +83,57 @@ class _KonsultasiDokterPenggunaPageState
     ),
   ];
 
+  StreamSubscription<List<AdminDoctorModel>>? _doctorSub;
+
   @override
   void initState() {
     super.initState();
     _loadFromBackend();
   }
 
-  /// Daftar dokter terverifikasi dari Firestore. Tanpa Firebase, seed demo
-  /// tetap dipakai agar UI/tes tidak berubah.
-  Future<void> _loadFromBackend() async {
-    if (!Backend.useFirebase) return;
-    try {
-      final doctors = await UserService.listVerifiedDokter();
-      if (!mounted) return;
-      setState(() {
-        _allDoctors = doctors
-            .map((d) => DoctorSearchModel(
-                  id: d.backendId,
-                  name: d.name,
-                  specialization: d.specialization,
-                  category: d.specialization,
-                  isVerified: true,
-                ))
-            .toList();
-        _categories = <String>{
-          'Semua',
-          for (final d in doctors)
-            if (d.specialization.isNotEmpty) d.specialization,
-        }.toList();
-        if (!_categories.contains(_selectedCategory)) {
-          _selectedCategory = 'Semua';
-        }
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _allDoctors = <DoctorSearchModel>[];
-        _categories = <String>['Semua'];
-        _selectedCategory = 'Semua';
-      });
-    }
-  }
-
   @override
   void dispose() {
+    _doctorSub?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Daftar dokter terverifikasi dari Firestore secara realtime.
+  void _loadFromBackend() {
+    if (!Backend.useFirebase) return;
+    _doctorSub?.cancel();
+    _doctorSub = UserService.streamVerifiedDokter().listen(
+      (doctors) {
+        if (!mounted) return;
+        setState(() {
+          _allDoctors = doctors
+              .map((d) => DoctorSearchModel(
+                    id: d.backendId,
+                    name: d.name,
+                    specialization: d.specialization,
+                    category: d.specialization,
+                    isVerified: true,
+                  ))
+              .toList();
+          _categories = <String>{
+            'Semua',
+            for (final d in doctors)
+              if (d.specialization.isNotEmpty) d.specialization,
+          }.toList();
+          if (!_categories.contains(_selectedCategory)) {
+            _selectedCategory = 'Semua';
+          }
+        });
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(() {
+          _allDoctors = <DoctorSearchModel>[];
+          _categories = <String>['Semua'];
+          _selectedCategory = 'Semua';
+        });
+      },
+    );
   }
 
   List<DoctorSearchModel> get _filteredDoctors {
