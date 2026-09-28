@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/empty_state.dart';
 import '../../components/navbottom/admin_navbottom.dart';
+import '../../services/activity_service.dart';
+import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/specialization_service.dart';
 import 'edit_spesialisasi_page.dart';
@@ -58,32 +61,40 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
           SpesialisasiModel(id: '7', name: 'Infeksi Kulit', isActive: false),
         ];
 
+  StreamSubscription<List<SpecializationRecord>>? _specSub;
+
   @override
   void initState() {
     super.initState();
     _loadFromBackend();
   }
 
-  /// Ambil master spesialisasi dari Firestore. Tanpa Firebase, daftar demo
-  /// tetap dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil backend
-  /// selalu menggantikan seed — termasuk saat daftar kosong.
-  Future<void> _loadFromBackend() async {
+  @override
+  void dispose() {
+    _specSub?.cancel();
+    super.dispose();
+  }
+
+  /// Ambil master spesialisasi dari Firestore secara realtime.
+  void _loadFromBackend() {
     if (!Backend.useFirebase) return;
-    try {
-      final records = await SpecializationService.list();
-      if (!mounted) return;
-      setState(() => _specializations
-        ..clear()
-        ..addAll(records.map((r) => SpesialisasiModel(
-              id: r.id,
-              name: r.name,
-              isActive: r.isActive,
-            ))));
-    } catch (_) {
-      // Query gagal → tampilkan kosong, jangan seed palsu di production.
-      if (!mounted) return;
-      setState(_specializations.clear);
-    }
+    _specSub?.cancel();
+    _specSub = SpecializationService.stream().listen(
+      (records) {
+        if (!mounted) return;
+        setState(() => _specializations
+          ..clear()
+          ..addAll(records.map((r) => SpesialisasiModel(
+                id: r.id,
+                name: r.name,
+                isActive: r.isActive,
+              ))));
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(_specializations.clear);
+      },
+    );
   }
 
   Future<void> _guard(Future<void> Function() action, String failMessage) async {
@@ -398,6 +409,12 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
       } catch (_) {
         return;
       }
+      await ActivityService.log(
+        title: 'Menambah spesialisasi $result',
+        tag: 'Spesialisasi',
+        actor: 'Admin',
+        actorUid: AuthService.uid ?? 'admin',
+      );
       if (!mounted) return;
       setState(() {
         _specializations.add(
@@ -434,6 +451,12 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
       } catch (_) {
         return;
       }
+      await ActivityService.log(
+        title: 'Mengedit spesialisasi $result',
+        tag: 'Spesialisasi',
+        actor: 'Admin',
+        actorUid: AuthService.uid ?? 'admin',
+      );
       if (!mounted) return;
       setState(() {
         item.name = result;
@@ -462,6 +485,12 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
           } catch (_) {
             return;
           }
+          await ActivityService.log(
+            title: 'Menonaktifkan spesialisasi ${item.name}',
+            tag: 'Spesialisasi',
+            actor: 'Admin',
+            actorUid: AuthService.uid ?? 'admin',
+          );
           if (!mounted) return;
           setState(() {
             item.isActive = false;
@@ -488,6 +517,12 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
           } catch (_) {
             return;
           }
+          await ActivityService.log(
+            title: 'Mengaktifkan spesialisasi ${item.name}',
+            tag: 'Spesialisasi',
+            actor: 'Admin',
+            actorUid: AuthService.uid ?? 'admin',
+          );
           if (!mounted) return;
           setState(() {
             item.isActive = true;
@@ -517,6 +552,12 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
         } catch (_) {
           return;
         }
+        await ActivityService.log(
+          title: 'Menghapus spesialisasi ${item.name}',
+          tag: 'Spesialisasi',
+          actor: 'Admin',
+          actorUid: AuthService.uid ?? 'admin',
+        );
         if (!mounted) return;
         final name = item.name;
         setState(() {
