@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/empty_state.dart';
@@ -112,12 +111,16 @@ class _NotifikasiPenggunaPageState extends State<NotifikasiPenggunaPage> {
 
   PenggunaNotificationModel _toModel(Map<String, dynamic> m) {
     final title = (m['title'] as String?) ?? '';
+    // `description` adalah alias `body` — fallback ke `body` bila kosong.
+    final desc = (m['description'] as String?)?.isNotEmpty == true
+        ? m['description'] as String
+        : (m['body'] as String?) ?? '';
     return PenggunaNotificationModel(
       id: (m['id'] as String?) ?? '',
       title: title,
-      description: (m['description'] as String?) ?? '',
+      description: desc,
       time: _fmtTime(m['createdAt']),
-      icon: _iconFor(title, (m['type'] as String?) ?? ''),
+      icon: _iconFor((m['type'] as String?) ?? ''),
       isUnread: m['isUnread'] == true || m['isRead'] == false,
       raw: m,
     );
@@ -169,15 +172,29 @@ class _NotifikasiPenggunaPageState extends State<NotifikasiPenggunaPage> {
   }
 
   String _fmtTime(Object? ts) {
-    if (ts is Timestamp) return AppDates.dateTime(ts.toDate());
-    return ts?.toString() ?? '';
+    return AppDates.formatTimestampWib(ts, relative: true);
   }
 
-  IconData _iconFor(String title, String type) {
-    if (type == 'booking' || title.contains('Konsultasi') || title.contains('Booking')) {
-      return LucideIcons.messageSquare;
+  /// Pemetaan type → icon (berdasarkan type, bukan title agar tidak rapuh).
+  IconData _iconFor(String type) {
+    switch (type) {
+      case 'consultation_started':
+      case 'consultation_message':
+      case 'consultation_completed':
+      case 'konsultasi': // legacy
+        return LucideIcons.messageSquare;
+      case 'booking_created':
+      case 'booking_confirmed':
+      case 'booking_cancelled':
+      case 'booking': // legacy
+        return LucideIcons.calendar;
+      case 'reminder':
+        return LucideIcons.sunrise;
+      case 'article_published':
+        return LucideIcons.bookOpen;
+      default:
+        return LucideIcons.bell;
     }
-    return LucideIcons.bell;
   }
 
   /// Notifikasi audience pengguna di-stream realtime oleh [_subscribeFeed].
