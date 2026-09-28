@@ -28,7 +28,12 @@ class SkinService {
     required String resultAcneRisk,
   }) async {
     if (!Backend.useFirebase) return;
+    final now = AppDates.nowWib();
+    final createdDisplay = AppDates.fullDisplayWib(now);
+    final createdIso = AppDates.iso(now);
     await _col(uid, 'skin_checks').add({
+      'createdDisplay': createdDisplay,
+      'createdIso': createdIso,
       ...answers,
       'resultSkinType': resultSkinType,
       'resultSensitivity': resultSensitivity,
@@ -49,10 +54,31 @@ class SkinService {
     int? limit,
   }) async {
     if (!Backend.useFirebase || uid.isEmpty) return const [];
+    try {
+      var q = _col(uid, 'skin_checks').orderBy('createdAt', descending: true);
+      if (limit != null) q = q.limit(limit);
+      final snap = await q.get();
+      return snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+    } catch (_) {
+      final snap = await _col(uid, 'skin_checks').get();
+      final docs = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+      docs.sort((a, b) => ((b['createdIso'] ?? '') as String).compareTo((a['createdIso'] ?? '') as String));
+      if (limit != null && docs.length > limit) return docs.sublist(0, limit);
+      return docs;
+    }
+  }
+
+  /// Stream riwayat skin check milik pengguna secara realtime.
+  static Stream<List<Map<String, dynamic>>> streamSkinChecks(
+    String uid, {
+    int? limit,
+  }) {
+    if (!Backend.useFirebase || uid.isEmpty) return const Stream.empty();
     var q = _col(uid, 'skin_checks').orderBy('createdAt', descending: true);
     if (limit != null) q = q.limit(limit);
-    final snap = await q.get();
-    return snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+    return q
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList());
   }
 
   // ---------------------------------------------------------------------------
@@ -127,10 +153,26 @@ class SkinService {
     String uid,
   ) async {
     if (!Backend.useFirebase || uid.isEmpty) return const [];
-    final snap = await _col(uid, 'skin_dailies')
+    try {
+      final snap = await _col(uid, 'skin_dailies')
+          .orderBy('createdAt', descending: true)
+          .get();
+      return snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+    } catch (_) {
+      final snap = await _col(uid, 'skin_dailies').get();
+      final docs = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+      docs.sort((a, b) => ((b['dateIso'] ?? '') as String).compareTo((a['dateIso'] ?? '') as String));
+      return docs;
+    }
+  }
+
+  /// Stream riwayat skin daily milik pengguna secara realtime.
+  static Stream<List<Map<String, dynamic>>> streamSkinDailies(String uid) {
+    if (!Backend.useFirebase || uid.isEmpty) return const Stream.empty();
+    return _col(uid, 'skin_dailies')
         .orderBy('createdAt', descending: true)
-        .get();
-    return snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList());
   }
 
   // ---------------------------------------------------------------------------
@@ -185,10 +227,26 @@ class SkinService {
     String uid,
   ) async {
     if (!Backend.useFirebase || uid.isEmpty) return const [];
-    final snap = await _col(uid, 'skincare_logs')
+    try {
+      final snap = await _col(uid, 'skincare_logs')
+          .orderBy('createdAt', descending: true)
+          .get();
+      return snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+    } catch (_) {
+      final snap = await _col(uid, 'skincare_logs').get();
+      final docs = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+      docs.sort((a, b) => ((b['dateIso'] ?? '') as String).compareTo((a['dateIso'] ?? '') as String));
+      return docs;
+    }
+  }
+
+  /// Stream riwayat skincare milik pengguna secara realtime.
+  static Stream<List<Map<String, dynamic>>> streamSkincare(String uid) {
+    if (!Backend.useFirebase || uid.isEmpty) return const Stream.empty();
+    return _col(uid, 'skincare_logs')
         .orderBy('createdAt', descending: true)
-        .get();
-    return snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList());
   }
 
   // ---------------------------------------------------------------------------
