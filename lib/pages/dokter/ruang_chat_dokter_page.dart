@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/empty_state.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
+import '../../services/active_chat_registry.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/consultation_service.dart';
@@ -57,6 +58,9 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
   @override
   void initState() {
     super.initState();
+    // Anti-spam: pesan masuk di ruang yang sedang dibuka tidak memunculkan
+    // native notification (chat realtime sudah memberi feedback visual).
+    ActiveChatRegistry.open(widget.consultationId);
     // Seed demo HANYA tanpa Firebase; dengan Firebase, stream yang mengisi.
     _messages = Backend.useFirebase
         ? <ChatBubbleModel>[]
@@ -154,6 +158,7 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
   @override
   void dispose() {
     _msgSub?.cancel();
+    ActiveChatRegistry.close(widget.consultationId);
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -511,7 +516,7 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
               Align(
                 alignment: Alignment.bottomRight,
                 child: Text(
-                  msg.time,
+                  msg.time.contains('WIB') ? msg.time : '${msg.time} WIB',
                   style: TextStyle(
                     fontSize: 10.5,
                     color: isDoctor
