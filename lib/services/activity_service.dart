@@ -49,6 +49,16 @@ class ActivityService {
     return snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
   }
 
+  /// Stream aktivitas milik user secara realtime.
+  static Stream<List<Map<String, dynamic>>> streamMine(String actorUid) {
+    if (!Backend.useFirebase || actorUid.isEmpty) return const Stream.empty();
+    return _col
+        .where('actorUid', isEqualTo: actorUid)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList());
+  }
+
   /// Semua aktivitas (khusus admin — laporan & beranda).
   static Future<List<Map<String, dynamic>>> listAll({int? limit}) async {
     if (!Backend.useFirebase) return const [];
@@ -56,5 +66,15 @@ class ActivityService {
     if (limit != null) q = q.limit(limit);
     final snap = await q.get();
     return snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+  }
+
+  /// Stream semua aktivitas secara realtime (khusus admin).
+  static Stream<List<Map<String, dynamic>>> streamAll({int? limit}) {
+    if (!Backend.useFirebase) return const Stream.empty();
+    var q = _col.orderBy('createdAt', descending: true);
+    if (limit != null) q = q.limit(limit);
+    return q
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList());
   }
 }
