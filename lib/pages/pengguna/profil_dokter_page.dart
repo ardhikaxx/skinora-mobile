@@ -637,13 +637,13 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
       final nowBooked = slot == null || slot.isBooked;
       if (nowBooked) {
         bookingError =
-            'Slot sudah dibooking oleh pasien lain. Silakan pilih jadwal lain.';
+            'Slot sudah dibooking oleh pasien lain. Silahkan pilih jadwal lain.';
       } else {
         try {
           final patient = await AuthService.loadProfile();
           if (patient == null || patient.uid.isEmpty) {
             throw StateError(
-              'Sesi pengguna tidak ditemukan. Silakan login ulang.',
+              'Sesi pengguna tidak ditemukan. Silahkan login ulang.',
             );
           }
           consultationId = await ConsultationService.book(
@@ -663,7 +663,7 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
           bookingError = msg.contains('permission-denied') ||
                   msg.toLowerCase().contains('already') ||
                   msg.contains('dibooking')
-              ? 'Slot sudah dibooking oleh pasien lain. Silakan pilih jadwal lain.'
+              ? 'Slot sudah dibooking oleh pasien lain. Silahkan pilih jadwal lain.'
               : 'Gagal booking: $msg';
         }
       }
