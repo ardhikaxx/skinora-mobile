@@ -196,6 +196,15 @@ service cloud.firestore {
             || uid == request.auth.uid
             || hasCareLink(request.auth.uid, uid)
             || hasCareLink(uid, request.auth.uid)
+            // Realtime chat: pengirim pesan boleh menulis notifikasi ke lawan
+            // bicaranya walaupun care_link belum ada (data lama / booking di
+            // luar alur), selama ia benar-benar partisipan konsultasi tersebut.
+            || (request.resource.data.consultationId is string
+              && exists(/databases/$(database)/documents/consultations/$(request.resource.data.consultationId))
+              && (
+                get(/databases/$(database)/documents/consultations/$(request.resource.data.consultationId)).data.patientId == request.auth.uid
+                || get(/databases/$(database)/documents/consultations/$(request.resource.data.consultationId)).data.doctorId == request.auth.uid
+              ))
           );
 
         // Update: pemilik hanya boleh mengubah status baca.
