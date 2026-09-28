@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -74,10 +76,18 @@ class _RiwayatAktivitasPenggunaPageState
     ),
   ];
 
+  StreamSubscription<List<Map<String, dynamic>>>? _sub;
+
   @override
   void initState() {
     super.initState();
     _loadFromBackend();
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
   }
 
   String _fmtTime(Object? ts) {
@@ -85,27 +95,30 @@ class _RiwayatAktivitasPenggunaPageState
     return ts?.toString() ?? '';
   }
 
-  /// Riwayat aktivitas milik pengguna dari Firestore. Tanpa Firebase, seed
+  /// Riwayat aktivitas milik pengguna dari Firestore secara realtime. Tanpa Firebase, seed
   /// demo tetap dipakai agar UI/tes tidak berubah.
-  Future<void> _loadFromBackend() async {
+  void _loadFromBackend() {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
     if (uid == null) return;
-    try {
-      final items = await ActivityService.listMine(uid);
-      if (!mounted) return;
-      setState(() {
-        activities = items
-            .map((m) => ActivityItem(
-                  title: (m['title'] as String?) ?? '',
-                  timestamp: _fmtTime(m['createdAt']),
-                ))
-            .toList();
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => activities = <ActivityItem>[]);
-    }
+    _sub?.cancel();
+    _sub = ActivityService.streamMine(uid).listen(
+      (items) {
+        if (!mounted) return;
+        setState(() {
+          activities = items
+              .map((m) => ActivityItem(
+                    title: (m['title'] as String?) ?? '',
+                    timestamp: _fmtTime(m['createdAt']),
+                  ))
+              .toList();
+        });
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(() => activities = <ActivityItem>[]);
+      },
+    );
   }
 
   @override
