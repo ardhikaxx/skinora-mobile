@@ -102,16 +102,133 @@ class AppDates {
       '${hour.toString().padLeft(2, '0')}.'
       '${minute.toString().padLeft(2, '0')}';
 
+  static String _hmsParts(int hour, int minute, int second) =>
+      '${hour.toString().padLeft(2, '0')}.'
+      '${minute.toString().padLeft(2, '0')}.'
+      '${second.toString().padLeft(2, '0')}';
+
   /// "2026-08-28 13.00" (WIB, 24 jam, separator jam titik)
   static String dateTime(DateTime d) {
     final w = toWib(d);
     return '${iso(w)} ${_hmParts(w.hour, w.minute)}';
   }
 
+  /// "28 Agu 2026, 13.00 WIB" atau "28 Agu 2026, 13.00.45 WIB"
+  static String dateTimeWib(DateTime d, {bool includeSeconds = false}) {
+    final w = toWib(d);
+    final time = includeSeconds
+        ? _hmsParts(w.hour, w.minute, w.second)
+        : _hmParts(w.hour, w.minute);
+    return '${w.day} ${_monthsShort[w.month - 1]} ${w.year}, $time WIB';
+  }
+
+  /// "Jumat, 28 Agustus 2026 • 13.00 WIB" atau "Jumat, 28 Agustus 2026 • 13.00.45 WIB"
+  static String fullDisplayWib(
+    DateTime d, {
+    bool includeSeconds = false,
+    bool withBullet = true,
+  }) {
+    final w = toWib(d);
+    final time = includeSeconds
+        ? _hmsParts(w.hour, w.minute, w.second)
+        : _hmParts(w.hour, w.minute);
+    final sep = withBullet ? ' • ' : ', ';
+    return '${_days[w.weekday - 1]}, ${w.day} ${_months[w.month - 1]} ${w.year}$sep$time WIB';
+  }
+
   /// "13.00" (WIB, 24 jam)
   static String hm(DateTime d) {
     final w = toWib(d);
     return _hmParts(w.hour, w.minute);
+  }
+
+  /// "13.00 WIB" (WIB, 24 jam)
+  static String hmWib(DateTime d) {
+    final w = toWib(d);
+    return '${_hmParts(w.hour, w.minute)} WIB';
+  }
+
+  /// "13.00.45" (WIB, 24 jam dengan detik)
+  static String hms(DateTime d) {
+    final w = toWib(d);
+    return _hmsParts(w.hour, w.minute, w.second);
+  }
+
+  /// "13.00.45 WIB" (WIB, 24 jam dengan detik)
+  static String hmsWib(DateTime d) {
+    final w = toWib(d);
+    return '${_hmsParts(w.hour, w.minute, w.second)} WIB';
+  }
+
+  /// Format waktu relatif dinamis WIB (mis. "Baru saja", "5 menit yang lalu", "Hari ini, 13.00 WIB", "Kemarin, 19.30 WIB", dll.).
+  static String relativeWib(DateTime d) {
+    final diff = DateTime.now().toUtc().difference(d.toUtc());
+    final now = nowWib();
+    final target = toWib(d);
+
+    if (diff.isNegative || diff.inSeconds < 45) {
+      return 'Baru saja';
+    }
+    if (diff.inMinutes < 60) {
+      return '${diff.inMinutes} menit yang lalu';
+    }
+    if (diff.inHours < 24 &&
+        target.day == now.day &&
+        target.month == now.month &&
+        target.year == now.year) {
+      return 'Hari ini, ${_hmParts(target.hour, target.minute)} WIB';
+    }
+    final yesterday = now.subtract(const Duration(days: 1));
+    if (target.day == yesterday.day &&
+        target.month == yesterday.month &&
+        target.year == yesterday.year) {
+      return 'Kemarin, ${_hmParts(target.hour, target.minute)} WIB';
+    }
+    if (target.year == now.year) {
+      return '${target.day} ${_monthsShort[target.month - 1]}, ${_hmParts(target.hour, target.minute)} WIB';
+    }
+    return '${target.day} ${_monthsShort[target.month - 1]} ${target.year}, ${_hmParts(target.hour, target.minute)} WIB';
+  }
+
+  /// Konversi aman dari berbagai tipe (Timestamp, DateTime, int epoch millis, String ISO)
+  /// ke format tanggal/waktu WIB Indonesia.
+  static String formatTimestampWib(
+    Object? ts, {
+    bool relative = false,
+    bool includeSeconds = false,
+  }) {
+    if (ts == null) return '';
+    DateTime dt;
+    if (ts is DateTime) {
+      dt = ts;
+    } else {
+      try {
+        // ignore: avoid_dynamic_calls
+        dt = (ts as dynamic).toDate() as DateTime;
+      } catch (_) {
+        if (ts is int) {
+          dt = DateTime.fromMillisecondsSinceEpoch(ts);
+        } else if (ts is String) {
+          final parsed = DateTime.tryParse(ts);
+          if (parsed != null) {
+            dt = parsed;
+          } else {
+            return ts;
+          }
+        } else {
+          return ts.toString();
+        }
+      }
+    }
+    if (relative) return relativeWib(dt);
+    return dateTimeWib(dt, includeSeconds: includeSeconds);
+  }
+
+  /// Stream waktu realtime WIB yang memancarkan waktu setiap detik (atau interval yang dipilih).
+  static Stream<DateTime> realtimeWibStream({
+    Duration interval = const Duration(seconds: 1),
+  }) {
+    return Stream<DateTime>.periodic(interval, (_) => nowWib()).asBroadcastStream();
   }
 
   /// Normalisasi jam apa pun ("13:00", "9:00", "13.00") → "13.00".
@@ -126,14 +243,15 @@ class AppDates {
   }
 
   /// "09:00 - 09:30" / "09.00 - 09.30" → "09.00 - 09.30"
-  static String formatRange(String raw) {
+  static String formatRange(String raw, {bool withWib = false}) {
     final normalized = raw.trim().replaceAll(':', '.');
-    if (!normalized.contains('-')) return formatHm(normalized);
+    final suffix = withWib ? ' WIB' : '';
+    if (!normalized.contains('-')) return '${formatHm(normalized)}$suffix';
     final ends = normalized.split('-');
-    if (ends.length != 2) return normalized;
+    if (ends.length != 2) return '$normalized$suffix';
     final a = formatHm(ends[0]);
     final b = formatHm(ends[1]);
-    return '$a - $b';
+    return '$a - $b$suffix';
   }
 
   /// Slot sudah lewat (tanggal/jam WIB lampau)? dateIso "yyyy-MM-dd", jam "HH:mm"/"HH.mm".
@@ -179,6 +297,8 @@ class AppDates {
   }
 
   static String todayDisplay() => display(nowWib());
+
+  static String todayDisplayWib() => '${display(nowWib())} WIB';
 
   static String todayIso() => iso(nowWib());
 }
