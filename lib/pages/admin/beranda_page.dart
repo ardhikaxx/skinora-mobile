@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -10,6 +9,7 @@ import '../../services/consultation_service.dart';
 import '../../services/notification_controller.dart';
 import '../../services/user_service.dart';
 import '../../utils/app_dates.dart';
+import '../../components/realtime_wib_badge.dart';
 import 'notifikasi_admin_page.dart';
 import 'master_spesialisasi_page.dart';
 import 'laporan_riwayat_page.dart';
@@ -89,8 +89,7 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
   }
 
   String _fmtTime(Object? ts) {
-    if (ts is Timestamp) return AppDates.dateTime(ts.toDate());
-    return ts?.toString() ?? '';
+    return AppDates.formatTimestampWib(ts);
   }
 
   /// Ambil statistik + aktivitas terbaru dari Firestore. Tanpa Firebase
@@ -197,6 +196,12 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
                 color: subText,
                 fontWeight: FontWeight.w400,
               ),
+            ),
+            SizedBox(height: 6),
+            RealtimeWibBadge(
+              style: RealtimeWibStyle.pill,
+              compact: true,
+              includeSeconds: true,
             ),
           ],
         ),
