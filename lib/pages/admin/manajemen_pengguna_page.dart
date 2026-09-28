@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
@@ -88,32 +89,35 @@ class _ManajemenPenggunaPageState extends State<ManajemenPenggunaPage> {
           ),
         ];
 
+  StreamSubscription<List<AdminUserModel>>? _userSub;
+
   @override
   void initState() {
     super.initState();
     _loadFromBackend();
   }
 
-  /// Ambil data pengguna dari Firestore. Tanpa Firebase (test), seed demo
-  /// tetap dipakai. Dengan Firebase, hasil backend selalu menggantikan seed
-  /// — termasuk saat daftar kosong — agar UI sinkron dengan data asli.
-  Future<void> _loadFromBackend() async {
+  /// Ambil data pengguna dari Firestore secara realtime.
+  void _loadFromBackend() {
     if (!Backend.useFirebase) return;
-    try {
-      final users = await UserService.listPengguna();
-      if (!mounted) return;
-      setState(() => _users
-        ..clear()
-        ..addAll(users));
-    } catch (_) {
-      // Query gagal → tampilkan kosong, jangan seed palsu di production.
-      if (!mounted) return;
-      setState(_users.clear);
-    }
+    _userSub?.cancel();
+    _userSub = UserService.streamPengguna().listen(
+      (users) {
+        if (!mounted) return;
+        setState(() => _users
+          ..clear()
+          ..addAll(users));
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(_users.clear);
+      },
+    );
   }
 
   @override
   void dispose() {
+    _userSub?.cancel();
     _searchController.dispose();
     super.dispose();
   }
