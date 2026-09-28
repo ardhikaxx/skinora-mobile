@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/empty_state.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../models/admin_article_model.dart';
 import '../../services/article_service.dart';
 import '../../services/backend.dart';
 import '../../utils/app_dates.dart';
@@ -112,6 +114,8 @@ class _EdukasiKulitPenggunaPageState extends State<EdukasiKulitPenggunaPage> {
     ),
   ];
 
+  StreamSubscription<List<AdminArticleModel>>? _articleSub;
+
   @override
   void initState() {
     super.initState();
@@ -120,51 +124,54 @@ class _EdukasiKulitPenggunaPageState extends State<EdukasiKulitPenggunaPage> {
 
   @override
   void dispose() {
+    _articleSub?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  /// Artikel terbit dari Firestore. Tanpa Firebase, seed demo tetap dipakai
-  /// agar UI/tes tidak berubah.
-  Future<void> _loadFromBackend() async {
+  /// Artikel terbit dari Firestore secara realtime.
+  void _loadFromBackend() {
     if (!Backend.useFirebase) return;
-    try {
-      final articles = await ArticleService.listPublished();
-      if (!mounted) return;
-      setState(() {
-        _allArticles = articles
-            .map((a) => SkinEducationModel(
-                  id: a.backendId,
-                  category: a.category.toUpperCase(),
-                  title: a.title,
-                  snippet: a.content.isEmpty
-                      ? a.title
-                      : (a.content.length > 140
-                          ? '${a.content.substring(0, 140)}…'
-                          : a.content),
-                  date: a.date.isNotEmpty
-                      ? a.date
-                      : AppDates.short(AppDates.nowWib()),
-                  content: a.content,
-                ))
-            .toList();
-        _categories = <String>{
-          'Semua',
-          for (final a in articles)
-            if (a.category.isNotEmpty) a.category,
-        }.toList();
-        if (!_categories.contains(_selectedCategory)) {
+    _articleSub?.cancel();
+    _articleSub = ArticleService.streamPublished().listen(
+      (articles) {
+        if (!mounted) return;
+        setState(() {
+          _allArticles = articles
+              .map((a) => SkinEducationModel(
+                    id: a.backendId,
+                    category: a.category.toUpperCase(),
+                    title: a.title,
+                    snippet: a.content.isEmpty
+                        ? a.title
+                        : (a.content.length > 140
+                            ? '${a.content.substring(0, 140)}…'
+                            : a.content),
+                    date: a.date.isNotEmpty
+                        ? a.date
+                        : AppDates.short(AppDates.nowWib()),
+                    content: a.content,
+                  ))
+              .toList();
+          _categories = <String>{
+            'Semua',
+            for (final a in articles)
+              if (a.category.isNotEmpty) a.category,
+          }.toList();
+          if (!_categories.contains(_selectedCategory)) {
+            _selectedCategory = 'Semua';
+          }
+        });
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(() {
+          _allArticles = <SkinEducationModel>[];
+          _categories = <String>['Semua'];
           _selectedCategory = 'Semua';
-        }
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _allArticles = <SkinEducationModel>[];
-        _categories = <String>['Semua'];
-        _selectedCategory = 'Semua';
-      });
-    }
+        });
+      },
+    );
   }
 
   List<SkinEducationModel> get _filteredArticles {
