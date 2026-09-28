@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../utils/app_dates.dart';
+import 'konsultasi_dokter_page.dart';
 import 'riwayat_skin_check_page.dart';
 
 class SkinCheckResultPage extends StatelessWidget {
   final String skinType;
   final String sensitivity;
   final String acneRisk;
+  final String? createdDisplay;
   final ValueChanged<int>? onNavigateTab;
 
   const SkinCheckResultPage({
@@ -14,6 +17,7 @@ class SkinCheckResultPage extends StatelessWidget {
     this.skinType = '',
     this.sensitivity = '',
     this.acneRisk = '',
+    this.createdDisplay,
     this.onNavigateTab,
   });
 
@@ -75,6 +79,36 @@ class SkinCheckResultPage extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 20.0),
                 children: [
+                  // Tanggal skin check otomatis (format Indonesia WIB).
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFEEEEEE)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(LucideIcons.calendarDays,
+                            size: 16, color: primaryMaroon),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            createdDisplay ??
+                                AppDates.fullDisplayWib(
+                                    AppDates.nowWib()),
+                            style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: darkText),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   // 2. Large Peach Result Card matching image copy 8.png
                   _buildMainResultCard(),
 
@@ -164,6 +198,46 @@ class SkinCheckResultPage extends StatelessWidget {
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryMaroon,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // 7. Button "Konsultasi Dokter" — langsung merujuk ke konsultasi.
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => KonsultasiDokterPenggunaPage(
+                              onNavigateTab: onNavigateTab,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(
+                        LucideIcons.stethoscope,
+                        size: 18,
+                        color: Colors.white,
+                      ),
+                      label: const Text(
+                        'Konsultasi Dokter',
+                        style: TextStyle(
+                          fontSize: 14.0,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFB23A48),
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
