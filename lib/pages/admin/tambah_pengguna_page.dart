@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../models/admin_user_model.dart';
+import '../../services/activity_service.dart';
+import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/user_service.dart';
 
@@ -26,6 +28,7 @@ class _TambahPenggunaPageState extends State<TambahPenggunaPage> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
+  final _birthDateController = TextEditingController();
 
   String _selectedGender = 'Perempuan';
   final List<String> _genders = ['Perempuan', 'Laki-laki'];
@@ -36,7 +39,33 @@ class _TambahPenggunaPageState extends State<TambahPenggunaPage> {
     _emailController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
+    _birthDateController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickBirthDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(2000),
+      firstDate: DateTime(1950),
+      lastDate: DateTime.now(),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: primaryMaroon,
+            onPrimary: Colors.white,
+            onSurface: darkText,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _birthDateController.text =
+            '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+      });
+    }
   }
 
   Future<void> _handleSubmit() async {
@@ -71,7 +100,7 @@ class _TambahPenggunaPageState extends State<TambahPenggunaPage> {
       email: email,
       phone: _phoneController.text.trim(),
       address: _addressController.text.trim(),
-      birthDate: '',
+      birthDate: _birthDateController.text.trim(),
       gender: _selectedGender,
       status: UserStatus.aktif,
     );
@@ -80,6 +109,12 @@ class _TambahPenggunaPageState extends State<TambahPenggunaPage> {
     if (Backend.useFirebase) {
       try {
         newUser = await UserService.createPengguna(newUser);
+        await ActivityService.log(
+          title: 'Menambah pengguna $name',
+          tag: 'Pengguna',
+          actor: 'Admin',
+          actorUid: AuthService.uid ?? 'admin',
+        );
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -90,6 +125,7 @@ class _TambahPenggunaPageState extends State<TambahPenggunaPage> {
     }
 
     if (!mounted) return;
+    // Dialog sukses ditampilkan pemanggil (ManajemenPenggunaPage) agar tunggal.
     Navigator.pop(context, newUser);
   }
 
@@ -205,6 +241,20 @@ class _TambahPenggunaPageState extends State<TambahPenggunaPage> {
                         _buildLabel('JENIS KELAMIN'),
                         const SizedBox(height: 8),
                         _buildGenderDropdown(),
+                        const SizedBox(height: 16),
+
+                        // TANGGAL LAHIR (date picker di dalam kolom)
+                        _buildLabel('TANGGAL LAHIR'),
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: _pickBirthDate,
+                          child: AbsorbPointer(
+                            child: _buildTextField(
+                              controller: _birthDateController,
+                              hintText: '1995-06-15',
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 24),
 
                         // Tombol Tambah Pengguna
