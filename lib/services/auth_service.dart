@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/user_profile.dart';
 import 'backend.dart';
@@ -100,6 +101,9 @@ class AuthService {
   /// Pesan error Indonesia memakai slot `_errorMessage` login / snackbar
   /// register yang sudah ada di UI.
   static String describeAuthError(Object error) {
+    debugPrint('AuthService.describeAuthError: ${error.runtimeType} → $error');
+
+    // FirebaseAuthException extends FirebaseException, jadi cek spesifik dulu.
     if (error is FirebaseAuthException) {
       switch (error.code) {
         case 'invalid-email':
@@ -112,6 +116,7 @@ class AuthService {
         case 'wrong-password':
         case 'invalid-credential':
         case 'invalid-argument':
+        case 'INVALID_LOGIN_CREDENTIALS':
           return 'Email atau password salah.';
         case 'email-already-in-use':
           return 'Email sudah terdaftar. Silahkan gunakan menu Masuk.';
@@ -127,10 +132,32 @@ class AuthService {
           return error.message ?? 'Pendaftaran tidak diizinkan untuk email ini.';
         case 'configuration-not-found':
           return 'Konfigurasi Firebase belum lengkap.';
+        case 'channel-error':
+          return 'Koneksi ke server gagal. Periksa jaringan Anda.';
         default:
-          return 'Terjadi kesalahan. Silahkan coba lagi.';
+          debugPrint('Unhandled FirebaseAuthException code: ${error.code}');
+          return 'Email atau password salah.';
       }
     }
+
+    // FirebaseException (Firestore, dll) — bukan Auth error.
+    if (error is FirebaseException) {
+      switch (error.code) {
+        case 'permission-denied':
+          return 'Akses ditolak. Hubungi administrator.';
+        case 'unavailable':
+          return 'Server sedang tidak tersedia. Coba lagi nanti.';
+        case 'not-found':
+          return 'Data profil tidak ditemukan.';
+        case 'network-request-failed':
+          return 'Koneksi gagal. Periksa jaringan Anda.';
+        default:
+          debugPrint('Unhandled FirebaseException code: ${error.code}');
+          return 'Terjadi kesalahan koneksi. Silahkan coba lagi.';
+      }
+    }
+
+    debugPrint('Non-Firebase error: ${error.runtimeType} → $error');
     return 'Terjadi kesalahan. Silahkan coba lagi.';
   }
 }
