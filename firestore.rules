@@ -313,6 +313,56 @@ service cloud.firestore {
       }
     }
 
+    // -----------------------------------------------------------------------
+    // Provisioned accounts (admin pre-register pengguna/dokter tanpa password)
+    // -----------------------------------------------------------------------
+    match /provisioned_accounts/{email} {
+      // Baca: signed in (register perlu cek provision) atau admin.
+      allow read: if signedIn();
+
+      // Create/update: hanya admin.
+      allow create, update: if isAdmin();
+
+      // Delete: hanya admin.
+      allow delete: if isAdmin();
+    }
+
+    // -----------------------------------------------------------------------
+    // Activity log (immutable write-only dari client)
+    // -----------------------------------------------------------------------
+    match /activities/{doc} {
+      // Baca: pemilik (actorUid == uid) atau admin.
+      allow read: if signedIn()
+        && (isAdmin() || resource.data.actorUid == request.auth.uid);
+
+      // Create: signed in, createdBy harus uid sendiri.
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.tag is string
+        && request.resource.data.actor is string;
+
+      // Immutable — tidak ada update/delete dari client.
+      allow update, delete: if false;
+    }
+
+    // -----------------------------------------------------------------------
+    // Spesialisasi (master data)
+    // -----------------------------------------------------------------------
+    match /specializations/{doc} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // -----------------------------------------------------------------------
+    // Artikel edukasi
+    // -----------------------------------------------------------------------
+    match /articles/{doc} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
