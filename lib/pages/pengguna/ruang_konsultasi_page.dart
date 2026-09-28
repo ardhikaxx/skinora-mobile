@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/empty_state.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../services/active_chat_registry.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/consultation_service.dart';
@@ -66,6 +67,9 @@ class _RuangKonsultasiPenggunaPageState
   void initState() {
     super.initState();
     _statusLabel = widget.status;
+    // Anti-spam: pesan masuk di ruang yang sedang dibuka tidak memunculkan
+    // native notification (chat realtime sudah memberi feedback visual).
+    ActiveChatRegistry.open(widget.consultationId);
     final consultationId = widget.consultationId;
     if (Backend.useFirebase &&
         consultationId != null &&
@@ -128,6 +132,7 @@ class _RuangKonsultasiPenggunaPageState
   void dispose() {
     _msgSub?.cancel();
     _statusSub?.cancel();
+    ActiveChatRegistry.close(widget.consultationId);
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -346,7 +351,7 @@ class _RuangKonsultasiPenggunaPageState
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  msg.time,
+                  msg.time.contains('WIB') ? msg.time : '${msg.time} WIB',
                   style: TextStyle(
                     fontSize: 10.5,
                     color: isUser
