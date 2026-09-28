@@ -176,6 +176,7 @@ class AppNotification {
     required this.body,
     this.description,
     this.entityId,
+    this.eventId,
     this.route,
     this.targetTab,
     this.consultationId,
@@ -204,6 +205,12 @@ class AppNotification {
   final String? description;
 
   final String? entityId;
+
+  /// Pembeda event berulang pada [entityId] yang sama (mis. ID pesan chat).
+  ///
+  /// Hanya memengaruhi **doc ID**/dedupe — deep-link tetap memakai [entityId].
+  final String? eventId;
+
   final String? route;
   final int? targetTab;
   final String? consultationId;
@@ -228,6 +235,7 @@ class AppNotification {
     required String title,
     required String body,
     String? entityId,
+    String? eventId,
     String? route,
     int? targetTab,
     String? consultationId,
@@ -245,6 +253,7 @@ class AppNotification {
         type: type,
         recipientId: recipientId,
         entityId: entityId,
+        eventId: eventId,
       ),
       recipientId: recipientId,
       audience: NotificationAudience.user(recipientId),
@@ -253,6 +262,7 @@ class AppNotification {
       title: title,
       body: body,
       entityId: entityId,
+      eventId: eventId,
       route: route,
       targetTab: targetTab,
       consultationId: consultationId,
@@ -294,6 +304,7 @@ class AppNotification {
       'isUnread': true,
       'readAt': null,
       'entityId': entityId,
+      'eventId': eventId,
       'route': resolvedRoute,
       'targetTab': targetTab,
       'consultationId': consultationId,
@@ -318,6 +329,7 @@ class AppNotification {
         type: type,
         recipientId: recipientId,
         entityId: entityId,
+        eventId: eventId,
       );
 
   /// Map untuk FCM **data-only message** (tanpa blok `notification`).
@@ -333,6 +345,7 @@ class AppNotification {
       'route': resolvedRoute,
       'channel': resolvedChannel,
       'entityId': ?entityId,
+      'eventId': ?eventId,
       'targetTab': ?targetTab?.toString(),
       'consultationId': ?consultationId,
       'bookingId': ?bookingId,
@@ -369,6 +382,7 @@ class AppNotification {
           type: type,
           recipientId: recipientId,
           entityId: str('entityId'),
+          eventId: str('eventId'),
         );
     final body = str('body') ?? str('description') ?? '';
     final tabRaw = str('targetTab');
@@ -387,6 +401,7 @@ class AppNotification {
       body: body,
       description: str('description'),
       entityId: str('entityId'),
+      eventId: str('eventId'),
       route: str('route'),
       targetTab: tab,
       consultationId: str('consultationId'),
@@ -445,6 +460,11 @@ class AppNotification {
 ///
 /// Format: `{type}__{recipient}__{entity}` — aman untuk doc ID Firestore
 /// (tanpa `/`), maksimum 1500 byte, dan selalu sama untuk event yang sama.
+///
+/// [eventId] dipakai untuk event yang terjadi **berulang pada entity yang
+/// sama**, mis. tiap pesan chat di satu konsultasi. Selama `entityId` tetap
+/// menunjuk ruang/tujuan deep-link, segmen `--{eventId}` membuat tiap pesan
+/// menghasilkan dokumen & native notification baru (tidak dianggap duplikat).
 class NotificationEventKey {
   NotificationEventKey._();
 
@@ -452,12 +472,15 @@ class NotificationEventKey {
     required String type,
     required String recipientId,
     String? entityId,
+    String? eventId,
   }) {
     final safeType = _sanitize(type.isEmpty ? NotificationType.system : type);
     final safeRecipient = _sanitize(recipientId);
     final safeEntity = _sanitize(entityId ?? '');
+    final safeEvent = _sanitize(eventId ?? '');
     const sep = '__';
-    return '$safeType$sep$safeRecipient$sep$safeEntity';
+    final base = '$safeType$sep$safeRecipient$sep$safeEntity';
+    return safeEvent == '-' ? base : '$base--$safeEvent';
   }
 
   static String _sanitize(String value) {
