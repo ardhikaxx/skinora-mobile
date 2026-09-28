@@ -10,31 +10,35 @@
 class ActiveChatRegistry {
   ActiveChatRegistry._();
 
-  static String? _consultationId;
+  /// Ruang yang sedang terbuka di UI (biasanya 1; bisa >1 saat deep-link
+  /// notifikasi menumpuk halaman ruang).
+  static final List<String> _openRooms = <String>[];
 
-  /// ID konsultasi yang sedang dibuka user, atau null bila tidak di ruang chat.
-  static String? get consultationId => _consultationId;
+  /// ID konsultasi yang paling terakhir dibuka, atau null bila tidak ada ruang.
+  static String? get consultationId =>
+      _openRooms.isEmpty ? null : _openRooms.last;
 
   static void open(String? consultationId) {
-    _consultationId =
-        (consultationId == null || consultationId.isEmpty) ? null : consultationId;
+    if (consultationId == null || consultationId.isEmpty) return;
+    _openRooms.remove(consultationId);
+    _openRooms.add(consultationId);
   }
 
   static void close(String? consultationId) {
-    if (consultationId == null ||
-        consultationId.isEmpty ||
-        _consultationId == consultationId) {
-      _consultationId = null;
+    if (consultationId == null || consultationId.isEmpty) {
+      _openRooms.clear();
+      return;
     }
+    _openRooms.remove(consultationId);
   }
 
-  static void clear() => _consultationId = null;
+  static void clear() => _openRooms.clear();
 
-  /// `true` bila [incomingConsultationId] adalah ruang yang sedang aktif.
+  /// `true` bila [incomingConsultationId] adalah salah satu ruang yang aktif.
   static bool isActiveRoom(String? incomingConsultationId) {
     if (incomingConsultationId == null || incomingConsultationId.isEmpty) {
       return false;
     }
-    return _consultationId == incomingConsultationId;
+    return _openRooms.contains(incomingConsultationId);
   }
 }
