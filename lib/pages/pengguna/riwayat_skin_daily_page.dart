@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/empty_state.dart';
@@ -157,54 +159,65 @@ class _RiwayatSkinDailyPageState extends State<RiwayatSkinDailyPage> {
     ),
   ];
 
+  StreamSubscription<List<Map<String, dynamic>>>? _sub;
+
   @override
   void initState() {
     super.initState();
     _loadFromBackend();
   }
 
-  /// Riwayat skin daily milik pengguna dari Firestore. Tanpa Firebase, seed
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  /// Riwayat skin daily milik pengguna dari Firestore secara realtime. Tanpa Firebase, seed
   /// demo tetap dipakai agar UI/tes tidak berubah.
-  Future<void> _loadFromBackend() async {
+  void _loadFromBackend() {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
     if (uid == null) return;
-    try {
-      final items = await SkinService.listSkinDailies(uid);
-      if (!mounted) return;
-      setState(() {
-        _entries = items.map((m) {
-          final symptoms =
-              (m['symptoms'] as List?)?.cast<String>() ?? const <String>[];
-          final locations =
-              (m['locations'] as List?)?.cast<String>() ?? const <String>[];
-          final status = (m['status'] as String?) ?? 'Baik';
-          final preview =
-              symptoms.isEmpty ? status : symptoms.join('  ');
-          return DailyHistoryEntry(
-            date: (m['dateDisplay'] as String?) ?? '',
-            status: status,
-            previewText: preview,
-            locations: locations,
-            symptoms: symptoms,
-            sleepTime: (m['jamTidur'] as String?) ?? '-',
-            waterGlasses: '${(m['air'] as String?) ?? '0'} gelas',
-            food: (m['makanan'] as String?) ?? '-',
-            activity: (m['aktivitas'] as String?) ?? '-',
-            routinePagi: m['skincarePagi'] as bool? ?? false,
-            routineMalam: m['skincareMalam'] as bool? ?? false,
-          );
-        }).toList();
-        _expandedIndices.clear();
-        if (_entries.isNotEmpty) _expandedIndices.add(0);
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _entries = <DailyHistoryEntry>[];
-        _expandedIndices.clear();
-      });
-    }
+    _sub?.cancel();
+    _sub = SkinService.streamSkinDailies(uid).listen(
+      (items) {
+        if (!mounted) return;
+        setState(() {
+          _entries = items.map((m) {
+            final symptoms =
+                (m['symptoms'] as List?)?.cast<String>() ?? const <String>[];
+            final locations =
+                (m['locations'] as List?)?.cast<String>() ?? const <String>[];
+            final status = (m['status'] as String?) ?? 'Baik';
+            final preview =
+                symptoms.isEmpty ? status : symptoms.join('  ');
+            return DailyHistoryEntry(
+              date: (m['dateDisplay'] as String?) ?? '',
+              status: status,
+              previewText: preview,
+              locations: locations,
+              symptoms: symptoms,
+              sleepTime: (m['jamTidur'] as String?) ?? '-',
+              waterGlasses: '${(m['air'] as String?) ?? '0'} gelas',
+              food: (m['makanan'] as String?) ?? '-',
+              activity: (m['aktivitas'] as String?) ?? '-',
+              routinePagi: m['skincarePagi'] as bool? ?? false,
+              routineMalam: m['skincareMalam'] as bool? ?? false,
+            );
+          }).toList();
+          _expandedIndices.clear();
+          if (_entries.isNotEmpty) _expandedIndices.add(0);
+        });
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(() {
+          _entries = <DailyHistoryEntry>[];
+          _expandedIndices.clear();
+        });
+      },
+    );
   }
 
   @override
