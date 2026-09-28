@@ -61,6 +61,10 @@ Future<void> skinoraLocalNotificationBackgroundHandler(
 ) async {
   final payload = ReminderScheduler.decode(response.payload);
   if (payload.isEmpty) return;
+  // Jembatan antar-isolate: UI isolate tidak berbagi state statis dengan
+  // background isolate, jadi payload disimpan dulu ke penyimpanan lokal
+  // supaya deep-link tetap berfungsi setelah aplikasi selesai dibuka.
+  await NotificationService.persistPendingIntent(payload);
   NotificationRouter.setPendingIntent(AppNotification.fromMap(payload));
   NotificationLog.info('local notification tap (background)');
 }
@@ -93,10 +97,46 @@ class NotificationService {
   /// Status permission OS (bukan preference aplikasi).
   static bool _osPermissionGranted = true;
 
+  /// Status permission OS yang bisa didengarkan UI (gate izin & halaman
+  /// Pengaturan) sehingga selalu reaktif ketika user mengubahnya di system
+  /// settings lalu kembali ke aplikasi.
+  static final ValueNotifier<bool> permissionGranted =
+      ValueNotifier<bool>(true);
+
+  /// Flag "dialog izin sudah pernah ditampilkan" Ã¢â‚¬â€ sekali per perangkat agar
+  /// prompt tidak muncul berulang di setiap login.
+  static const String _permissionAskedPrefsKey =
+      'skinora.notification_permission_asked';
+
+  /// Jembatan payload tap notifikasi antar-isolate: callback tap di background
+  /// isolate tidak berbagi state dengan UI isolate, jadi payload ditulis ke
+  /// SharedPreferences lalu dipulihkan saat aplikasi dibuka.
+  static const String _pendingIntentPrefsKey =
+      'skinora.pending_notification_payload';
+
   /// Listener Firestore notifikasi foreground (fallback bila FCM belum
   /// terkirim / Cloud Functions belum aktif).
   static StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _feedSub;
   static bool _feedPrimed = false;
+
+  /// Listener realtime konsultasi aktif (dokter / pasien).
+  static StreamSubscription<dynamic>? _consultationsSub;
+  static bool _consultationsPrimed = false;
+
+  /// Map listener pesan chat per-konsultasi (key: consultationId).
+  static final Map<String, StreamSubscription<dynamic>> _chatSubsMap =
+      <String, StreamSubscription<dynamic>>{};
+  /// Set konsultasi yang sudah di-prime (snapshot pertama terlewati).
+  static final Set<String> _chatPrimed = <String>{};
+
+  /// Ambang "notifikasi masih segar" untuk jalur Firestore.
+  ///
+  /// Snapshot pertama (cache lokal → server) bisa memuat dokumen lama yang
+  /// baru tersinkron; hanya dokumen dalam rentang ini yang ditampilkan sebagai
+  /// native notification supaya tidak ada belasan notifikasi lama sekaligus.
+  /// Diperlebar ke 30 menit untuk menangani keterlambatan sinkronisasi
+  /// Firestore saat koneksi buruk.
+  static const Duration _freshWindow = Duration(minutes: 30);
 
   // ---------------------------------------------------------------------------
   // Public state
@@ -107,6 +147,14 @@ class NotificationService {
   static bool get appNotificationsEnabled => _appNotificationsEnabled;
   static bool get osPermissionGranted => _osPermissionGranted;
 
+  /// Update status permission sekaligus menyiarkannya ke UI.
+  static void _setOsPermission(bool value) {
+    _osPermissionGranted = value;
+    if (permissionGranted.value != value) {
+      permissionGranted.value = value;
+    }
+  }
+
   static String userAudience(String uid) => NotificationAudience.user(uid);
   static const String adminAudience = NotificationAudience.legacyAdminRole;
 
@@ -116,29 +164,37 @@ class NotificationService {
   /// Dipanggil di `main()` SETELAH `Firebase.initializeApp` dan SEBELUM
   /// `runApp`, sehingga shell role sudah memiliki infrastruktur notifikasi.
   static Future<void> init() async {
-    if (_initialized || !Backend.useFirebase) return;
+    if (_initialized) return;
     _initialized = true;
 
     _appNotificationsEnabled = await _readEnabledPreference();
 
     await _initLocalNotifications();
-    await _initFirebaseMessaging();
-    await _initAuthLifecycle();
+    if (Backend.useFirebase) {
+      await _initFirebaseMessaging();
+      await _initAuthLifecycle();
+    }
     _initLifecycleObserver();
+    await refreshPermissionStatus();
 
     NotificationLog.info('NotificationService siap');
   }
 
   // ---------------------------------------------------------------------------
-  // Public API — nama persis seperti kontrak sistem notifikasi
+  // Public API Ã¢â‚¬â€ nama persis seperti kontrak sistem notifikasi
   // ---------------------------------------------------------------------------
   /// Alias [init]: inisialisasi `FlutterLocalNotificationsPlugin`, channel
   /// Android, FCM, listener lifecycle, dan sinkronisasi token/reminder.
   static Future<void> initialize() => init();
 
-  /// Minta izin notifikasi: FCM (iOS APNs + badge/sound), Android 13+
-  /// `POST_NOTIFICATIONS` via `flutter_local_notifications`, dan izin iOS
-  /// sisi local notification.
+  /// Minta izin notifikasi: Android 13+ `POST_NOTIFICATIONS` via
+  /// `flutter_local_notifications`, iOS (alert/badge/sound), lalu FCM
+  /// (APNs iOS + fallback status Android).
+  ///
+  /// Urutan ini penting: prompt dari local-notifications adalah yang benar-
+  /// benar menampilkan dialog sistem. Panggilan di `main()` sebelum frame
+  /// pertama bisa diabaikan OS, jadi jalur utama adalah dialog izin di
+  /// `NotificationPermissionGate` (setelah login) dan tombol di Pengaturan.
   ///
   /// OS hanya menampilkan prompt sekali; panggilan berikutnya hanya
   /// membaca status terkini. [force] dipakai tombol "Izinkan Notifikasi"
@@ -146,53 +202,114 @@ class NotificationService {
   ///
   /// Mengembalikan `true` bila izin diberikan.
   static Future<bool> requestPermission({bool force = false}) async {
-    if (!Backend.useFirebase) return false;
+    if (kIsWeb) return _osPermissionGranted;
     if (_permissionRequested && !force) {
       await refreshPermissionStatus();
       return _osPermissionGranted;
     }
     _permissionRequested = true;
 
+    // 1) Prompt resmi sisi local notification (satu-satunya yang memunculkan
+    //    dialog POST_NOTIFICATIONS di Android 13+).
+    await _ensureLocalInitialized();
     try {
-      final settings = await FirebaseMessaging.instance.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-        provisional: false,
-      );
-      _osPermissionGranted =
-          settings.authorizationStatus == AuthorizationStatus.authorized ||
-              settings.authorizationStatus == AuthorizationStatus.provisional;
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        await _local
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>()
+            ?.requestNotificationsPermission();
+      } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+        await _local
+            .resolvePlatformSpecificImplementation<
+                IOSFlutterLocalNotificationsPlugin>()
+            ?.requestPermissions(alert: true, badge: true, sound: true);
+      }
     } catch (e) {
-      NotificationLog.error('requestPermission gagal', e);
+      NotificationLog.error('prompt izin notifikasi lokal gagal', e);
     }
 
-    // Android 13+ juga butuh prompt dari flutter_local_notifications.
-    try {
-      await _local
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.requestNotificationsPermission();
-    } catch (e) {
-      NotificationLog.error('requestNotificationsPermission gagal', e);
+    // 2) FCM: APNs (iOS) + badge/sound sekaligus fallback status Android.
+    if (Backend.useFirebase) {
+      try {
+        final settings = await FirebaseMessaging.instance.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+          provisional: false,
+        );
+        final authorized =
+            settings.authorizationStatus == AuthorizationStatus.authorized ||
+                settings.authorizationStatus == AuthorizationStatus.provisional;
+        if (authorized) _setOsPermission(true);
+      } catch (e) {
+        NotificationLog.error('requestPermission FCM gagal', e);
+      }
     }
 
-    // iOS: izin alert/badge/sound di sisi local notification.
-    try {
-      await _local
-          .resolvePlatformSpecificImplementation<
-              IOSFlutterLocalNotificationsPlugin>()
-          ?.requestPermissions(alert: true, badge: true, sound: true);
-    } catch (e) {
-      NotificationLog.error('iOS requestPermissions gagal', e);
-    }
-
+    // 3) Status sebenarnya dibaca ulang (Android: areNotificationsEnabled)
+    //    agar UI tidak menampilkan "izin aktif" padahal belum.
+    await refreshPermissionStatus();
     NotificationLog.info('permission OS = $_osPermissionGranted');
     return _osPermissionGranted;
   }
 
+  /// `true` bila dialog izin sudah pernah ditampilkan di perangkat ini.
+  ///
+  /// Dipersist di SharedPreferences sehingga prompt hanya muncul sekali,
+  /// tetapi status izin tetap dicek ulang setiap aplikasi kembali ke depan.
+  static Future<bool> hasAskedPermissionDialog() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_permissionAskedPrefsKey) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Tandai dialog izin sudah pernah ditampilkan (tidak menunggu hasil).
+  static Future<void> markPermissionDialogAsked() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_permissionAskedPrefsKey, true);
+    } catch (_) {
+      // Best-effort: gagal menyimpan flag hanya berarti dialog bisa muncul lagi.
+    }
+  }
+
+  /// Simpan payload tap notifikasi ke penyimpanan lokal.
+  ///
+  /// Dipakai callback tap di background isolate (aplikasi terminated) yang
+  /// tidak berbagi state dengan UI isolate; payload dipulihkan saat init
+  /// berikutnya lalu diteruskan ke [NotificationRouter].
+  static Future<void> persistPendingIntent(
+    Map<Object?, Object?> payload,
+  ) async {
+    if (payload.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_pendingIntentPrefsKey, jsonEncode(payload));
+    } catch (e) {
+      NotificationLog.error('gagal menyimpan pending intent', e);
+    }
+  }
+
+  static Future<void> _restorePersistedPendingIntent() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_pendingIntentPrefsKey);
+      if (raw == null || raw.isEmpty) return;
+      await prefs.remove(_pendingIntentPrefsKey);
+      final payload = ReminderScheduler.decode(raw);
+      if (payload.isEmpty) return;
+      NotificationRouter.setPendingIntent(AppNotification.fromMap(payload));
+      NotificationLog.info('pending intent dipulihkan dari penyimpanan lokal');
+    } catch (e) {
+      NotificationLog.error('gagal memulihkan pending intent', e);
+    }
+  }
+
   /// Tampilkan notifikasi native sekarang juga (foreground / background
-  /// isolate). Idempoten — [SeenCache] memastikan satu `notificationId` hanya
+  /// isolate). Idempoten Ã¢â‚¬â€ [SeenCache] memastikan satu `notificationId` hanya
   /// tampil sekali meski datang dari FCM dan Firestore sekaligus.
   static Future<void> showNotification(
     AppNotification n, {
@@ -233,7 +350,7 @@ class NotificationService {
     }
   }
 
-  /// Batalkan seluruh notifikasi terjadwal di perangkat ini —
+  /// Batalkan seluruh notifikasi terjadwal di perangkat ini Ã¢â‚¬â€
   /// reminder pagi/malam user aktif lalu semua sisa jadwal lokal.
   static Future<void> cancelAllNotifications() async {
     if (kIsWeb) return;
@@ -252,13 +369,13 @@ class NotificationService {
 
   /// Satu-satunya jalur pemrosesan pesan FCM ketika aplikasi aktif
   /// (`FirebaseMessaging.onMessage`). Mengubah `RemoteMessage.data` menjadi
-  /// notifikasi native via [showNotification] — tanpa duplikat karena payload
+  /// notifikasi native via [showNotification] Ã¢â‚¬â€ tanpa duplikat karena payload
   /// FCM yang dikirim backend berupa **data-only**.
   static Future<void> handleForegroundMessage(RemoteMessage message) =>
       _onForegroundMessage(message);
 
   /// Satu-satunya jalur ketika user mengetuk notifikasi yang ditampilkan oleh
-  /// `flutter_local_notifications` (payload JSON → deep-link [NotificationRouter]).
+  /// `flutter_local_notifications` (payload JSON Ã¢â€ â€™ deep-link [NotificationRouter]).
   static Future<void> handleNotificationTap(NotificationResponse response) =>
       _onLocalNotificationTap(response);
 
@@ -341,6 +458,18 @@ class NotificationService {
 
     final messaging = FirebaseMessaging.instance;
 
+    // iOS: presentasi notifikasi di foreground (alert, badge, sound).
+    // Tanpa ini notifikasi FCM yang datang saat app aktif di iOS tidak tampil.
+    try {
+      await messaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    } catch (e) {
+      NotificationLog.error('setForegroundNotificationPresentationOptions gagal', e);
+    }
+
     // Permission: iOS (APNs) + Android 13+ (POST_NOTIFICATIONS).
     await requestPermission();
 
@@ -378,6 +507,13 @@ class NotificationService {
     } catch (e) {
       NotificationLog.error('launch details gagal', e);
     }
+
+    // Cadangan: payload yang ditulis callback tap di background isolate
+    // (state antar-isolate tidak dibagi). Hanya dipakai bila launch details
+    // belum membawa intent apa pun.
+    if (NotificationRouter.pendingIntent == null) {
+      await _restorePersistedPendingIntent();
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -405,7 +541,7 @@ class NotificationService {
   static Future<void> handleSignIn(String uid) async {
     if (_uid == uid) return;
     // Pending intent dari notification tray harus bertahan melewati cleanup
-    // logout di bawah — kalau tidak, tap notifikasi saat aplikasi belum
+    // logout di bawah Ã¢â‚¬â€ kalau tidak, tap notifikasi saat aplikasi belum
     // login akan hilang begitu sesi terbentuk.
     final retainedPending = NotificationRouter.pendingIntent;
     await handleSignOut(deactivateDevice: true);
@@ -424,6 +560,12 @@ class NotificationService {
     await _registerCurrentToken();
     await _syncRemindersFromProfile();
     _subscribeFeed();
+    // Chat feed: dengarkan pesan baru di semua konsultasi aktif milik user
+    // sebagai fallback jika FCM Cloud Functions belum aktif.
+    if (_role == NotificationRole.pengguna ||
+        _role == NotificationRole.dokter) {
+      unawaited(_subscribeChatFeed());
+    }
     if (_role == NotificationRole.admin) {
       unawaited(_syncPendingDoctorVerifications());
     }
@@ -451,11 +593,22 @@ class NotificationService {
     _feedSub = null;
     _feedPrimed = false;
 
+    // Bersihkan listener konsultasi & pesan chat per-konsultasi.
+    await _consultationsSub?.cancel();
+    _consultationsSub = null;
+    _consultationsPrimed = false;
+
+    for (final sub in _chatSubsMap.values) {
+      await sub.cancel();
+    }
+    _chatSubsMap.clear();
+    _chatPrimed.clear();
+
     NotificationController.reset();
     ActiveChatRegistry.clear();
     // Pending intent HANYA dibuang pada logout sungguhan (ada sesi aktif).
     // Saat aplikasi cold-start tanpa sesi, auth listener memanggil handler
-    // ini dengan uid null — deep-link dari notification tray harus bertahan
+    // ini dengan uid null Ã¢â‚¬â€ deep-link dari notification tray harus bertahan
     // sampai user selesai login.
     if (uid != null) {
       NotificationRouter.setPendingIntent(null);
@@ -542,7 +695,7 @@ class NotificationService {
     );
   }
 
-  /// Preference "notifikasi aktif" — dibaca is UI maupun isolate background.
+  /// Preference "notifikasi aktif" Ã¢â‚¬â€ dibaca is UI maupun isolate background.
   static Future<bool> _readEnabledPreference() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -568,7 +721,7 @@ class NotificationService {
     final data = message.data;
     if (data.isEmpty) {
       // Pesan `notification` tidak dipakai Skinora; jika tetap datang,
-      // system sudah menampilkannya — jangan ditampilkan dua kali.
+      // system sudah menampilkannya Ã¢â‚¬â€ jangan ditampilkan dua kali.
       NotificationLog.info('pesan notification-type diabaikan (sudah system)');
       return;
     }
@@ -626,21 +779,285 @@ class NotificationService {
         .listen(
       (snap) {
         if (!_feedPrimed) {
-          // Snapshot pertama = histori yang sudah ada — jangan ditampilkan.
+          // Snapshot pertama = histori yang sudah ada Ã¢â‚¬â€ jangan ditampilkan.
           _feedPrimed = true;
           return;
         }
         for (final change in snap.docChanges) {
           if (change.type != DocumentChangeType.added) continue;
-          final n = AppNotification.fromMap({
+          final data = change.doc.data() ?? const <String, dynamic>{};
+          final n = AppNotification.fromMap(<Object?, Object?>{
             'notificationId': change.doc.id,
-            ...change.doc.data()!,
+            ...data,
           });
+          // Dokumen lama yang baru tersinkron (cache Ã¢â€ â€™ server) tidak
+          // ditampilkan agar tidak muncul belasan notifikasi sekaligus saat
+          // aplikasi dibuka; badge & daftar tetap diperbarui halaman
+          // Notifikasi (stream Firestore yang sama).
+          if (!_isFresh(data['createdAt'])) {
+            NotificationLog.info('lewati notifikasi lama: ${n.id}');
+            continue;
+          }
           unawaited(showLocalNotification(n));
         }
       },
       onError: (Object e) => NotificationLog.error('feed notifikasi', e),
     );
+  }
+
+  /// Refresh chat feed setelah ada konsultasi baru (booking baru, dsb.)
+  /// agar listener pesan baru langsung aktif tanpa re-login.
+  /// Refresh chat feed setelah ada konsultasi baru (booking baru, dsb.)
+  /// agar listener pesan aktif segera tanpa re-login.
+  static Future<void> refreshChatFeed() async {
+    if (_uid == null) return;
+    final role = _role;
+    if (role != NotificationRole.pengguna && role != NotificationRole.dokter) {
+      return;
+    }
+    await _subscribeChatFeed();
+  }
+
+  /// `true` bila `createdAt` dokumen masih dalam [_freshWindow].
+  ///
+  /// Dokumen tanpa timestamp server (mis. payload FCM murni) dianggap segar.
+  static bool _isFresh(Object? createdAt) {
+    if (createdAt is! Timestamp) return true;
+    final age = DateTime.now().difference(createdAt.toDate());
+    return age <= _freshWindow;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Chat feed fallback (notifikasi pesan baru saat FCM Cloud Functions belum aktif)
+  // ---------------------------------------------------------------------------
+  /// Dengarkan seluruh konsultasi aktif milik user secara realtime beserta
+  /// pesan barunya.
+  ///
+  /// Anti-spam & keandalan:
+  /// * Query sederhana terindeks: where(field == uid).orderBy(createdAt DESC).
+  /// * Filter 'selesai' di memori sehingga tidak membutuhkan composite index kompleks.
+  /// * Menggunakan stream snapshots() sehingga booking baru langsung terdeteksi
+  ///   dan pesan baru langsung dimonitor tanpa re-login!
+  /// * Snapshot pertama dilewati (prime) agar pesan lama tidak memunculkan notif.
+  /// * Pesan dari diri sendiri tidak dinotifikasikan.
+  /// * Ruang yang sedang dibuka ([ActiveChatRegistry]) dikecualikan.
+  /// * [SeenCache] mencegah notif ganda dengan jalur FCM / Firestore.
+  static Future<void> _subscribeChatFeed() async {
+    final uid = _uid;
+    final role = _role;
+    if (uid == null || role == null || !Backend.useFirebase) return;
+
+    try {
+      await _consultationsSub?.cancel();
+      _consultationsSub = null;
+      _consultationsPrimed = false;
+
+      final db = FirebaseFirestore.instance;
+      final field = role == NotificationRole.dokter ? 'doctorId' : 'patientId';
+
+      _consultationsSub = db
+          .collection('consultations')
+          .where(field, isEqualTo: uid)
+          .orderBy('createdAt', descending: true)
+          .limit(25)
+          .snapshots()
+          .listen(
+        (consultationsSnap) {
+          final currentUid = _uid;
+          if (currentUid == null) return;
+
+          final activeConsultationIds = <String>{};
+
+          for (final change in consultationsSnap.docChanges) {
+            final doc = change.doc;
+            final data = doc.data() ?? const <String, dynamic>{};
+            final status = (data['status'] as String?) ?? 'terjadwal';
+            final consultationId = doc.id;
+
+            if (status == 'selesai') {
+              // Konsultasi selesai -> bersihkan listener pesan
+              _chatSubsMap.remove(consultationId)?.cancel();
+              _chatPrimed.remove(consultationId);
+              continue;
+            }
+
+            activeConsultationIds.add(consultationId);
+
+            // Notifikasi konsultasi baru secara realtime ketika ada booking masuk
+            if (_consultationsPrimed && change.type == DocumentChangeType.added) {
+              if (_isFresh(data['createdAt'])) {
+                final patientName =
+                    (data['patientName'] as String?) ?? 'Pasien';
+                final doctorName = (data['doctorName'] as String?) ?? 'Dokter';
+                final scheduleDate =
+                    (data['scheduleDate'] as String?) ?? '';
+                final scheduleTime =
+                    (data['scheduleTime'] as String?) ?? '';
+                final isDoctor = role == NotificationRole.dokter;
+
+                final notifTitle =
+                    isDoctor ? 'Konsultasi Baru' : 'Konsultasi Terjadwal';
+                final notifBody = isDoctor
+                    ? '$patientName memesan konsultasi untuk jadwal $scheduleDate $scheduleTime.'
+                    : 'Konsultasi bersama $doctorName pada $scheduleDate $scheduleTime telah dijadwalkan.';
+
+                final newConsultNotif = AppNotification.forRecipient(
+                  type: NotificationType.bookingCreated,
+                  recipientId: currentUid,
+                  audienceRole: role,
+                  title: notifTitle,
+                  body: notifBody,
+                  entityId: consultationId,
+                  consultationId: consultationId,
+                  doctorId: (data['doctorId'] as String?) ?? '',
+                  patientId: (data['patientId'] as String?) ?? '',
+                  route: isDoctor
+                      ? NotificationPageRoute.dokterShell
+                      : NotificationPageRoute.penggunaRiwayatKonsultasi,
+                  targetTab: isDoctor ? NotificationTab.dokterChat : null,
+                  createdBy: (data['createdBy'] as String?) ?? currentUid,
+                );
+                unawaited(showLocalNotification(newConsultNotif));
+              }
+            }
+
+            // Notifikasi jika status konsultasi berubah menjadi 'berlangsung'
+            if (_consultationsPrimed &&
+                change.type == DocumentChangeType.modified &&
+                status == 'berlangsung') {
+              if (role == NotificationRole.pengguna) {
+                final doctorName =
+                    (data['doctorName'] as String?) ?? 'Dokter';
+                final startedNotif = AppNotification.forRecipient(
+                  type: NotificationType.consultationStarted,
+                  recipientId: currentUid,
+                  audienceRole: NotificationRole.pengguna,
+                  title: 'Konsultasi Dimulai',
+                  body:
+                      'Konsultasi bersama $doctorName sudah dimulai. Silakan masuk ke ruang konsultasi.',
+                  entityId: consultationId,
+                  consultationId: consultationId,
+                  doctorId: (data['doctorId'] as String?) ?? '',
+                  patientId: (data['patientId'] as String?) ?? '',
+                  route: NotificationPageRoute.penggunaRuangKonsultasi,
+                  createdBy: (data['doctorId'] as String?) ?? currentUid,
+                );
+                unawaited(showLocalNotification(startedNotif));
+              }
+            }
+
+            // Pasang listener pesan untuk konsultasi aktif bila belum terpasang
+            if (!_chatSubsMap.containsKey(consultationId)) {
+              _attachMessageListener(consultationId, data);
+            }
+          }
+
+          if (!_consultationsPrimed) {
+            _consultationsPrimed = true;
+          }
+
+          // Bersihkan listener untuk konsultasi yang tidak lagi aktif
+          final inactiveIds = _chatSubsMap.keys
+              .where((id) => !activeConsultationIds.contains(id))
+              .toList();
+          for (final remId in inactiveIds) {
+            _chatSubsMap.remove(remId)?.cancel();
+            _chatPrimed.remove(remId);
+          }
+        },
+        onError: (Object e) {
+          NotificationLog.error('_subscribeChatFeed consultations stream error', e);
+        },
+      );
+
+      NotificationLog.info('chat feed realtime subscribed untuk role=$role');
+    } catch (e) {
+      NotificationLog.error('_subscribeChatFeed gagal', e);
+    }
+  }
+
+  static void _attachMessageListener(
+    String consultationId,
+    Map<String, dynamic> consultationData,
+  ) {
+    final db = FirebaseFirestore.instance;
+    final doctorId = (consultationData['doctorId'] as String?) ?? '';
+    final patientId = (consultationData['patientId'] as String?) ?? '';
+    final doctorName = (consultationData['doctorName'] as String?) ?? 'Dokter';
+    final patientName =
+        (consultationData['patientName'] as String?) ?? 'Pasien';
+
+    bool primed = false;
+
+    final sub = db
+        .collection('consultations')
+        .doc(consultationId)
+        .collection('messages')
+        .orderBy('createdAt', descending: true)
+        .limit(5)
+        .snapshots()
+        .listen(
+      (msgSnap) {
+        if (!primed) {
+          // Lewati snapshot pertama (histori pesan yang sudah ada).
+          primed = true;
+          _chatPrimed.add(consultationId);
+          return;
+        }
+
+        final currentUid = _uid;
+        if (currentUid == null) return;
+
+        for (final change in msgSnap.docChanges) {
+          if (change.type != DocumentChangeType.added) continue;
+
+          final msgData = change.doc.data() ?? const <String, dynamic>{};
+          final senderId = (msgData['senderId'] as String?) ?? '';
+          if (senderId == currentUid) continue; // Jangan menotifikasi diri sendiri
+
+          // Jika user sedang aktif membuka ruang konsultasi ini, lewati native notification
+          if (ActiveChatRegistry.isActiveRoom(consultationId)) {
+            NotificationLog.info(
+              'chat notif dilewati (ruang chat aktif): $consultationId',
+            );
+            continue;
+          }
+
+          final senderIsDoctor = (msgData['senderRole'] as String?) == 'dokter';
+          final senderName = senderIsDoctor ? doctorName : patientName;
+          final notifTitle = 'Pesan Baru dari $senderName';
+          final notifBody = 'Anda menerima pesan baru dari $senderName.';
+          final targetRole = senderIsDoctor
+              ? NotificationRole.pengguna
+              : NotificationRole.dokter;
+
+          final msgId = change.doc.id;
+          final n = AppNotification.forRecipient(
+            type: NotificationType.consultationMessage,
+            recipientId: currentUid,
+            audienceRole: targetRole,
+            title: notifTitle,
+            body: notifBody,
+            entityId: consultationId,
+            eventId: msgId,
+            consultationId: consultationId,
+            doctorId: doctorId,
+            patientId: patientId,
+            createdBy: senderId,
+          );
+
+          unawaited(showLocalNotification(n));
+          NotificationLog.info(
+            'chat feed notif (local): konsultasi=$consultationId msg=$msgId dari=$senderName',
+          );
+        }
+      },
+      onError: (Object e) {
+        NotificationLog.error('chat feed error ($consultationId)', e);
+      },
+    );
+
+    _chatSubsMap[consultationId] = sub;
   }
 
   // ---------------------------------------------------------------------------
@@ -674,6 +1091,17 @@ class NotificationService {
       }
     }
 
+    // Cek izin OS
+    if (!_osPermissionGranted) {
+      final refreshed = await refreshPermissionStatus();
+      if (!refreshed) {
+        NotificationLog.info(
+          'lewati presentasi (izin OS belum diberikan): ${n.id}',
+        );
+        return;
+      }
+    }
+
     if (!await SeenCache.markIfNew(n.id)) {
       NotificationLog.info('lewati duplikat: ${n.id}');
       return;
@@ -685,19 +1113,23 @@ class NotificationService {
     }
 
     final high = AppNotification.isHighPriority(n.type);
+
+    AndroidNotificationDetails buildAndroid(String icon) =>
+        AndroidNotificationDetails(
+          n.resolvedChannel,
+          _channelName(n.resolvedChannel),
+          channelDescription: _channelDescription(n.resolvedChannel),
+          icon: icon,
+          importance: high ? Importance.high : Importance.defaultImportance,
+          priority: high ? Priority.high : Priority.defaultPriority,
+          color: const Color(0xFF8B2B38),
+          playSound: true,
+          enableVibration: true,
+          autoCancel: true,
+        );
+
     final details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        n.resolvedChannel,
-        _channelName(n.resolvedChannel),
-        channelDescription: _channelDescription(n.resolvedChannel),
-        icon: 'ic_stat_skinora',
-        importance: high ? Importance.high : Importance.defaultImportance,
-        priority: high ? Priority.high : Priority.defaultPriority,
-        color: const Color(0xFF8B2B38),
-        playSound: true,
-        enableVibration: true,
-        autoCancel: true,
-      ),
+      android: buildAndroid('ic_stat_skinora'),
       iOS: DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
@@ -718,12 +1150,38 @@ class NotificationService {
       );
       NotificationLog.info('local notification tampil: ${n.id}');
     } catch (e) {
-      NotificationLog.error('gagal menampilkan local notification', e);
+      // Fallback: beberapa perangkat tidak memuat ic_stat_skinora dengan benar
+      // (resolusi / XML vector) Ã¢â‚¬â€ pakai ic_launcher sebagai cadangan.
+      NotificationLog.error('gagal menampilkan local notification, mencoba fallback icon', e);
+      try {
+        final fallbackDetails = NotificationDetails(
+          android: buildAndroid('@mipmap/ic_launcher'),
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+            interruptionLevel: high
+                ? InterruptionLevel.timeSensitive
+                : InterruptionLevel.active,
+          ),
+        );
+        await _local.show(
+          id: localNotificationId(n.id),
+          title: n.title,
+          body: n.body,
+          notificationDetails: fallbackDetails,
+          payload: jsonEncode(n.toFcmData()),
+        );
+        NotificationLog.info('local notification tampil (fallback icon): ${n.id}');
+      } catch (e2) {
+        NotificationLog.error('gagal menampilkan local notification (fallback)', e2);
+      }
     }
   }
 
   static Future<void> _ensureLocalInitialized() async {
-    if (!Backend.useFirebase) return;
+    if (kIsWeb) return;
+    if (_localInitialized) return;
     try {
       const android = AndroidInitializationSettings('@mipmap/ic_launcher');
       const ios = DarwinInitializationSettings();
@@ -734,6 +1192,7 @@ class NotificationService {
             skinoraLocalNotificationBackgroundHandler,
       );
       _localInitialized = true;
+      await _createChannels();
     } catch (e) {
       NotificationLog.error('lazy init local notifications gagal', e);
     }
@@ -796,7 +1255,6 @@ class NotificationService {
   /// * bila user belum login, payload disimpan sebagai pending intent dan
   ///   dilanjutkan setelah guard shell selesai.
   static Future<void> _openIfAuthorized(AppNotification n) async {
-    if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
     if (uid == null) {
       NotificationRouter.setPendingIntent(n);
@@ -835,25 +1293,46 @@ class NotificationService {
 
   /// Deteksi ulang status permission ketika aplikasi kembali ke foreground
   /// (mis. user baru saja mengaktifkan notifikasi di system settings).
-  static Future<void> refreshPermissionStatus() async {
-    if (!Backend.useFirebase) return;
+  ///
+  /// Mengembalikan status terbaru sehingga pemanggil (gate izin / halaman
+  /// Pengaturan) bisa bereaksi tanpa query tambahan.
+  static Future<bool> refreshPermissionStatus() async {
+    if (kIsWeb) {
+      _setOsPermission(true);
+      return true;
+    }
+    await _ensureLocalInitialized();
     try {
-      if (defaultTargetPlatform == TargetPlatform.iOS) {
-        final ios = _local.resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin>();
-        final options = await ios?.checkPermissions();
-        if (options != null) _osPermissionGranted = options.isEnabled;
-      } else {
+      if (defaultTargetPlatform == TargetPlatform.android) {
         final android = _local.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
         final enabled = await android?.areNotificationsEnabled();
-        if (enabled != null) _osPermissionGranted = enabled;
+        if (enabled != null) {
+          _setOsPermission(enabled);
+        } else if (Backend.useFirebase) {
+          final settings =
+              await FirebaseMessaging.instance.getNotificationSettings();
+          _setOsPermission(
+            settings.authorizationStatus == AuthorizationStatus.authorized ||
+                settings.authorizationStatus ==
+                    AuthorizationStatus.provisional,
+          );
+        }
+      } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+        final ios = _local.resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin>();
+        final options = await ios?.checkPermissions();
+        if (options != null) _setOsPermission(options.isEnabled);
+      } else {
+        // Desktop: tidak ada izin runtime notifikasi.
+        _setOsPermission(true);
       }
     } catch (e) {
       NotificationLog.error('cek permission OS gagal', e);
-      return;
+      return _osPermissionGranted;
     }
     NotificationLog.info('permission OS = $_osPermissionGranted');
+    return _osPermissionGranted;
   }
 
   // ---------------------------------------------------------------------------
@@ -866,7 +1345,7 @@ class NotificationService {
   /// daftar `role = dokter, status = menunggu` ketika masuk.
   ///
   /// Idempoten: doc ID = `doctor_verification_pending__{adminUid}__{doctorUid}`,
-  /// dan [NotificationRepository.create] melewatkan dokumen yang sudah ada —
+  /// dan [NotificationRepository.create] melewatkan dokumen yang sudah ada Ã¢â‚¬â€
   /// membuka aplikasi berulang tidak pernah menggandakan notifikasi.
   static Future<void> _syncPendingDoctorVerifications() async {
     final adminUid = _uid;
@@ -903,7 +1382,7 @@ class NotificationService {
     }
   }
 
-  /// Fan-out ke **semua admin aktif** — satu dokumen per admin sehingga status
+  /// Fan-out ke **semua admin aktif** Ã¢â‚¬â€ satu dokumen per admin sehingga status
   /// read/unread tidak berbagi antar admin.
   static Future<void> notifyAdmins({
     required String title,
@@ -941,7 +1420,7 @@ class NotificationService {
   }
 
   // ---------------------------------------------------------------------------
-  // Legacy facade — dipertahankan agar pemanggil existing tidak berubah.
+  // Legacy facade Ã¢â‚¬â€ dipertahankan agar pemanggil existing tidak berubah.
   // ---------------------------------------------------------------------------
   static Future<void> notifyUser({
     required String uid,
@@ -951,6 +1430,8 @@ class NotificationService {
     String type = NotificationType.legacyRingkas,
     required String createdBy,
     String? entityId,
+    String? eventId,
+    String? consultationId,
     String? route,
     int? targetTab,
     String? audienceRole,
@@ -964,6 +1445,8 @@ class NotificationService {
         title: title,
         body: description,
         entityId: entityId,
+        eventId: eventId,
+        consultationId: consultationId,
         route: route,
         targetTab: targetTab,
         iconKey: iconKey,
@@ -1078,3 +1561,4 @@ class SeenCache {
     _loaded = null;
   }
 }
+
