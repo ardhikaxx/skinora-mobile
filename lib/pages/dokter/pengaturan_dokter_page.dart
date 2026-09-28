@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
+import '../../components/notification_permission.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/notification_service.dart';
@@ -314,6 +315,12 @@ class _PengaturanDokterPageState extends State<PengaturanDokterPage> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 10),
+
+                  // Status izin notifikasi OS (Android 13+ / iOS): user tahu
+                  // bila notifikasi diblokir sistem & bisa meminta izin ulang.
+                  const SystemNotificationPermissionTile(),
+
                   const SizedBox(height: 18),
 
                   // Button: "Simpan Pengaturan"
