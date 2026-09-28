@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -50,6 +52,7 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
   String _selectedCategory = 'Semua';
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  StreamSubscription<dynamic>? _activitySub;
 
   // Angka ringkasan — seed demo HANYA tanpa Firebase. Dengan Firebase,
   // default '0'/'0%' hingga data asli dimuat dari Firestore.
@@ -195,6 +198,11 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
   void initState() {
     super.initState();
     _loadFromBackend();
+    if (Backend.useFirebase) {
+      _activitySub = ActivityService.streamAll(limit: 50).listen((_) {
+        _loadFromBackend();
+      }, onError: (_) {});
+    }
   }
 
   String _fmtTime(Object? ts) {
@@ -323,6 +331,7 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
 
   @override
   void dispose() {
+    _activitySub?.cancel();
     _searchController.dispose();
     super.dispose();
   }
