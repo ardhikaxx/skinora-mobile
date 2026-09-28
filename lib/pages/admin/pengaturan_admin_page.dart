@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/navbottom/admin_navbottom.dart';
+import '../../components/notification_permission.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/notification_service.dart';
@@ -187,6 +188,12 @@ class _PengaturanAdminPageState extends State<PengaturanAdminPage> {
                       ],
                     ),
                   ),
+
+                  const SizedBox(height: 10),
+
+                  // Status izin notifikasi OS (Android 13+ / iOS): user tahu
+                  // bila notifikasi diblokir sistem & bisa meminta izin ulang.
+                  const SystemNotificationPermissionTile(),
 
                   const SizedBox(height: 24),
 
