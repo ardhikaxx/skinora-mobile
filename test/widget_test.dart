@@ -1440,14 +1440,19 @@ void main() {
     await tester.pumpAndSettle();
 
     // Enter start and end time
-    final startField = find.widgetWithText(TextField, '09:00');
-    final endField = find.widgetWithText(TextField, '09:30');
+    final startField = find.widgetWithText(TextField, '09.00');
+    final endField = find.widgetWithText(TextField, '09.30');
     await tester.enterText(startField, '15:30');
     await tester.enterText(endField, '16:00');
     await tester.pumpAndSettle();
 
     // Tap "Simpan Slot"
     await tester.tap(find.text('Simpan Slot'));
+    await tester.pumpAndSettle();
+
+    // Success dialog appears (template berhasil), tap OK
+    expect(find.text('Berhasil'), findsOneWidget);
+    await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
 
     // Form is closed and new slot appears
