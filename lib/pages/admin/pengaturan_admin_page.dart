@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../components/notification_permission.dart';
+import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/notification_service.dart';
@@ -53,6 +54,12 @@ class _PengaturanAdminPageState extends State<PengaturanAdminPage> {
         await UserService.updateSettings(
           uid,
           notificationsEnabled: _enableNotifications,
+        );
+        await ActivityService.log(
+          title: 'Mengubah pengaturan',
+          tag: 'Pengaturan',
+          actor: 'Admin',
+          actorUid: uid,
         );
         // Sinkronkan permission OS + state toggle notifikasi aplikasi.
         await NotificationService.applyNotificationSettings(
