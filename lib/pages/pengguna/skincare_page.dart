@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
@@ -61,6 +64,54 @@ class _SkincarePageState extends State<SkincarePage> {
     'Dark Spot Cream',
   ];
 
+  StreamSubscription<dynamic>? _skincareSub;
+  List<Map<String, dynamic>> _skincareLogs = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _subscribeSkincare();
+  }
+
+  @override
+  void dispose() {
+    _skincareSub?.cancel();
+    super.dispose();
+  }
+
+  /// Sinkronisasi realtime catatan rutinitas skincare dari Firestore.
+  void _subscribeSkincare() {
+    if (!Backend.useFirebase || AuthService.uid == null) return;
+    _skincareSub = SkinService.streamSkincare(AuthService.uid!).listen((logs) {
+      if (!mounted) return;
+      _skincareLogs = logs;
+      _applyLogsForDate(_selectedDate);
+    }, onError: (_) {});
+  }
+
+  void _applyLogsForDate(DateTime date) {
+    final iso = AppDates.iso(date);
+    final match = _skincareLogs.where((l) => (l['dateIso'] as String?) == iso);
+    if (match.isNotEmpty) {
+      final doc = match.first;
+      final mSteps = (doc['morningSteps'] as List?)?.cast<String>() ?? [];
+      final nSteps = (doc['nightSteps'] as List?)?.cast<String>() ?? [];
+      setState(() {
+        _selectedMorning
+          ..clear()
+          ..addAll(mSteps);
+        _selectedNight
+          ..clear()
+          ..addAll(nSteps);
+      });
+    } else {
+      setState(() {
+        _selectedMorning.clear();
+        _selectedNight.clear();
+      });
+    }
+  }
+
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -85,6 +136,7 @@ class _SkincarePageState extends State<SkincarePage> {
       setState(() {
         _selectedDate = picked;
       });
+      _applyLogsForDate(picked);
     }
   }
 
@@ -114,16 +166,11 @@ class _SkincarePageState extends State<SkincarePage> {
       }
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          isMorning
-              ? 'Morning Routine berhasil disimpan'
-              : 'Night Routine berhasil disimpan',
-        ),
-        backgroundColor: primaryMaroon,
-        duration: const Duration(seconds: 2),
-      ),
+    AdminSuccessDialog.show(
+      context,
+      message: isMorning
+          ? 'Morning Routine berhasil disimpan'
+          : 'Night Routine berhasil disimpan',
     );
   }
 
@@ -330,10 +377,28 @@ class _SkincarePageState extends State<SkincarePage> {
                 border: Border.all(color: innerBorder, width: 1.0),
               ),
               child: Row(
-                children: const [
-                  Icon(
+                children: [
+                  const Icon(
                     LucideIcons.calendar,
                     size: 18,
+                    color: subText,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _formatIndonesianDate(_selectedDate),
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: darkText,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const Icon(
+                    LucideIcons.chevronDown,
+                    size: 16,
                     color: subText,
                   ),
                 ],
