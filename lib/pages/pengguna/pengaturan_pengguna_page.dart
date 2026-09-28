@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../components/notification_permission.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/notification_service.dart';
@@ -296,6 +297,13 @@ class _PengaturanPenggunaPageState extends State<PengaturanPenggunaPage> {
                       ],
                     ),
                   ),
+
+                  const SizedBox(height: 10),
+
+                  // Status izin notifikasi OS (Android 13+ / iOS): bukan
+                  // sekadar toggle aplikasi, jadi user tahu bila notifikasi
+                  // diblokir oleh sistem dan bisa meminta izin ulang.
+                  const SystemNotificationPermissionTile(),
 
                   const SizedBox(height: 18),
 
