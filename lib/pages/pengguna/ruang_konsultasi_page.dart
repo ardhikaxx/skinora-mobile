@@ -54,7 +54,6 @@ class _RuangKonsultasiPenggunaPageState
   static const Color doctorBubbleText = Color(0xFF461220);
   static const Color badgeBg = Color(0xFFFED0BB);
   static const Color badgeText = Color(0xFF8B2B38);
-  static const Color sendBtnBg = Color(0xFFD89CA3);
 
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -62,11 +61,19 @@ class _RuangKonsultasiPenggunaPageState
   StreamSubscription<List<Map<String, dynamic>>>? _msgSub;
   StreamSubscription<Map<String, dynamic>?>? _statusSub;
   String _statusLabel = '';
+  bool _hasText = false;
+
+  /// Format jam chat konsisten WIB Indonesia 24 jam: "13.00 WIB".
+  String _formatChatTimeWib(String raw) => AppDates.formatChatTimeWib(raw);
 
   @override
   void initState() {
     super.initState();
     _statusLabel = widget.status;
+    _textController.addListener(() {
+      final has = _textController.text.trim().isNotEmpty;
+      if (has != _hasText && mounted) setState(() => _hasText = has);
+    });
     // Anti-spam: pesan masuk di ruang yang sedang dibuka tidak memunculkan
     // native notification (chat realtime sudah memberi feedback visual).
     ActiveChatRegistry.open(widget.consultationId);
@@ -74,6 +81,19 @@ class _RuangKonsultasiPenggunaPageState
     if (Backend.useFirebase &&
         consultationId != null &&
         consultationId.isNotEmpty) {
+      ConsultationService.getById(consultationId).then((doc) {
+        if (!mounted || doc == null) return;
+        final raw = (doc['status'] as String?) ?? '';
+        final label = switch (raw.toLowerCase()) {
+          'berlangsung' => 'Berlangsung',
+          'selesai' => 'Selesai',
+          _ => 'Terjadwal',
+        };
+        if (label != _statusLabel) {
+          setState(() => _statusLabel = label);
+        }
+      }).catchError((_) {});
+
       _msgSub = ConsultationService.messageStream(consultationId).listen(
         (items) {
           if (!mounted) return;
@@ -82,8 +102,9 @@ class _RuangKonsultasiPenggunaPageState
               ..clear()
               ..addAll(items.map((m) {
                 final senderRole = (m['senderRole'] as String?) ?? '';
-                final timeRaw = AppDates.formatHm(
-                  (m['time'] as String?) ?? '',
+                final timeRaw = AppDates.formatChatTimeWib(
+                  m['time'],
+                  m['createdAt'],
                 );
                 return ChatMessageModel(
                   id: (m['id'] as String?) ?? '',
@@ -102,7 +123,7 @@ class _RuangKonsultasiPenggunaPageState
         (doc) {
           if (!mounted || doc == null) return;
           final raw = (doc['status'] as String?) ?? '';
-          final label = switch (raw) {
+          final label = switch (raw.toLowerCase()) {
             'berlangsung' => 'Berlangsung',
             'selesai' => 'Selesai',
             _ => 'Terjadwal',
@@ -139,10 +160,21 @@ class _RuangKonsultasiPenggunaPageState
   }
 
   Future<void> _sendMessage() async {
+    // Sesi selesai -> tolak pengiriman.
+    if (_statusLabel.toLowerCase() == 'selesai') {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sesi konsultasi telah selesai. Anda tidak dapat mengirim pesan lagi.'),
+        ),
+      );
+      return;
+    }
     final text = _textController.text.trim();
     if (text.isEmpty) return;
 
-    final timeStr = AppDates.hm(AppDates.nowWib());
+    // Jam kirim selalu WIB 24 jam Indonesia ("13.00 WIB").
+    final timeStr = AppDates.formatChatTimeWib(AppDates.nowWib());
 
     final consultationId = widget.consultationId;
     final uid = AuthService.uid;
@@ -351,7 +383,7 @@ class _RuangKonsultasiPenggunaPageState
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  msg.time.contains('WIB') ? msg.time : '${msg.time} WIB',
+                  _formatChatTimeWib(msg.time),
                   style: TextStyle(
                     fontSize: 10.5,
                     color: isUser
@@ -369,6 +401,32 @@ class _RuangKonsultasiPenggunaPageState
 
   /// Bottom Text Input Field and Send Button
   Widget _buildInputArea() {
+    final finished = _statusLabel.toLowerCase() == 'selesai';
+    if (finished) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            top: BorderSide(color: Color(0xFFF0F0F0), width: 1.0),
+          ),
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF6F6F6),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE5E5EA)),
+          ),
+          child: const Text(
+            'Sesi konsultasi telah selesai. Anda tidak dapat mengirim pesan lagi.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12.5, color: Color(0xFF8E8E93)),
+          ),
+        ),
+      );
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
       decoration: const BoxDecoration(
@@ -414,18 +472,31 @@ class _RuangKonsultasiPenggunaPageState
           const SizedBox(width: 10),
           GestureDetector(
             onTap: _sendMessage,
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: sendBtnBg,
+                // Lebih terang saat ada teks diketik.
+                color: _hasText ? primaryMaroon : const Color(0xFFE8C5C8),
                 borderRadius: BorderRadius.circular(14),
+                boxShadow: _hasText
+                    ? [
+                        BoxShadow(
+                          color: primaryMaroon.withValues(alpha: 0.4),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ]
+                    : null,
               ),
-              child: const Center(
+              child: Center(
                 child: Icon(
                   LucideIcons.send,
                   size: 20,
-                  color: Colors.white,
+                  color: _hasText
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.5),
                 ),
               ),
             ),
