@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/empty_state.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
+import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/schedule_service.dart';
@@ -261,6 +263,12 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
             timeStart: start,
             timeEnd: end,
           );
+          await ActivityService.log(
+            title: 'Menambah jadwal $date $start - $end',
+            tag: 'Jadwal',
+            actor: 'Dokter',
+            actorUid: uid,
+          );
         } catch (e) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -277,11 +285,9 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
         _endTimeController.clear();
       });
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Slot jadwal berhasil disimpan'),
-          duration: Duration(seconds: 2),
-        ),
+      AdminSuccessDialog.show(
+        context,
+        message: 'Slot jadwal berhasil disimpan',
       );
       return;
     }
@@ -309,12 +315,56 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
     });
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Slot jadwal berhasil disimpan'),
-        duration: Duration(seconds: 2),
+    AdminSuccessDialog.show(
+      context,
+      message: 'Slot jadwal berhasil disimpan',
+    );
+  }
+
+  /// Tanggal memakai date picker, tampil di dalam kolom input.
+  Future<void> _pickSlotDate() async {
+    final now = AppDates.nowWib();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 2),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: primaryMaroon,
+            onPrimary: Colors.white,
+            onSurface: darkText,
+          ),
+        ),
+        child: child!,
       ),
     );
+    if (picked != null && mounted) {
+      setState(() => _dateController.text = AppDates.display(picked));
+    }
+  }
+
+  /// Jam memakai clock picker (TimePicker), tampil di kolom input.
+  Future<void> _pickSlotTime(TextEditingController controller) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: primaryMaroon,
+            onPrimary: Colors.white,
+            onSurface: darkText,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null && mounted) {
+      final raw = '${picked.hour}:${picked.minute.toString().padLeft(2, '0')}';
+      setState(() => controller.text = AppDates.formatHm(raw));
+    }
   }
 
   void _showDeleteConfirmationDialog(
@@ -864,19 +914,20 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
           ),
           const SizedBox(height: 14),
 
-          // TANGGAL
+          // TANGGAL — date picker di dalam kolom.
           _buildFormLabel('TANGGAL'),
           const SizedBox(height: 6),
           _buildFormTextField(
             controller: _dateController,
-            hintText: Backend.useFirebase
-                ? 'Contoh: Jumat, 28 Agustus 2026'
-                : 'Jumat, 28 Agustus 2026',
+            hintText: 'Pilih tanggal',
+            onTap: _pickSlotDate,
+            suffixIcon: LucideIcons.calendar,
           ),
 
           const SizedBox(height: 14),
 
-          // JAM MULAI & JAM SELESAI
+          // JAM MULAI & JAM SELESAI — clock picker di dalam kolom
+          // (tetap bisa diketik manual agar kompatibel tes).
           Row(
             children: [
               Expanded(
@@ -887,7 +938,9 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
                     const SizedBox(height: 6),
                     _buildFormTextField(
                       controller: _startTimeController,
-                      hintText: Backend.useFirebase ? 'Contoh: 09.00' : '09:00',
+                      hintText: '09.00',
+                      onTap: () => _pickSlotTime(_startTimeController),
+                      suffixIcon: LucideIcons.clock,
                     ),
                   ],
                 ),
@@ -901,7 +954,9 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
                     const SizedBox(height: 6),
                     _buildFormTextField(
                       controller: _endTimeController,
-                      hintText: Backend.useFirebase ? 'Contoh: 09.30' : '09:30',
+                      hintText: '09.30',
+                      onTap: () => _pickSlotTime(_endTimeController),
+                      suffixIcon: LucideIcons.clock,
                     ),
                   ],
                 ),
@@ -960,9 +1015,12 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
   Widget _buildFormTextField({
     required TextEditingController controller,
     required String hintText,
+    VoidCallback? onTap,
+    IconData? suffixIcon,
   }) {
     return TextField(
       controller: controller,
+      onTap: onTap,
       style: const TextStyle(
         fontSize: 14.0,
         color: darkText,
@@ -974,6 +1032,9 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
           color: Color(0xFF9CA3AF),
           fontSize: 13.5,
         ),
+        suffixIcon: suffixIcon == null
+            ? null
+            : Icon(suffixIcon, size: 16, color: const Color(0xFF9CA3AF)),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14.0,
           vertical: 11.0,
