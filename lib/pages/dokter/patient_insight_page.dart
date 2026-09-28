@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/empty_state.dart';
@@ -93,15 +94,29 @@ class _PatientInsightPageState extends State<PatientInsightPage> {
     ),
   ];
 
+  StreamSubscription? _consultSub;
+
   @override
   void initState() {
     super.initState();
     _loadFromBackend();
+    if (Backend.useFirebase) {
+      final uid = AuthService.uid;
+      if (uid != null) {
+        _consultSub = ConsultationService.streamForDoctor(uid).listen((_) {
+          _loadFromBackend();
+        });
+      }
+    }
   }
 
-  /// Daftar pasien dari konsultasi dokter. Tanpa Firebase, seed demo tetap
-  /// dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil backend
-  /// selalu menggantikan seed — termasuk saat daftar kosong.
+  @override
+  void dispose() {
+    _consultSub?.cancel();
+    super.dispose();
+  }
+
+  /// Daftar pasien dari konsultasi dokter secara realtime.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
