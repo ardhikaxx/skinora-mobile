@@ -48,6 +48,15 @@ class ArticleService {
     return snap.docs.map(fromDoc).toList();
   }
 
+  /// Stream semua artikel (admin) secara realtime.
+  static Stream<List<AdminArticleModel>> streamAll() {
+    if (!Backend.useFirebase) return const Stream.empty();
+    return _col
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs.map(fromDoc).toList());
+  }
+
   /// Hanya yang diterbitkan (pengguna).
   static Future<List<AdminArticleModel>> listPublished() async {
     if (!Backend.useFirebase) return const [];
@@ -56,6 +65,16 @@ class ArticleService {
         .orderBy('createdAt', descending: true)
         .get();
     return snap.docs.map(fromDoc).toList();
+  }
+
+  /// Stream artikel yang diterbitkan (pengguna) secara realtime.
+  static Stream<List<AdminArticleModel>> streamPublished() {
+    if (!Backend.useFirebase) return const Stream.empty();
+    return _col
+        .where('status', isEqualTo: 'diterbitkan')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs.map(fromDoc).toList());
   }
 
   static Future<AdminArticleModel> create(AdminArticleModel a) async {
