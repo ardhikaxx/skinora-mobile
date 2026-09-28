@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -37,6 +39,11 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
   /// Badge lonceng realtime — satu listener bersama (lihat
   /// NotificationController), bukan query ulang setiap halaman dibuka.
   ValueListenable<int>? _unreadListenable;
+  StreamSubscription<dynamic>? _profileSub;
+  StreamSubscription<dynamic>? _skinCheckSubStream;
+  StreamSubscription<dynamic>? _skinDailySubStream;
+  StreamSubscription<dynamic>? _skincareSubStream;
+  StreamSubscription<dynamic>? _consultSubStream;
 
   // Ringkasan hari ini — seed hanya mode demo; Firebase → data asli / empty.
   String _skinCheckValue = Backend.useFirebase ? 'Belum' : 'Kombinasi';
@@ -52,6 +59,60 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
   void initState() {
     super.initState();
     _subscribeUnreadBadge();
+    _subscribeProfileRealtime();
+    _subscribeSummaryRealtime();
+    _loadFromBackend();
+  }
+
+  /// Profil realtime: perubahan nama di edit profil langsung tampil di beranda.
+  void _subscribeProfileRealtime() {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    _profileSub = UserService.streamByUid(uid).listen((profile) {
+      if (!mounted || profile == null) return;
+      final name = (profile.name as String?) ?? '';
+      if (name.isNotEmpty && name != _userName) {
+        setState(() => _userName = name);
+      }
+    }, onError: (_) {});
+  }
+
+  /// Ringkasan realtime: perubahan skin check, skin daily, skincare, atau konsultasi
+  /// langsung memperbarui kartu ringkasan di beranda secara otomatis.
+  void _subscribeSummaryRealtime() {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    _skinCheckSubStream?.cancel();
+    _skinDailySubStream?.cancel();
+    _skincareSubStream?.cancel();
+    _consultSubStream?.cancel();
+
+    _skinCheckSubStream =
+        SkinService.streamSkinChecks(uid, limit: 5).listen((_) {
+      if (mounted) _loadFromBackend();
+    }, onError: (_) {});
+
+    _skinDailySubStream = SkinService.streamSkinDailies(uid).listen((_) {
+      if (mounted) _loadFromBackend();
+    }, onError: (_) {});
+
+    _skincareSubStream = SkinService.streamSkincare(uid).listen((_) {
+      if (mounted) _loadFromBackend();
+    }, onError: (_) {});
+
+    _consultSubStream =
+        ConsultationService.streamForPatient(uid).listen((_) {
+      if (mounted) _loadFromBackend();
+    }, onError: (_) {});
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Realtime ringkasan: refresh tiap halaman ditampilkan ulang
+    // (mis. kembali dari Skin Check / Daily / Routine).
     _loadFromBackend();
   }
 
@@ -76,6 +137,11 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
   @override
   void dispose() {
     _unreadListenable?.removeListener(_onUnreadChanged);
+    _profileSub?.cancel();
+    _skinCheckSubStream?.cancel();
+    _skinDailySubStream?.cancel();
+    _skincareSubStream?.cancel();
+    _consultSubStream?.cancel();
     super.dispose();
   }
 
@@ -86,11 +152,11 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
     if (uid == null) return;
     try {
       final results = await Future.wait<Object?>([
-        UserService.loadByUid(uid),
-        SkinService.listSkinChecks(uid, limit: 5),
-        SkinService.listSkinDailies(uid),
-        SkinService.listSkincare(uid),
-        ConsultationService.listForPatient(uid),
+        UserService.loadByUid(uid).catchError((_) => null),
+        SkinService.listSkinChecks(uid, limit: 5).catchError((_) => <Map<String, dynamic>>[]),
+        SkinService.listSkinDailies(uid).catchError((_) => <Map<String, dynamic>>[]),
+        SkinService.listSkincare(uid).catchError((_) => <Map<String, dynamic>>[]),
+        ConsultationService.listForPatient(uid).catchError((_) => <Map<String, dynamic>>[]),
       ]);
       final profile = results[0] as dynamic;
       final checks = (results[1] as List<Map<String, dynamic>>?) ?? const [];
@@ -99,24 +165,29 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
       final consults = (results[4] as List<Map<String, dynamic>>?) ?? const [];
 
       final todayIso = AppDates.todayIso();
+      final localIso = AppDates.iso(DateTime.now());
 
-      // Skin Check: hasil terakhir (fallback hari ini)
+      // Skin Check: hasil terakhir
       if (checks.isNotEmpty) {
         final latest = checks.first;
-        _skinCheckValue =
-            ((latest['resultSkinType'] as String?) ?? '').isEmpty
-                ? 'Belum'
-                : (latest['resultSkinType'] as String);
-        final ts = latest['createdAt'];
-        if (ts != null && ts.runtimeType.toString().contains('Timestamp')) {
-          // ignore: avoid_dynamic_calls
-          final dt = AppDates.toWib(
-            // ignore: avoid_dynamic_calls
-            (ts as dynamic).toDate() as DateTime,
-          );
-          _skinCheckSub = AppDates.iso(dt);
+        final skinType = (latest['resultSkinType'] as String?) ?? '';
+        _skinCheckValue = skinType.isNotEmpty ? skinType : 'Normal';
+        final display = (latest['createdDisplay'] as String?) ?? '';
+        if (display.isNotEmpty) {
+          _skinCheckSub = display.split('•').first.trim();
         } else {
-          _skinCheckSub = todayIso;
+          final ts = latest['createdAt'];
+          if (ts != null) {
+            try {
+              // ignore: avoid_dynamic_calls
+              final dt = AppDates.toWib((ts as dynamic).toDate() as DateTime);
+              _skinCheckSub = AppDates.short(dt);
+            } catch (_) {
+              _skinCheckSub = todayIso;
+            }
+          } else {
+            _skinCheckSub = todayIso;
+          }
         }
       } else {
         _skinCheckValue = 'Belum';
@@ -126,20 +197,20 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
       // Skin Daily: entri hari ini
       final todayDaily = dailies.where((d) {
         final di = (d['dateIso'] as String?) ?? '';
-        if (di.isNotEmpty) return di == todayIso;
+        if (di == todayIso || di == localIso) return true;
         final ts = d['createdAt'];
-        if (ts == null) return false;
-        try {
-          // ignore: avoid_dynamic_calls
-          final dt = AppDates.toWib(
+        if (ts != null) {
+          try {
             // ignore: avoid_dynamic_calls
-            (ts as dynamic).toDate() as DateTime,
-          );
-          return AppDates.iso(dt) == todayIso;
-        } catch (_) {
-          return false;
+            final dt = AppDates.toWib((ts as dynamic).toDate() as DateTime);
+            if (AppDates.iso(dt) == todayIso || AppDates.iso(dt) == localIso) {
+              return true;
+            }
+          } catch (_) {}
         }
+        return false;
       }).toList();
+
       if (todayDaily.isNotEmpty) {
         _skinDailyValue = 'Terisi';
         final symptoms = (todayDaily.first['symptoms'] as List?) ?? const [];
@@ -148,21 +219,65 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
             .where((s) => s.isNotEmpty)
             .toList();
         _skinDailySub = SkinService.deriveDailyStatus(symptomStr);
+      } else if (dailies.isNotEmpty) {
+        final latest = dailies.first;
+        final di = (latest['dateIso'] as String?) ?? '';
+        if (di == todayIso || di == localIso) {
+          _skinDailyValue = 'Terisi';
+          final symptoms = (latest['symptoms'] as List?) ?? const [];
+          final symptomStr = symptoms
+              .map((s) => s.toString())
+              .where((s) => s.isNotEmpty)
+              .toList();
+          _skinDailySub = SkinService.deriveDailyStatus(symptomStr);
+        } else {
+          _skinDailyValue = 'Belum';
+          _skinDailySub = '-';
+        }
       } else {
         _skinDailyValue = 'Belum';
         _skinDailySub = '-';
       }
 
-      // Skincare: total produk tercatat minggu ini (atau entri terakhir)
-      if (skincare.isNotEmpty) {
+      // Skincare: entri hari ini (realtime)
+      final todaySkincare = skincare.where((e) {
+        final di = (e['dateIso'] as String?) ?? '';
+        if (di == todayIso || di == localIso) return true;
+        final ts = e['createdAt'];
+        if (ts != null) {
+          try {
+            // ignore: avoid_dynamic_calls
+            final dt = AppDates.toWib((ts as dynamic).toDate() as DateTime);
+            if (AppDates.iso(dt) == todayIso || AppDates.iso(dt) == localIso) {
+              return true;
+            }
+          } catch (_) {}
+        }
+        return false;
+      }).toList();
+
+      final skincareSource = todaySkincare.isNotEmpty
+          ? todaySkincare
+          : (skincare.isNotEmpty &&
+                  (((skincare.first['dateIso'] as String?) ?? '') == todayIso ||
+                      ((skincare.first['dateIso'] as String?) ?? '') == localIso)
+              ? [skincare.first]
+              : <Map<String, dynamic>>[]);
+
+      if (skincareSource.isNotEmpty) {
         _skincareValue = 'Tercatat';
         var productCount = 0;
-        for (final entry in skincare) {
-          final morning = (entry['morning'] as List?) ?? const [];
-          final night = (entry['night'] as List?) ?? const [];
+        for (final entry in skincareSource) {
+          final morning = (entry['morningSteps'] as List?) ??
+              (entry['morning'] as List?) ??
+              const [];
+          final night = (entry['nightSteps'] as List?) ??
+              (entry['night'] as List?) ??
+              const [];
           productCount += morning.length + night.length;
         }
-        _skincareSub = productCount > 0 ? '$productCount produk' : 'Tercatat';
+        _skincareSub =
+            productCount > 0 ? '$productCount produk' : 'Tercatat';
       } else {
         _skincareValue = 'Belum';
         _skincareSub = '-';
@@ -171,7 +286,7 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
       // Chat / konsultasi: jadwal aktif berikutnya
       final upcoming = consults
           .where((c) {
-            final st = (c['status'] as String?) ?? '';
+            final st = ((c['status'] as String?) ?? '').toLowerCase();
             return st != 'selesai';
           })
           .toList();
@@ -181,7 +296,7 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
         final di = (c['dateIso'] as String?) ?? '';
         final ts = (c['timeStart'] as String?) ?? '';
         if (di.isNotEmpty) {
-          _chatSub = ts.isEmpty ? di : '$di • ${AppDates.formatHm(ts)}';
+          _chatSub = ts.isEmpty ? di : '$di • ${AppDates.formatChatTimeWib(ts)}';
         } else {
           _chatSub = ((c['scheduleDate'] as String?) ?? '-');
         }
@@ -198,14 +313,6 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
       if (!mounted) return;
       setState(() {
         _userName = '';
-        _skinCheckValue = 'Belum';
-        _skinCheckSub = '-';
-        _skinDailyValue = 'Belum';
-        _skinDailySub = '-';
-        _skincareValue = 'Belum';
-        _skincareSub = '-';
-        _chatValue = 'Belum';
-        _chatSub = '-';
       });
     }
   }
@@ -225,9 +332,12 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFFCFCFD),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
-          children: [
+        child: RefreshIndicator(
+          color: primaryMaroon,
+          onRefresh: _loadFromBackend,
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+            children: [
             // 1. Header Profile & Notification Bell
             _buildHeader(),
             const SizedBox(height: 20),
@@ -243,7 +353,8 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
             // 4. Tips Hari Ini Card
             _buildTipsHariIniCard(),
             const SizedBox(height: 16),
-          ],
+            ],
+          ),
         ),
       ),
     );
