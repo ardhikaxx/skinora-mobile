@@ -91,6 +91,7 @@ class _EditArtikelPageState extends State<EditArtikelPage> {
     }
 
     if (!mounted) return;
+    // Dialog sukses ditampilkan pemanggil agar tunggal.
     Navigator.pop(context, updatedArticle);
   }
 
