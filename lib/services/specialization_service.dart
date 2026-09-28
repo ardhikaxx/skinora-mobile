@@ -33,10 +33,31 @@ class SpecializationService {
         .toList();
   }
 
+  /// Stream master data spesialisasi secara realtime dari Firestore.
+  static Stream<List<SpecializationRecord>> stream() {
+    if (!Backend.useFirebase) return const Stream.empty();
+    return _col.snapshots().map(
+          (snap) => snap.docs
+              .map((d) => SpecializationRecord(
+                    id: d.id,
+                    name: (d.data()['name'] as String?) ?? '',
+                    isActive: (d.data()['isActive'] as bool?) ?? true,
+                  ))
+              .toList(),
+        );
+  }
+
   /// Hanya nama aktif — untuk dropdown form & chip kategori pengguna.
   static Future<List<String>> listActiveNames() async {
     final all = await list();
     return all.where((s) => s.isActive).map((s) => s.name).toList();
+  }
+
+  /// Stream nama spesialisasi aktif secara realtime.
+  static Stream<List<String>> streamActiveNames() {
+    return stream().map(
+      (all) => all.where((s) => s.isActive).map((s) => s.name).toList(),
+    );
   }
 
   static Future<void> create(String name) async {
