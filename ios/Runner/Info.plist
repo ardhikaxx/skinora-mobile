@@ -51,5 +51,8 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<!-- Geolokasi: izin lokasi untuk cuaca & fitur lokasi (dipinta sekali saat awal app). -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Skinora menggunakan lokasi Anda untuk menampilkan suhu dan kelembaban udara di sekitar Anda agar saran perawatan kulit lebih akurat.</string>
 </dict>
 </plist>
