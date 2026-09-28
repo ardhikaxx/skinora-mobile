@@ -254,6 +254,38 @@ class AppDates {
     return '$a - $b$suffix';
   }
 
+  /// Format jam chat konsisten 24 jam WIB Indonesia (mis. "14.30 WIB").
+  /// Menerima DateTime, Timestamp Firestore, ISO String, atau jam "14:30"/"14.30".
+  static String formatChatTimeWib(Object? raw, [Object? fallback]) {
+    if (raw == null || raw.toString().trim().isEmpty) {
+      if (fallback != null && fallback.toString().trim().isNotEmpty) {
+        return formatChatTimeWib(fallback);
+      }
+      return '${hm(nowWib())} WIB';
+    }
+    if (raw is DateTime) {
+      return hmWib(raw);
+    }
+    try {
+      // ignore: avoid_dynamic_calls
+      final dt = (raw as dynamic).toDate() as DateTime;
+      return hmWib(dt);
+    } catch (_) {}
+
+    final str = raw.toString().trim();
+    if (str.contains('T') || (str.contains('-') && str.length >= 10)) {
+      final parsed = DateTime.tryParse(str);
+      if (parsed != null) {
+        return hmWib(parsed);
+      }
+    }
+    if (str.toUpperCase().contains('WIB')) {
+      final body = str.toUpperCase().replaceAll('WIB', '').trim();
+      return '${formatHm(body)} WIB';
+    }
+    return '${formatHm(str)} WIB';
+  }
+
   /// Slot sudah lewat (tanggal/jam WIB lampau)? dateIso "yyyy-MM-dd", jam "HH:mm"/"HH.mm".
   static bool isPastSlot({
     required String dateIso,
