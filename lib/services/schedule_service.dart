@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../services/activity_service.dart';
 import '../services/backend.dart';
 import '../services/notification_payload.dart';
 import '../services/notification_service.dart';
@@ -199,6 +200,12 @@ class ScheduleService {
     final date = (m['date'] as String?) ?? '';
     final time = (m['time'] as String?) ?? '';
     await ref.delete();
+    await ActivityService.log(
+      title: 'Menghapus jadwal $date $time',
+      tag: 'Jadwal',
+      actor: 'Dokter',
+      actorUid: doctorUid,
+    );
     await NotificationService.notifyUser(
       uid: doctorUid,
       title: 'Jadwal Dihapus',
@@ -220,6 +227,14 @@ class ScheduleService {
       'isAvailable': isAvailable,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+    await ActivityService.log(
+      title: isAvailable
+          ? 'Membuka jadwal praktik'
+          : 'Menutup jadwal praktik',
+      tag: 'Jadwal',
+      actor: 'Dokter',
+      actorUid: doctorUid,
+    );
     await NotificationService.notifyUser(
       uid: doctorUid,
       title: isAvailable ? 'Praktik Dibuka' : 'Praktik Ditutup',
