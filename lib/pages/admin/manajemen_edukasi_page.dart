@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
@@ -129,32 +130,35 @@ class _ManajemenEdukasiPageState extends State<ManajemenEdukasiPage> {
     }).toList();
   }
 
+  StreamSubscription<List<AdminArticleModel>>? _articleSub;
+
   @override
   void initState() {
     super.initState();
     _loadFromBackend();
   }
 
-  /// Ambil artikel dari Firestore. Tanpa Firebase (test), seed demo tetap
-  /// dipakai. Dengan Firebase, hasil backend selalu menggantikan seed —
-  /// termasuk saat daftar kosong — agar UI sinkron dengan data asli.
-  Future<void> _loadFromBackend() async {
+  /// Ambil artikel dari Firestore secara realtime.
+  void _loadFromBackend() {
     if (!Backend.useFirebase) return;
-    try {
-      final articles = await ArticleService.listAll();
-      if (!mounted) return;
-      setState(() => _articles
-        ..clear()
-        ..addAll(articles));
-    } catch (_) {
-      // Query gagal → tampilkan kosong, jangan seed palsu di production.
-      if (!mounted) return;
-      setState(_articles.clear);
-    }
+    _articleSub?.cancel();
+    _articleSub = ArticleService.streamAll().listen(
+      (articles) {
+        if (!mounted) return;
+        setState(() => _articles
+          ..clear()
+          ..addAll(articles));
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(_articles.clear);
+      },
+    );
   }
 
   @override
   void dispose() {
+    _articleSub?.cancel();
     _searchController.dispose();
     super.dispose();
   }
