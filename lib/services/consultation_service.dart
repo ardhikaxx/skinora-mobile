@@ -198,8 +198,12 @@ class ConsultationService {
     return snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
   }
 
-  /// Stream konsultasi aktif dokter (realtime — booking baru langsung muncul).
-  static Stream<List<Map<String, dynamic>>> streamForDoctor(String doctorUid) {
+  /// Stream konsultasi dokter (realtime). Secara default hanya yang aktif,
+  /// atau semua termasuk selesai jika [includeFinished] bernilai true.
+  static Stream<List<Map<String, dynamic>>> streamForDoctor(
+    String doctorUid, {
+    bool includeFinished = false,
+  }) {
     if (!Backend.useFirebase || doctorUid.isEmpty) {
       return const Stream.empty();
     }
@@ -210,7 +214,8 @@ class ConsultationService {
         .map(
           (snap) => snap.docs
               .map((d) => {'id': d.id, ...d.data()})
-              .where((m) => (m['status'] as String?) != 'selesai')
+              .where((m) =>
+                  includeFinished || (m['status'] as String?) != 'selesai')
               .toList(),
         );
   }
@@ -234,6 +239,35 @@ class ConsultationService {
     if (!Backend.useFirebase || id.isEmpty) return const Stream.empty();
     return _col.doc(id).snapshots().map(
           (s) => s.exists ? {'id': s.id, ...s.data()!} : null,
+        );
+  }
+
+  /// Stream riwayat konsultasi selesai dokter (realtime).
+  static Stream<List<Map<String, dynamic>>> streamFinishedForDoctor(
+    String doctorUid,
+  ) {
+    if (!Backend.useFirebase || doctorUid.isEmpty) {
+      return const Stream.empty();
+    }
+    return _col
+        .where('doctorId', isEqualTo: doctorUid)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map((d) => {'id': d.id, ...d.data()})
+              .where((m) => (m['status'] as String?) == 'selesai')
+              .toList(),
+        );
+  }
+
+  /// Stream semua konsultasi (admin realtime beranda & laporan).
+  static Stream<List<Map<String, dynamic>>> streamAllConsultations({int? limit}) {
+    if (!Backend.useFirebase) return const Stream.empty();
+    var q = _col.orderBy('createdAt', descending: true);
+    if (limit != null) q = q.limit(limit);
+    return q.snapshots().map(
+          (snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList(),
         );
   }
 
@@ -268,6 +302,8 @@ class ConsultationService {
     return {'id': snap.id, ...snap.data()!};
   }
 
+  static Future<Map<String, dynamic>?> getById(String id) => byId(id);
+
   static Future<List<String>> patientIdsForDoctor(String doctorUid) async {
     final list = await listForDoctor(doctorUid, includeFinished: true);
     return list
@@ -284,6 +320,7 @@ class ConsultationService {
     if (!Backend.useFirebase) return;
     final ref = _col.doc(id);
     String patientId = '';
+    String patientName = '';
     String doctorId = '';
     String doctorName = '';
     final bool started = await _db.runTransaction((tx) async {
@@ -295,6 +332,7 @@ class ConsultationService {
         throw StateError('Status konsultasi tidak valid untuk dimulai.');
       }
       patientId = (snap.data()?['patientId'] as String?) ?? '';
+      patientName = (snap.data()?['patientName'] as String?) ?? '';
       doctorId = (snap.data()?['doctorId'] as String?) ?? '';
       doctorName = (snap.data()?['doctorName'] as String?) ?? '';
       tx.update(ref, {
@@ -304,12 +342,20 @@ class ConsultationService {
       return true;
     });
     if (!started || patientId.isEmpty) return;
+    await ActivityService.log(
+      title: patientName.isNotEmpty
+          ? 'Memulai konsultasi dengan $patientName'
+          : 'Memulai konsultasi',
+      tag: 'Konsultasi',
+      actor: doctorName.isNotEmpty ? doctorName : 'Dokter',
+      actorUid: doctorId,
+    );
     // Pemberitahuan ke pasien: konsultasi dimulai (actor = dokter).
     await NotificationService.notifyUser(
       uid: patientId,
       title: 'Konsultasi Dimulai',
       description:
-          'Konsultasi bersama $doctorName sudah dimulai. Silakan masuk ke ruang konsultasi.',
+          'Konsultasi bersama $doctorName sudah dimulai. Silahkan masuk ke ruang konsultasi.',
       iconKey: 'messageSquare',
       type: NotificationType.consultationStarted,
       entityId: id,
@@ -424,6 +470,13 @@ class ConsultationService {
     required String time,
   }) async {
     if (!Backend.useFirebase) return;
+    // Kunci pengiriman: sesi yang sudah selesai tidak boleh ada pesan baru.
+    final consultSnap = await _col.doc(consultationId).get();
+    final consultData = consultSnap.data();
+    if (consultData != null &&
+        ((consultData['status'] as String?) ?? '').toLowerCase() == 'selesai') {
+      throw StateError('Sesi konsultasi telah selesai.');
+    }
     // ID dokumen pesan dipakai sebagai `eventId` notifikasi sehingga **setiap
     // pesan** menghasilkan notifikasi sendiri (bukan hanya pesan pertama per
     // konsultasi), sementara deep-link tetap memakai `consultationId`.
