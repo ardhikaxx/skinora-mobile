@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -201,6 +203,8 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
           ),
         ];
 
+  StreamSubscription<dynamic>? _consultSub;
+
   @override
   void initState() {
     super.initState();
@@ -215,6 +219,18 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
       _currentPatient = _emptyPatient;
     }
     _loadFromBackend();
+    if (Backend.useFirebase && AuthService.uid != null) {
+      _consultSub =
+          ConsultationService.streamForDoctor(AuthService.uid!).listen((_) {
+        _loadFromBackend();
+      }, onError: (_) {});
+    }
+  }
+
+  @override
+  void dispose() {
+    _consultSub?.cancel();
+    super.dispose();
   }
 
   /// Muat daftar pasien konsultasi + data skin subcollection. Tanpa Firebase,
