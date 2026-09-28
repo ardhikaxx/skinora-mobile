@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
+import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/user_service.dart';
@@ -242,6 +244,12 @@ class _EditProfilDokterPageState extends State<EditProfilDokterPage> {
               'str': store.str,
             },
           );
+          await ActivityService.log(
+            title: 'Mengedit profil dokter $name',
+            tag: 'Profil',
+            actor: name,
+            actorUid: uid,
+          );
         } catch (e) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -253,7 +261,11 @@ class _EditProfilDokterPageState extends State<EditProfilDokterPage> {
     }
 
     if (!mounted) return;
-    Navigator.pop(context, true);
+    AdminSuccessDialog.show(
+      context,
+      message: 'Profil dokter berhasil diperbarui',
+      onOk: () => Navigator.pop(context, true),
+    );
   }
 
   @override
