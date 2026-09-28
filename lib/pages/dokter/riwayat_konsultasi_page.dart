@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/empty_state.dart';
@@ -196,85 +197,89 @@ class _RiwayatKonsultasiPageState extends State<RiwayatKonsultasiPage> {
   // id Firestore -> data mentah untuk load chat di detail.
   final Map<String, Map<String, dynamic>> _backendMeta = {};
 
+  StreamSubscription<List<Map<String, dynamic>>>? _consultSub;
+
   @override
   void initState() {
     super.initState();
     _loadFromBackend();
   }
 
-  /// Riwayat konsultasi selesai dari Firestore. Tanpa Firebase, seed demo
-  /// tetap dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil backend
-  /// selalu menggantikan seed — termasuk saat daftar kosong.
-  Future<void> _loadFromBackend() async {
+  @override
+  void dispose() {
+    _consultSub?.cancel();
+    super.dispose();
+  }
+
+  /// Riwayat konsultasi selesai dari Firestore secara realtime.
+  void _loadFromBackend() {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
     if (uid == null) return;
-    try {
-      final items = await ConsultationService.listForDoctor(
-        uid,
-        includeFinished: true,
-      );
-      final finished =
-          items.where((m) => ((m['status'] as String?) ?? '') == 'selesai');
-      if (!mounted) return;
-      final list = <ConsultationHistoryModel>[];
-      for (final m in finished) {
-        final id = (m['id'] as String?) ?? '';
-        _backendMeta[id] = m;
-        var chat = const <HistoryChatMessage>[];
-        try {
-          final msgs = await ConsultationService.loadMessages(id);
-          chat = msgs
-              .map((x) => HistoryChatMessage(
-                    sender: ((x['senderRole'] as String?) ?? '') == 'dokter'
-                        ? 'Dokter'
-                        : 'Pasien',
-                    message: (x['text'] as String?) ?? '',
-                  ))
-              .toList();
-        } catch (_) {
-          // chat kosong = tampil default UI
-        }
-        final date = (m['dateIso'] as String?) ?? '';
-        final ts = (m['timeStart'] as String?) ?? '';
-        final te = (m['timeEnd'] as String?) ?? '';
-        final time = ts.isNotEmpty
-            ? '${AppDates.formatHm(ts)} - ${AppDates.formatHm(te.isNotEmpty ? te : ts)}'
-            : AppDates.formatRange((m['scheduleTime'] as String?) ?? '');
-        var patientName = (m['patientName'] as String?) ?? '';
-        if (patientName.isEmpty) {
-          final pid = (m['patientId'] as String?) ?? '';
-          if (pid.isNotEmpty) {
-            try {
-              final p = await UserService.loadByUid(pid);
-              if (p != null && p.name.isNotEmpty) patientName = p.name;
-            } catch (_) {
-              // profil gagal → tetap 'Pasien'
+    _consultSub?.cancel();
+    _consultSub = ConsultationService.streamFinishedForDoctor(uid).listen(
+      (finished) async {
+        if (!mounted) return;
+        final list = <ConsultationHistoryModel>[];
+        for (final m in finished) {
+          final id = (m['id'] as String?) ?? '';
+          _backendMeta[id] = m;
+          var chat = const <HistoryChatMessage>[];
+          try {
+            final msgs = await ConsultationService.loadMessages(id);
+            chat = msgs
+                .map((x) => HistoryChatMessage(
+                      sender: ((x['senderRole'] as String?) ?? '') == 'dokter'
+                          ? 'Dokter'
+                          : 'Pasien',
+                      message: (x['text'] as String?) ?? '',
+                    ))
+                .toList();
+          } catch (_) {
+            // chat kosong = tampil default UI
+          }
+          final date = (m['dateIso'] as String?) ?? '';
+          final ts = (m['timeStart'] as String?) ?? '';
+          final te = (m['timeEnd'] as String?) ?? '';
+          final time = ts.isNotEmpty
+              ? '${AppDates.formatHm(ts)} - ${AppDates.formatHm(te.isNotEmpty ? te : ts)}'
+              : AppDates.formatRange((m['scheduleTime'] as String?) ?? '');
+          var patientName = (m['patientName'] as String?) ?? '';
+          if (patientName.isEmpty) {
+            final pid = (m['patientId'] as String?) ?? '';
+            if (pid.isNotEmpty) {
+              try {
+                final p = await UserService.loadByUid(pid);
+                if (p != null && p.name.isNotEmpty) patientName = p.name;
+              } catch (_) {
+                // profil gagal → tetap 'Pasien'
+              }
             }
           }
+          if (patientName.isEmpty) patientName = 'Pasien';
+          list.add(ConsultationHistoryModel(
+            id: id,
+            patientName: patientName,
+            dateTime: date.isEmpty
+                ? ((m['scheduleDate'] as String?) ?? '')
+                : '$date • $time',
+            diagnosis: (m['diagnosis'] as String?) ?? '',
+            notes: (m['notes'] as String?) ?? '',
+            chatHistory: chat,
+          ));
         }
-        if (patientName.isEmpty) patientName = 'Pasien';
-        list.add(ConsultationHistoryModel(
-          id: id,
-          patientName: patientName,
-          dateTime: date.isEmpty
-              ? ((m['scheduleDate'] as String?) ?? '')
-              : '$date • $time',
-          diagnosis: (m['diagnosis'] as String?) ?? '',
-          notes: (m['notes'] as String?) ?? '',
-          chatHistory: chat,
-        ));
-      }
-      setState(() {
-        DoctorConsultationStore().history
-          ..clear()
-          ..addAll(list);
-      });
-    } catch (_) {
-      // Query gagal → tampilkan kosong, jangan seed palsu di production.
-      if (!mounted) return;
-      setState(DoctorConsultationStore().history.clear);
-    }
+        if (!mounted) return;
+        setState(() {
+          DoctorConsultationStore().history
+            ..clear()
+            ..addAll(list);
+        });
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(DoctorConsultationStore().history.clear);
+      },
+    );
   }
 
   @override
