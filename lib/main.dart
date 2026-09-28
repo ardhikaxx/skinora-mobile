@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'firebase_options.dart';
 import 'components/notification_permission.dart';
 import 'services/auth_service.dart';
-import 'services/backend.dart';
+import 'services/location_service.dart';
 import 'services/notification_router.dart';
 import 'services/notification_service.dart';
 import 'pages/auth/login_page.dart';
@@ -112,6 +112,11 @@ Future<void> main() async {
   NotificationRouter.configure(navigatorKey: rootNavigatorKey);
   await NotificationService.init();
 
+  // Geolokasi: minta izin lokasi sekali di awal (Android/iOS) agar koordinat
+  // siap untuk cuaca (Open-Meteo) & fitur lokasi lain. Tidak menunggu hasil
+  // agar startup tidak tertahan; fallback Jakarta bila ditolak.
+  unawaited(LocationService.init());
+
   runApp(const SkinoraApp());
 }
 
@@ -196,42 +201,48 @@ class _SkinoraAppState extends State<SkinoraApp> {
         '/admin/notifikasi': (context) => const NotifikasiAdminPage(),
         '/admin/spesialisasi': (context) => const MasterSpesialisasiPage(),
         '/admin/spesialisasi/tambah': (context) => const TambahSpesialisasiPage(),
-        '/admin/spesialisasi/edit': (context) => EditSpesialisasiPage(
-              initialName: Backend.useFirebase ? '' : 'Jerawat',
-            ),
+        '/admin/spesialisasi/edit': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          final initialName = (args is String) ? args : '';
+          return EditSpesialisasiPage(initialName: initialName);
+        },
         '/admin/dokter': (context) => const ManajemenDokterPage(showBottomNav: true),
         '/admin/dokter/tambah': (context) => const TambahDokterPage(),
-        '/admin/dokter/detail': (context) => DetailDokterPage(
-              doctor: AdminDoctorModel(
-                id: Backend.useFirebase ? '' : '1',
-                name: Backend.useFirebase ? '' : 'dr. Anita Dewi, Sp.KK',
-                email: Backend.useFirebase ? '' : 'anita@demo.com',
-                phone: Backend.useFirebase ? '' : '081234567800',
-                specialization: Backend.useFirebase ? '' : 'Estetika Kulit',
-                experience: Backend.useFirebase ? '' : '8 tahun',
-                str: Backend.useFirebase ? '' : 'STR-2018-12345',
-                bio: Backend.useFirebase
-                    ? ''
-                    : 'Dokter spesialis kulit dan kelamin dengan pengalaman 8 tahun di bidang estetika kulit. Lulusan Fakultas Kedokteran Universitas Indonesia.',
-                status: Backend.useFirebase
-                    ? DoctorStatus.menunggu
-                    : DoctorStatus.terverifikasi,
-              ),
-            ),
+        '/admin/dokter/detail': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          final doctor = (args is AdminDoctorModel)
+              ? args
+              : AdminDoctorModel(
+                  id: '',
+                  name: '',
+                  email: '',
+                  phone: '',
+                  specialization: '',
+                  experience: '',
+                  str: '',
+                  bio: '',
+                  status: DoctorStatus.menunggu,
+                );
+          return DetailDokterPage(doctor: doctor);
+        },
         '/admin/pengguna': (context) => const ManajemenPenggunaPage(showBottomNav: true),
         '/admin/pengguna/tambah': (context) => const TambahPenggunaPage(),
-        '/admin/pengguna/detail': (context) => DetailPenggunaPage(
-              user: AdminUserModel(
-                id: Backend.useFirebase ? '' : '1',
-                name: Backend.useFirebase ? '' : 'Leonita Yulyta Agustin',
-                email: Backend.useFirebase ? '' : 'leonita@demo.com',
-                phone: Backend.useFirebase ? '' : '081234567890',
-                address: Backend.useFirebase ? '' : 'Jl. Sudirman No. 123, Jakarta',
-                birthDate: Backend.useFirebase ? '' : '1995-06-15',
-                gender: Backend.useFirebase ? '' : 'Perempuan',
-                status: UserStatus.aktif,
-              ),
-            ),
+        '/admin/pengguna/detail': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          final user = (args is AdminUserModel)
+              ? args
+              : AdminUserModel(
+                  id: '',
+                  name: '',
+                  email: '',
+                  phone: '',
+                  address: '',
+                  birthDate: '',
+                  gender: '',
+                  status: UserStatus.aktif,
+                );
+          return DetailPenggunaPage(user: user);
+        },
         '/admin/profil': (context) => const ProfilAdminPage(),
         '/admin/edit-profil': (context) => const EditProfilAdminPage(),
         '/admin/pengaturan': (context) => const PengaturanAdminPage(),
@@ -239,30 +250,53 @@ class _SkinoraAppState extends State<SkinoraApp> {
         '/admin/riwayat-aktivitas': (context) => const RiwayatAktivitasAdminPage(),
         '/admin/edukasi': (context) => const ManajemenEdukasiPage(showBottomNav: true),
         '/admin/edukasi/tambah': (context) => const TambahArtikelPage(),
-        '/admin/edukasi/edit': (context) => EditArtikelPage(
-              article: AdminArticleModel(
-                id: Backend.useFirebase ? '' : '1',
-                title: Backend.useFirebase ? '' : 'Mengenal Tipe Kulit Wajah Anda',
-                category: Backend.useFirebase ? '' : 'Kulit Dasar',
-                date: Backend.useFirebase ? '' : '2026-08-01',
-                content: Backend.useFirebase
-                    ? ''
-                    : 'Pelajari cara mengenali tipe kulit wajah Anda untuk perawatan yang lebih tepat.',
-                status: Backend.useFirebase
-                    ? ArticleStatus.draf
-                    : ArticleStatus.diterbitkan,
-              ),
-            ),
+        '/admin/edukasi/edit': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          final article = (args is AdminArticleModel)
+              ? args
+              : AdminArticleModel(
+                  id: '',
+                  title: '',
+                  category: '',
+                  date: '',
+                  content: '',
+                  status: ArticleStatus.draf,
+                );
+          return EditArtikelPage(article: article);
+        },
         '/admin/laporan': (context) => const LaporanRiwayatPage(),
         '/dokter': (context) => const DokterMainPage(),
         '/dokter/patient-insight': (context) => const PatientInsightPage(),
-        '/dokter/patient-insight/detail': (context) => const DetailPatientInsightPage(),
+        '/dokter/patient-insight/detail': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          if (args is PatientInsightModel) {
+            return DetailPatientInsightPage(patient: args);
+          }
+          return const DetailPatientInsightPage();
+        },
         '/dokter/notifikasi': (context) => const NotifikasiDokterPage(),
         '/dokter/pengaturan': (context) => const PengaturanDokterPage(),
         '/dokter/chat': (context) => const ChatKonsultasiPage(showBottomNav: true),
-        '/dokter/chat/ruang': (context) => const RuangChatDokterPage(),
+        '/dokter/chat/ruang': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          if (args is Map) {
+            return RuangChatDokterPage(
+              patientName: (args['patientName'] as String?) ?? '',
+              consultationId: args['consultationId'] as String?,
+              dateTime: args['dateTime'] as String?,
+              status: args['status'] as String?,
+            );
+          }
+          return const RuangChatDokterPage();
+        },
         '/dokter/riwayat': (context) => const RiwayatKonsultasiPage(showBottomNav: true),
-        '/dokter/riwayat/detail': (context) => const DetailRiwayatKonsultasiPage(),
+        '/dokter/riwayat/detail': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          if (args is ConsultationHistoryModel) {
+            return DetailRiwayatKonsultasiPage(consultation: args);
+          }
+          return const DetailRiwayatKonsultasiPage();
+        },
         '/dokter/profil': (context) => const ProfilDokterPage(showBottomNav: true),
         '/dokter/profil/edit': (context) => const EditProfilDokterPage(),
         '/dokter/tentang': (context) => const TentangDokterPage(),
@@ -273,60 +307,121 @@ class _SkinoraAppState extends State<SkinoraApp> {
         '/pengguna': (context) => const PenggunaMainPage(),
         '/pengguna/notifikasi': (context) => const NotifikasiPenggunaPage(),
         '/pengguna/konsultasi': (context) => const KonsultasiDokterPenggunaPage(),
-        '/pengguna/profil-dokter': (context) => const ProfilDokterPenggunaPage(),
-        '/pengguna/ruang-konsultasi': (context) => const RuangKonsultasiPenggunaPage(),
-        '/pengguna/riwayat-ruang-konsultasi': (context) => const RiwayatRuangKonsultasiPage(),
+        '/pengguna/profil-dokter': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          if (args is Map) {
+            return ProfilDokterPenggunaPage(
+              doctorId: args['doctorId'] as String?,
+              doctorName: args['doctorName'] as String?,
+              specialization: args['specialization'] as String?,
+            );
+          }
+          return const ProfilDokterPenggunaPage();
+        },
+        '/pengguna/ruang-konsultasi': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          if (args is Map) {
+            return RuangKonsultasiPenggunaPage(
+              doctorId: args['doctorId'] as String?,
+              doctorName: (args['doctorName'] as String?) ?? '',
+              status: (args['status'] as String?) ?? 'Terjadwal',
+              consultationId: args['consultationId'] as String?,
+            );
+          }
+          return const RuangKonsultasiPenggunaPage();
+        },
+        '/pengguna/riwayat-ruang-konsultasi': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          if (args is Map) {
+            return RiwayatRuangKonsultasiPage(
+              doctorName: (args['doctorName'] as String?) ?? '',
+              status: (args['status'] as String?) ?? 'Selesai',
+              consultationId: args['consultationId'] as String?,
+            );
+          }
+          return const RiwayatRuangKonsultasiPage();
+        },
         '/pengguna/riwayat-konsultasi': (context) => const RiwayatKonsultasiPenggunaPage(),
         '/pengguna/edukasi': (context) => const EdukasiKulitPenggunaPage(),
-        '/pengguna/detail-edukasi': (context) => const DetailEdukasiPenggunaPage(),
+        '/pengguna/detail-edukasi': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          if (args is SkinEducationModel) {
+            return DetailEdukasiPenggunaPage(article: args);
+          }
+          return const DetailEdukasiPenggunaPage();
+        },
         '/pengguna/skin-check/pertanyaan-1': (context) => const SkinCheckQuestion1Page(),
-        '/pengguna/skin-check/pertanyaan-2': (context) =>
-            SkinCheckQuestion2Page(age: Backend.useFirebase ? '' : '20'),
-        '/pengguna/skin-check/pertanyaan-3': (context) => SkinCheckQuestion3Page(
-              age: Backend.useFirebase ? '' : '20',
-              gender: Backend.useFirebase ? '' : 'Perempuan',
-            ),
-        '/pengguna/skin-check/pertanyaan-4': (context) => SkinCheckQuestion4Page(
-              age: Backend.useFirebase ? '' : '20',
-              gender: Backend.useFirebase ? '' : 'Perempuan',
-              conditionAfterWash:
-                  Backend.useFirebase ? '' : 'Terasa cukup nyaman',
-            ),
-        '/pengguna/skin-check/pertanyaan-5': (context) => SkinCheckQuestion5Page(
-              age: Backend.useFirebase ? '' : '20',
-              gender: Backend.useFirebase ? '' : 'Perempuan',
-              conditionAfterWash:
-                  Backend.useFirebase ? '' : 'Terasa cukup nyaman',
-              oilCondition: Backend.useFirebase
-                  ? ''
-                  : 'Sedikit berminyak, terutama di area tertentu',
-            ),
-        '/pengguna/skin-check/pertanyaan-6': (context) => SkinCheckQuestion6Page(
-              age: Backend.useFirebase ? '' : '20',
-              gender: Backend.useFirebase ? '' : 'Perempuan',
-              conditionAfterWash:
-                  Backend.useFirebase ? '' : 'Terasa cukup nyaman',
-              oilCondition: Backend.useFirebase
-                  ? ''
-                  : 'Sedikit berminyak, terutama di area tertentu',
-              sensitivity: Backend.useFirebase
-                  ? ''
-                  : 'Kadang mengalami kemerahan atau iritasi',
-            ),
-        '/pengguna/skin-check/pertanyaan-7': (context) => SkinCheckQuestion7Page(
-              age: Backend.useFirebase ? '' : '20',
-              gender: Backend.useFirebase ? '' : 'Perempuan',
-              conditionAfterWash:
-                  Backend.useFirebase ? '' : 'Terasa cukup nyaman',
-              oilCondition: Backend.useFirebase
-                  ? ''
-                  : 'Sedikit berminyak, terutama di area tertentu',
-              sensitivity: Backend.useFirebase
-                  ? ''
-                  : 'Kadang mengalami kemerahan atau iritasi',
-              humidity: Backend.useFirebase ? '' : '74%',
-            ),
-        '/pengguna/skin-check/hasil': (context) => const SkinCheckResultPage(),
+        '/pengguna/skin-check/pertanyaan-2': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          final age = (args is String) ? args : '';
+          return SkinCheckQuestion2Page(age: age);
+        },
+        '/pengguna/skin-check/pertanyaan-3': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          final map = (args is Map) ? args : const {};
+          return SkinCheckQuestion3Page(
+            age: (map['age'] as String?) ?? '',
+            gender: (map['gender'] as String?) ?? '',
+          );
+        },
+        '/pengguna/skin-check/pertanyaan-4': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          final map = (args is Map) ? args : const {};
+          return SkinCheckQuestion4Page(
+            age: (map['age'] as String?) ?? '',
+            gender: (map['gender'] as String?) ?? '',
+            conditionAfterWash:
+                (map['conditionAfterWash'] as String?) ?? '',
+          );
+        },
+        '/pengguna/skin-check/pertanyaan-5': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          final map = (args is Map) ? args : const {};
+          return SkinCheckQuestion5Page(
+            age: (map['age'] as String?) ?? '',
+            gender: (map['gender'] as String?) ?? '',
+            conditionAfterWash:
+                (map['conditionAfterWash'] as String?) ?? '',
+            oilCondition: (map['oilCondition'] as String?) ?? '',
+          );
+        },
+        '/pengguna/skin-check/pertanyaan-6': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          final map = (args is Map) ? args : const {};
+          return SkinCheckQuestion6Page(
+            age: (map['age'] as String?) ?? '',
+            gender: (map['gender'] as String?) ?? '',
+            conditionAfterWash:
+                (map['conditionAfterWash'] as String?) ?? '',
+            oilCondition: (map['oilCondition'] as String?) ?? '',
+            sensitivity: (map['sensitivity'] as String?) ?? '',
+          );
+        },
+        '/pengguna/skin-check/pertanyaan-7': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          final map = (args is Map) ? args : const {};
+          return SkinCheckQuestion7Page(
+            age: (map['age'] as String?) ?? '',
+            gender: (map['gender'] as String?) ?? '',
+            conditionAfterWash:
+                (map['conditionAfterWash'] as String?) ?? '',
+            oilCondition: (map['oilCondition'] as String?) ?? '',
+            sensitivity: (map['sensitivity'] as String?) ?? '',
+            humidity: (map['humidity'] as String?) ?? '',
+          );
+        },
+        '/pengguna/skin-check/hasil': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          if (args is Map) {
+            return SkinCheckResultPage(
+              skinType: (args['skinType'] as String?) ?? '',
+              sensitivity: (args['sensitivity'] as String?) ?? '',
+              acneRisk: (args['acneRisk'] as String?) ?? '',
+              createdDisplay: args['createdDisplay'] as String?,
+            );
+          }
+          return const SkinCheckResultPage();
+        },
         '/pengguna/skin-check/riwayat': (context) => const RiwayatSkinCheckPage(),
         '/pengguna/edit-profil': (context) => const EditProfilPenggunaPage(),
         '/pengguna/pengaturan': (context) => const PengaturanPenggunaPage(),
