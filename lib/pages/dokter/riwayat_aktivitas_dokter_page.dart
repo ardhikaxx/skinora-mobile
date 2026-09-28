@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -60,10 +61,18 @@ class _RiwayatAktivitasDokterPageState
           ),
         ];
 
+  StreamSubscription<List<Map<String, dynamic>>>? _activitySub;
+
   @override
   void initState() {
     super.initState();
     _loadFromBackend();
+  }
+
+  @override
+  void dispose() {
+    _activitySub?.cancel();
+    super.dispose();
   }
 
   String _fmtTime(Object? ts) {
@@ -71,29 +80,29 @@ class _RiwayatAktivitasDokterPageState
     return ts?.toString() ?? '';
   }
 
-  /// Riwayat aktivitas milik dokter dari Firestore. Tanpa Firebase, seed
-  /// demo tetap dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil
-  /// backend selalu menggantikan seed — termasuk saat kosong.
-  Future<void> _loadFromBackend() async {
+  /// Riwayat aktivitas milik dokter dari Firestore secara realtime.
+  void _loadFromBackend() {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
     if (uid == null) return;
-    try {
-      final items = await ActivityService.listMine(uid);
-      if (!mounted) return;
-      setState(() {
-        activities = items
-            .map((m) => DoctorActivityItem(
-                  title: (m['title'] as String?) ?? '',
-                  timestamp: _fmtTime(m['createdAt']),
-                ))
-            .toList();
-      });
-    } catch (_) {
-      // Query gagal → tampilkan kosong, jangan seed palsu di production.
-      if (!mounted) return;
-      setState(() => activities = const <DoctorActivityItem>[]);
-    }
+    _activitySub?.cancel();
+    _activitySub = ActivityService.streamMine(uid).listen(
+      (items) {
+        if (!mounted) return;
+        setState(() {
+          activities = items
+              .map((m) => DoctorActivityItem(
+                    title: (m['title'] as String?) ?? '',
+                    timestamp: _fmtTime(m['createdAt']),
+                  ))
+              .toList();
+        });
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(() => activities = const <DoctorActivityItem>[]);
+      },
+    );
   }
 
   @override
