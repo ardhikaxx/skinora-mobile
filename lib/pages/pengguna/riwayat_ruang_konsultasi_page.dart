@@ -55,6 +55,15 @@ class _RiwayatRuangKonsultasiPageState
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   StreamSubscription<List<Map<String, dynamic>>>? _msgSub;
+  StreamSubscription<Map<String, dynamic>?>? _statusSub;
+  bool _hasText = false;
+  String _statusLive = '';
+
+  bool get _isFinished =>
+      _statusLive.toLowerCase() == 'selesai' ||
+      widget.status.toLowerCase() == 'selesai';
+
+  String _formatChatTimeWib(String raw) => AppDates.formatChatTimeWib(raw);
 
   List<ConsultationChatMessage> _messages = Backend.useFirebase
       ? <ConsultationChatMessage>[]
@@ -118,6 +127,11 @@ class _RiwayatRuangKonsultasiPageState
   @override
   void initState() {
     super.initState();
+    _statusLive = widget.status;
+    _textController.addListener(() {
+      final has = _textController.text.trim().isNotEmpty;
+      if (has != _hasText && mounted) setState(() => _hasText = has);
+    });
     // Anti-spam: pesan masuk di ruang yang sedang dibuka tidak memunculkan
     // native notification (chat realtime sudah memberi feedback visual).
     ActiveChatRegistry.open(widget.consultationId);
@@ -144,7 +158,7 @@ class _RiwayatRuangKonsultasiPageState
             return ConsultationChatMessage(
               id: (m['id'] as String?) ?? '',
               text: (m['text'] as String?) ?? '',
-              time: (m['time'] as String?) ?? '',
+              time: AppDates.formatChatTimeWib(m['time'], m['createdAt']),
               isFromUser: senderRole == 'user',
             );
           }).toList();
@@ -162,11 +176,22 @@ class _RiwayatRuangKonsultasiPageState
         setState(() => _messages = const <ConsultationChatMessage>[]);
       },
     );
+    _statusSub = ConsultationService.streamById(consultationId).listen((doc) {
+      if (!mounted || doc == null) return;
+      final raw = ((doc['status'] as String?) ?? '').toLowerCase();
+      final label = switch (raw) {
+        'berlangsung' => 'Berlangsung',
+        'selesai' => 'Selesai',
+        _ => 'Terjadwal',
+      };
+      if (label != _statusLive) setState(() => _statusLive = label);
+    }, onError: (_) {});
   }
 
   @override
   void dispose() {
     _msgSub?.cancel();
+    _statusSub?.cancel();
     ActiveChatRegistry.close(widget.consultationId);
     _textController.dispose();
     _scrollController.dispose();
@@ -174,9 +199,19 @@ class _RiwayatRuangKonsultasiPageState
   }
 
   Future<void> _sendMessage() async {
+    if (_isFinished) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sesi konsultasi telah selesai. Anda tidak dapat mengirim pesan lagi.'),
+        ),
+      );
+      return;
+    }
     final text = _textController.text.trim();
     if (text.isEmpty) return;
 
+    // Jam kirim selalu WIB 24 jam Indonesia ("13.00").
     final timeStr = AppDates.hm(AppDates.nowWib());
 
     final consultationId = widget.consultationId;
@@ -363,7 +398,7 @@ class _RiwayatRuangKonsultasiPageState
             ),
             const SizedBox(height: 6),
             Text(
-              msg.time,
+              _formatChatTimeWib(msg.time),
               style: TextStyle(
                 fontSize: 10.5,
                 color: isUser
@@ -378,6 +413,31 @@ class _RiwayatRuangKonsultasiPageState
   }
 
   Widget _buildInputArea() {
+    if (_isFinished) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            top: BorderSide(color: Color(0xFFF0F0F0), width: 1.0),
+          ),
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF6F6F6),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE5E5EA)),
+          ),
+          child: const Text(
+            'Sesi konsultasi telah selesai. Anda tidak dapat mengirim pesan lagi.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12.5, color: Color(0xFF8E8E93)),
+          ),
+        ),
+      );
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
       decoration: const BoxDecoration(
@@ -421,11 +481,12 @@ class _RiwayatRuangKonsultasiPageState
           const SizedBox(width: 10),
           GestureDetector(
             onTap: _sendMessage,
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: sendBtnBg,
+                color: _hasText ? primaryMaroon : sendBtnBg,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: const Center(
