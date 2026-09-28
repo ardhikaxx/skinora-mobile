@@ -4,6 +4,9 @@ import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/skin_service.dart';
+import '../../services/weather_service.dart';
+import '../../services/location_service.dart';
+import '../../utils/app_dates.dart';
 import 'skin_check_result_page.dart';
 
 class SkinCheckQuestion7Page extends StatefulWidget {
@@ -40,12 +43,14 @@ class _SkinCheckQuestion7PageState extends State<SkinCheckQuestion7Page> {
   static const Color iconColor = Color(0xFF8E8E93);
 
   late final TextEditingController _tempController;
+  bool _checkingWeather = false;
+  String _weatherInfo = '';
 
   @override
   void initState() {
     super.initState();
     _tempController =
-        TextEditingController(text: widget.initialTemperature ?? '29°C');
+        TextEditingController(text: widget.initialTemperature ?? '');
   }
 
   @override
@@ -58,10 +63,31 @@ class _SkinCheckQuestion7PageState extends State<SkinCheckQuestion7Page> {
     Navigator.pop(context, _tempController.text.trim());
   }
 
-  void _handleCek() {
+  /// Ambil suhu realtime dari API gratis Open-Meteo (Jakarta, WIB)
+  /// lalu inputkan otomatis ke kolom.
+  Future<void> _handleCek() async {
+    if (_checkingWeather) return;
     setState(() {
-      _tempController.text = '29°C';
+      _checkingWeather = true;
+      _weatherInfo = '';
     });
+    try {
+      final reading = await WeatherService.fetchCurrent();
+      final place = await LocationService.displayLocation();
+      if (!mounted) return;
+      setState(() {
+        _tempController.text = reading.temperatureLabel;
+        _weatherInfo =
+            'Realtime ${reading.temperatureLabel} • ${reading.humidityLabel} (WIB, $place)';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memuat cuaca realtime: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _checkingWeather = false);
+    }
   }
 
   String get _sensitivityResult => widget.sensitivity
@@ -105,6 +131,9 @@ class _SkinCheckQuestion7PageState extends State<SkinCheckQuestion7Page> {
     final skinType = _skinTypeResult;
     final sensitivity = _sensitivityResult;
     final acneRisk = _acneRiskResult;
+    // Tanggal skin check otomatis: format Indonesia WIB.
+    final createdDisplay = AppDates.fullDisplayWib(AppDates.nowWib());
+    final createdIso = AppDates.todayIso();
 
     if (Backend.useFirebase && AuthService.uid != null) {
       final uid = AuthService.uid!;
@@ -121,6 +150,8 @@ class _SkinCheckQuestion7PageState extends State<SkinCheckQuestion7Page> {
             'sensitivity': widget.sensitivity,
             'humidity': widget.humidity,
             'temperature': _tempController.text.trim(),
+            'createdDisplay': createdDisplay,
+            'createdIso': createdIso,
           },
           resultSkinType: skinType,
           resultSensitivity: sensitivity,
@@ -138,6 +169,7 @@ class _SkinCheckQuestion7PageState extends State<SkinCheckQuestion7Page> {
           skinType: skinType,
           sensitivity: sensitivity,
           acneRisk: acneRisk,
+          createdDisplay: createdDisplay,
           onNavigateTab: widget.onNavigateTab,
         ),
       ),
@@ -327,30 +359,58 @@ class _SkinCheckQuestion7PageState extends State<SkinCheckQuestion7Page> {
                         ),
                         const SizedBox(width: 12),
 
-                        // Button "Cek"
+                        // Button "Cek" — realtime via API cuaca gratis.
                         GestureDetector(
-                          onTap: _handleCek,
+                          onTap: _checkingWeather ? null : _handleCek,
                           child: Container(
                             height: 48,
                             padding: const EdgeInsets.symmetric(horizontal: 20),
                             decoration: BoxDecoration(
-                              color: primaryMaroon,
+                              color: _checkingWeather
+                                  ? const Color(0xFFD89CA3)
+                                  : primaryMaroon,
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            child: const Center(
-                              child: Text(
-                                'Cek',
-                                style: TextStyle(
-                                  fontSize: 14.0,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
+                            child: Center(
+                              child: _checkingWeather
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Cek',
+                                      style: TextStyle(
+                                        fontSize: 14.0,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                             ),
                           ),
                         ),
                       ],
                     ),
+                    if (_weatherInfo.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          const Icon(LucideIcons.cloudSun,
+                              size: 14, color: Color(0xFF8E8E93)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              _weatherInfo,
+                              style: const TextStyle(
+                                  fontSize: 12, color: Color(0xFF8E8E93)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
 
                     const SizedBox(height: 24),
 
