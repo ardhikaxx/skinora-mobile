@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
@@ -40,10 +42,38 @@ class _ProfilPenggunaPageState extends State<ProfilPenggunaPage> {
   String _birthDate = Backend.useFirebase ? '' : '1995-06-15';
   String _gender = Backend.useFirebase ? '' : 'Perempuan';
 
+  StreamSubscription<dynamic>? _profileSub;
+
   @override
   void initState() {
     super.initState();
+    _subscribeProfileRealtime();
     _loadFromBackend();
+  }
+
+  /// Profil realtime: perubahan nama/telepon/alamat/tgl lahir/gender
+  /// langsung tampil selain reload manual yang sudah ada.
+  void _subscribeProfileRealtime() {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    _profileSub = UserService.streamByUid(uid).listen((profile) {
+      if (!mounted || profile == null) return;
+      setState(() {
+        _name = profile.name;
+        _email = profile.email;
+        _phone = profile.phone;
+        _address = profile.address;
+        _birthDate = profile.birthDate;
+        _gender = profile.gender;
+      });
+    }, onError: (_) {});
+  }
+
+  @override
+  void dispose() {
+    _profileSub?.cancel();
+    super.dispose();
   }
 
   /// Profile milik pengguna dari Firestore. Tanpa Firebase, seed demo
@@ -268,10 +298,14 @@ class _ProfilPenggunaPageState extends State<ProfilPenggunaPage> {
                     initialName: _name,
                     initialPhone: _phone,
                     initialAddress: _address,
+                    initialBirthDate: _birthDate,
+                    initialGender: _gender,
                     onNavigateTab: widget.onNavigateTab,
                   ),
                 ),
               );
+              // Realtime: reload dari backend agar profil & beranda konsisten.
+              await _loadFromBackend();
               if (result != null && result is Map<String, String>) {
                 setState(() {
                   if (result['name']?.isNotEmpty == true) {
@@ -282,6 +316,13 @@ class _ProfilPenggunaPageState extends State<ProfilPenggunaPage> {
                   }
                   if (result['address'] != null) {
                     _address = result['address']!;
+                  }
+                  if (result['birthDate'] != null) {
+                    _birthDate = result['birthDate']!;
+                  }
+                  if (result['gender'] != null &&
+                      result['gender']!.isNotEmpty) {
+                    _gender = result['gender']!;
                   }
                 });
               }
