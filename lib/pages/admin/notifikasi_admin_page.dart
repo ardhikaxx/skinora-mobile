@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/empty_state.dart';
@@ -151,8 +150,7 @@ class _NotifikasiAdminPageState extends State<NotifikasiAdminPage> {
   }
 
   String _fmtTime(Object? ts) {
-    if (ts is Timestamp) return AppDates.dateTime(ts.toDate());
-    return ts?.toString() ?? '';
+    return AppDates.formatTimestampWib(ts, relative: true);
   }
 
   @override
