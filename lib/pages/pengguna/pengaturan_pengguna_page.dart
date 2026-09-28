@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../components/notification_permission.dart';
+import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/notification_service.dart';
@@ -108,6 +110,12 @@ class _PengaturanPenggunaPageState extends State<PengaturanPenggunaPage> {
           morningReminder: _morningReminderController.text.trim(),
           eveningReminder: _eveningReminderController.text.trim(),
         );
+        await ActivityService.log(
+          title: 'Mengubah pengaturan',
+          tag: 'Pengaturan',
+          actor: AuthService.currentUser?.email ?? 'Pengguna',
+          actorUid: AuthService.uid ?? '',
+        );
         // Sinkronkan permission OS + jadwal pengingat pagi/malam dari
         // nilai yang baru saja disimpan (idempotent).
         await NotificationService.applyNotificationSettings(
@@ -124,14 +132,13 @@ class _PengaturanPenggunaPageState extends State<PengaturanPenggunaPage> {
       }
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Pengaturan berhasil disimpan'),
-        backgroundColor: primaryMaroon,
-        duration: Duration(seconds: 2),
-      ),
+    AdminSuccessDialog.show(
+      context,
+      message: 'Pengaturan berhasil disimpan',
+      onOk: () {
+        Navigator.pop(context);
+      },
     );
-    Navigator.pop(context);
   }
 
   @override
