@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
@@ -79,13 +80,13 @@ class _LoginPageState extends State<LoginPage> {
 
     if (input.isEmpty) {
       setState(() {
-        _errorMessage = 'Silakan masukkan email / role Anda';
+        _errorMessage = 'Silahkan masukkan email / role Anda';
       });
       return;
     }
     if (password.isEmpty) {
       setState(() {
-        _errorMessage = 'Silakan masukkan password Anda';
+        _errorMessage = 'Silahkan masukkan password Anda';
       });
       return;
     }
@@ -104,7 +105,7 @@ class _LoginPageState extends State<LoginPage> {
       if (profile == null) {
         await AuthService.signOut();
         setState(() {
-          _errorMessage = 'Akun tidak terdaftar. Silakan daftar terlebih dahulu.';
+          _errorMessage = 'Akun tidak terdaftar. Silahkan daftar terlebih dahulu.';
           _busy = false;
         });
         return;
@@ -152,11 +153,9 @@ class _LoginPageState extends State<LoginPage> {
     }
     AuthService.sendPasswordReset(email).then((_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Email reset password telah dikirim.'),
-          duration: Duration(seconds: 2),
-        ),
+      AdminSuccessDialog.show(
+        context,
+        message: 'Email reset password telah dikirim.',
       );
     }).catchError((Object e) {
       if (!mounted) return;
