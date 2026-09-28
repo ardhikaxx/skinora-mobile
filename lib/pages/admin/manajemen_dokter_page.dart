@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
@@ -95,32 +96,35 @@ class _ManajemenDokterPageState extends State<ManajemenDokterPage> {
           ),
         ];
 
+  StreamSubscription<List<AdminDoctorModel>>? _doctorSub;
+
   @override
   void initState() {
     super.initState();
     _loadFromBackend();
   }
 
-  /// Ambil data dokter dari Firestore. Tanpa Firebase (test), seed demo
-  /// tetap dipakai. Dengan Firebase, hasil backend selalu menggantikan seed
-  /// — termasuk saat daftar kosong — agar UI sinkron dengan data asli.
-  Future<void> _loadFromBackend() async {
+  /// Ambil data dokter dari Firestore secara realtime.
+  void _loadFromBackend() {
     if (!Backend.useFirebase) return;
-    try {
-      final doctors = await UserService.listDokter();
-      if (!mounted) return;
-      setState(() => _doctors
-        ..clear()
-        ..addAll(doctors));
-    } catch (_) {
-      // Query gagal → tampilkan kosong, jangan seed palsu di production.
-      if (!mounted) return;
-      setState(_doctors.clear);
-    }
+    _doctorSub?.cancel();
+    _doctorSub = UserService.streamDokter().listen(
+      (doctors) {
+        if (!mounted) return;
+        setState(() => _doctors
+          ..clear()
+          ..addAll(doctors));
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(_doctors.clear);
+      },
+    );
   }
 
   @override
   void dispose() {
+    _doctorSub?.cancel();
     _searchController.dispose();
     super.dispose();
   }
