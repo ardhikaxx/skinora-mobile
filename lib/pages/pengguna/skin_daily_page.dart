@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
@@ -42,6 +45,9 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
 
   bool _isSkincarePagi = false;
   bool _isSkincareMalam = false;
+  int _filledDays = 0;
+  bool _justSaved = false;
+  StreamSubscription<List<Map<String, dynamic>>>? _sub;
 
   final List<String> _locationOptions = [
     'T-Zone',
@@ -75,10 +81,12 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
     _airController = TextEditingController(text: '0');
     _makananController = TextEditingController();
     _aktivitasController = TextEditingController();
+    _loadProgress();
   }
 
   @override
   void dispose() {
+    _sub?.cancel();
     _kebiasaanController.dispose();
     _jamTidurController.dispose();
     _airController.dispose();
@@ -139,9 +147,97 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
 
     if (picked != null) {
       setState(() {
+        _justSaved = false;
         _selectedDate = picked;
       });
+      _applyLogForDate(picked);
     }
+  }
+
+  /// Jam tidur memakai clock picker (TimePicker) dan tampil di kolom input.
+  Future<void> _pickSleepTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: primaryMaroon,
+              onPrimary: Colors.white,
+              onSurface: darkText,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && mounted) {
+      final raw = '${picked.hour}:${picked.minute.toString().padLeft(2, '0')}';
+      setState(() => _jamTidurController.text = AppDates.formatHm(raw));
+    }
+  }
+
+  List<Map<String, dynamic>> _dailyLogs = [];
+
+  void _applyLogForDate(DateTime date) {
+    final iso = AppDates.iso(date);
+    final match = _dailyLogs.where((l) => (l['dateIso'] as String?) == iso);
+    if (match.isNotEmpty) {
+      final doc = match.first;
+      final locs = (doc['locations'] as List?)?.cast<String>() ?? [];
+      final syms = (doc['symptoms'] as List?)?.cast<String>() ?? [];
+      setState(() {
+        _selectedLocations
+          ..clear()
+          ..addAll(locs);
+        _selectedSymptoms
+          ..clear()
+          ..addAll(syms);
+        _kebiasaanController.text = (doc['kebiasaan'] as String?) ?? '';
+        _jamTidurController.text = (doc['jamTidur'] as String?) ?? '';
+        _airController.text = (doc['air'] as String?) ?? '0';
+        _makananController.text = (doc['makanan'] as String?) ?? '';
+        _aktivitasController.text = (doc['aktivitas'] as String?) ?? '';
+        _isSkincarePagi = doc['skincarePagi'] == true;
+        _isSkincareMalam = doc['skincareMalam'] == true;
+      });
+    }
+  }
+
+  /// Hitung progress harian 0/7 s.d. 7/7 secara realtime dari tanggal unik yang terisi.
+  void _loadProgress() {
+    if (!Backend.useFirebase || AuthService.uid == null) {
+      if (mounted) setState(() => _filledDays = 0);
+      return;
+    }
+    _sub?.cancel();
+    _sub = SkinService.streamSkinDailies(AuthService.uid!).listen((items) {
+      if (!mounted) return;
+      _dailyLogs = items;
+      final uniq = items
+          .map((e) => ((e['dateIso'] as String?) ?? '').trim())
+          .where((e) => e.isNotEmpty)
+          .toSet();
+      setState(() => _filledDays = uniq.length.clamp(0, 7));
+      if (!_justSaved) {
+        _applyLogForDate(_selectedDate);
+      }
+    }, onError: (_) {});
+  }
+
+  void _resetForm() {
+    setState(() {
+      _selectedLocations.clear();
+      _selectedSymptoms.clear();
+      _kebiasaanController.clear();
+      _jamTidurController.clear();
+      _airController.text = '0';
+      _makananController.clear();
+      _aktivitasController.clear();
+      _isSkincarePagi = false;
+      _isSkincareMalam = false;
+    });
   }
 
   Future<void> _saveDailyJournal() async {
@@ -181,12 +277,12 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
       }
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Jurnal harian berhasil disimpan'),
-        backgroundColor: primaryMaroon,
-        duration: Duration(seconds: 2),
-      ),
+    setState(() => _justSaved = true);
+    _resetForm();
+    if (!mounted) return;
+    AdminSuccessDialog.show(
+      context,
+      message: 'Jurnal harian berhasil disimpan',
     );
   }
 
@@ -347,8 +443,10 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
     );
   }
 
-  /// Card 1: PROGRESS Card
+  /// Card 1: PROGRESS Card — berprogress 0/7 s.d. 7/7, insight terbuka setelah 7 hari.
   Widget _buildProgressCard() {
+    final progress = (_filledDays.clamp(0, 7)) / 7.0;
+    final canSeeInsight = _filledDays >= 7;
     return Container(
       padding: const EdgeInsets.all(18.0),
       decoration: BoxDecoration(
@@ -368,8 +466,8 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text(
+            children: [
+              const Text(
                 'PROGRESS',
                 style: TextStyle(
                   fontSize: 13.5,
@@ -379,8 +477,8 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
                 ),
               ),
               Text(
-                '7 hari',
-                style: TextStyle(
+                '$_filledDays/7 hari',
+                style: const TextStyle(
                   fontSize: 13.5,
                   fontWeight: FontWeight.bold,
                   color: darkText,
@@ -399,7 +497,7 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
               color: const Color(0xFFF2F2F7),
               child: FractionallySizedBox(
                 alignment: Alignment.centerLeft,
-                widthFactor: 1.0, // 7 days full progress matching mockup
+                widthFactor: progress,
                 child: Container(
                   color: primaryMaroon,
                 ),
@@ -408,37 +506,52 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
           ),
           const SizedBox(height: 14),
 
-          // "Lihat Insight Kulit ->" Link
+          // "Lihat Insight Kulit ->" Link — aktif setelah 7 hari.
           InkWell(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => InsightKulitPenggunaPage(
-                    onNavigateTab: widget.onNavigateTab,
-                  ),
-                ),
-              );
-            },
+            onTap: canSeeInsight
+                ? () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => InsightKulitPenggunaPage(
+                          onNavigateTab: widget.onNavigateTab,
+                        ),
+                      ),
+                    );
+                  }
+                : () {
+                    AdminSuccessDialog.show(
+                      context,
+                      title: 'Progress Mingguan',
+                      message:
+                          'Progress mingguan baru dapat dilihat setelah Anda mengisi jurnal harian selama 7 hari (saat ini $_filledDays/7 hari).',
+                    );
+                  },
             borderRadius: BorderRadius.circular(6),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 2.0),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
+                children: [
                   Text(
-                    'Lihat Insight Kulit',
+                    canSeeInsight
+                        ? 'Lihat Insight Kulit'
+                        : 'Isi $_filledDays/7 hari — lengkapi 7 hari untuk melihat progress',
                     style: TextStyle(
                       fontSize: 13.0,
                       fontWeight: FontWeight.bold,
-                      color: primaryMaroon,
+                      color: canSeeInsight
+                          ? primaryMaroon
+                          : const Color(0xFF9E9E9E),
                     ),
                   ),
-                  SizedBox(width: 5),
+                  const SizedBox(width: 5),
                   Icon(
                     LucideIcons.arrowRight,
                     size: 14,
-                    color: primaryMaroon,
+                    color: canSeeInsight
+                        ? primaryMaroon
+                        : const Color(0xFF9E9E9E),
                   ),
                 ],
               ),
@@ -449,7 +562,7 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
     );
   }
 
-  /// Card 2: TANGGAL Card
+  /// Card 2: TANGGAL Card — tanggal di dalam kolom + date picker.
   Widget _buildTanggalCard() {
     return Container(
       padding: const EdgeInsets.all(18.0),
@@ -479,7 +592,7 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
           ),
           const SizedBox(height: 12),
 
-          // Date Input Box
+          // Date Input Box — tanggal tampil di dalam kolom.
           InkWell(
             onTap: _pickDate,
             borderRadius: BorderRadius.circular(12),
@@ -492,25 +605,32 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
                 border: Border.all(color: innerBorder, width: 1.0),
               ),
               child: Row(
-                children: const [
-                  Icon(
+                children: [
+                  const Icon(
                     LucideIcons.calendar,
                     size: 18,
                     color: subText,
                   ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _formatIndonesianDate(_selectedDate),
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: darkText,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const Icon(
+                    LucideIcons.chevronDown,
+                    size: 16,
+                    color: subText,
+                  ),
                 ],
               ),
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          // Date Text Below Box
-          Text(
-            _formatIndonesianDate(_selectedDate),
-            style: const TextStyle(
-              fontSize: 12.0,
-              color: subText,
-              fontWeight: FontWeight.normal,
             ),
           ),
         ],
@@ -794,28 +914,42 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                SizedBox(
-                  height: 46,
-                  child: TextField(
-                    controller: _jamTidurController,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(fontSize: 14.0, color: darkText),
-                    decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14.0,
-                        vertical: 10.0,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: innerBorder, width: 1.0),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: innerBorder, width: 1.0),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: primaryMaroon, width: 1.2),
+                GestureDetector(
+                  onTap: _pickSleepTime,
+                  child: SizedBox(
+                    height: 46,
+                    child: AbsorbPointer(
+                      child: TextField(
+                        controller: _jamTidurController,
+                        readOnly: true,
+                        style:
+                            const TextStyle(fontSize: 14.0, color: darkText),
+                        decoration: InputDecoration(
+                          hintText: 'Pilih jam (mis. 21.30)',
+                          hintStyle: const TextStyle(
+                              fontSize: 13, color: Color(0xFF9E9E9E)),
+                          suffixIcon: const Icon(LucideIcons.clock,
+                              size: 16, color: subText),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14.0,
+                            vertical: 10.0,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                                color: innerBorder, width: 1.0),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                                color: innerBorder, width: 1.0),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                                color: primaryMaroon, width: 1.2),
+                          ),
+                        ),
                       ),
                     ),
                   ),
