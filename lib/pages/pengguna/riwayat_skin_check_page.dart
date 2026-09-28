@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -7,6 +9,7 @@ import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/skin_service.dart';
 import '../../utils/app_dates.dart';
+import 'konsultasi_dokter_page.dart';
 import 'skin_check_result_page.dart';
 
 class SkinCheckHistoryModel {
@@ -75,60 +78,80 @@ class _RiwayatSkinCheckPageState extends State<RiwayatSkinCheckPage> {
     ),
   ];
 
+  StreamSubscription<List<Map<String, dynamic>>>? _sub;
+
   @override
   void initState() {
     super.initState();
     _loadFromBackend();
   }
 
-  String _fmtDate(Object? ts) {
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  String _fmtDate(Object? ts, {Map<String, dynamic>? doc}) {
+    // Prioritas: createdDisplay (format Indonesia WIB) bila ada.
+    final display = (doc?['createdDisplay'] as String?)?.trim() ?? '';
+    if (display.isNotEmpty) return display;
+    final iso = (doc?['createdIso'] as String?)?.trim() ?? '';
+    if (ts is Timestamp) return AppDates.fullDisplayWib(ts.toDate());
+    if (iso.isNotEmpty) {
+      final parsed = AppDates.tryParseIso(iso);
+      if (parsed != null) return AppDates.display(parsed);
+    }
     if (ts is Timestamp) return AppDates.iso(ts.toDate());
     return ts?.toString() ?? '';
   }
 
-  /// Riwayat skin check milik pengguna dari Firestore. Tanpa Firebase, seed
+  /// Riwayat skin check milik pengguna dari Firestore secara realtime. Tanpa Firebase, seed
   /// demo tetap dipakai agar UI/tes tidak berubah.
-  Future<void> _loadFromBackend() async {
+  void _loadFromBackend() {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
     if (uid == null) return;
-    try {
-      final items = await SkinService.listSkinChecks(uid);
-      if (!mounted) return;
-      setState(() {
-        _historyList = items.map((m) {
-          final skinType = (m['resultSkinType'] as String?) ?? 'Normal';
-          final sensitivity = (m['resultSensitivity'] as String?) ?? 'Non-Sensitif';
-          final acneRisk = (m['resultAcneRisk'] as String?) ?? 'Tidak Rentan';
-          final nonSens = !sensitivity.toLowerCase().contains('sensitif') ||
-              sensitivity.toLowerCase().contains('non');
-          final notRentan = acneRisk.toLowerCase().contains('tidak');
-          final tags = [
-            skinType,
-            nonSens ? 'Non-Sensitif' : sensitivity,
-            notRentan ? 'Tidak Rentan' : acneRisk,
-          ];
-          return SkinCheckHistoryModel(
-            id: (m['id'] as String?) ?? '',
-            date: _fmtDate(m['createdAt']),
-            skinType: skinType,
-            subtitle:
-                '${nonSens ? 'Non-Sensitif' : sensitivity} - $acneRisk',
-            icon: skinType.toLowerCase() == 'normal'
-                ? LucideIcons.sun
-                : LucideIcons.shield,
-            tags: tags,
-            neutralTags: [
-              if (nonSens) 'Non-Sensitif',
-              if (notRentan) 'Tidak Rentan',
-            ],
-          );
-        }).toList();
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _historyList = <SkinCheckHistoryModel>[]);
-    }
+    _sub?.cancel();
+    _sub = SkinService.streamSkinChecks(uid).listen(
+      (items) {
+        if (!mounted) return;
+        setState(() {
+          _historyList = items.map((m) {
+            final skinType = (m['resultSkinType'] as String?) ?? 'Normal';
+            final sensitivity = (m['resultSensitivity'] as String?) ?? 'Non-Sensitif';
+            final acneRisk = (m['resultAcneRisk'] as String?) ?? 'Tidak Rentan';
+            final nonSens = !sensitivity.toLowerCase().contains('sensitif') ||
+                sensitivity.toLowerCase().contains('non');
+            final notRentan = acneRisk.toLowerCase().contains('tidak');
+            final tags = [
+              skinType,
+              nonSens ? 'Non-Sensitif' : sensitivity,
+              notRentan ? 'Tidak Rentan' : acneRisk,
+            ];
+            return SkinCheckHistoryModel(
+              id: (m['id'] as String?) ?? '',
+              date: _fmtDate(m['createdAt'], doc: m),
+              skinType: skinType,
+              subtitle:
+                  '${nonSens ? 'Non-Sensitif' : sensitivity} - $acneRisk',
+              icon: skinType.toLowerCase() == 'normal'
+                  ? LucideIcons.sun
+                  : LucideIcons.shield,
+              tags: tags,
+              neutralTags: [
+                if (nonSens) 'Non-Sensitif',
+                if (notRentan) 'Tidak Rentan',
+              ],
+            );
+          }).toList();
+        });
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(() => _historyList = <SkinCheckHistoryModel>[]);
+      },
+    );
   }
 
   @override
@@ -278,6 +301,7 @@ class _RiwayatSkinCheckPageState extends State<RiwayatSkinCheckPage> {
                 acneRisk: item.tags.contains('Rentan')
                     ? 'Rentan'
                     : 'Tidak Rentan',
+                createdDisplay: item.date,
                 onNavigateTab: widget.onNavigateTab,
               ),
             ),
@@ -378,6 +402,39 @@ class _RiwayatSkinCheckPageState extends State<RiwayatSkinCheckPage> {
                   ),
                 );
               }).toList(),
+            ),
+            const SizedBox(height: 14),
+            // Tombol langsung ke konsultasi dokter.
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => KonsultasiDokterPenggunaPage(
+                        onNavigateTab: widget.onNavigateTab,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(LucideIcons.stethoscope,
+                    size: 16, color: Colors.white),
+                label: const Text(
+                  'Konsultasi Dokter',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryMaroon,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
             ),
           ],
         ),
