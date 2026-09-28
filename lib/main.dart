@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'firebase_options.dart';
+import 'components/notification_permission.dart';
 import 'services/auth_service.dart';
 import 'services/backend.dart';
 import 'services/notification_router.dart';
@@ -180,6 +181,14 @@ class _SkinoraAppState extends State<SkinoraApp> {
         ),
       ),
       initialRoute: '/login',
+      // Dialog izin notifikasi dipasang di level aplikasi: begitu user punya
+      // sesi (login baru / sesi berlanjut di perangkat), prompt izin OS muncul
+      // satu kali — jalur inilah yang benar-benar menampilkan dialog Android
+      // 13+ (permintaan dari `main()` sebelum frame pertama bisa diabaikan).
+      builder: (context, child) => NotificationPermissionGate(
+        navigatorKey: rootNavigatorKey,
+        child: child ?? const SizedBox.shrink(),
+      ),
       routes: {
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
