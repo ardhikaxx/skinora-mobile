@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -41,6 +43,7 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
 
   /// Badge lonceng realtime (shared listener — lihat NotificationController).
   ValueListenable<int>? _unreadListenable;
+  StreamSubscription<dynamic>? _profileSub;
 
   String _statHariIni = Backend.useFirebase ? '0' : '2';
   String _statMenunggu = Backend.useFirebase ? '0' : '1';
@@ -60,7 +63,41 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
   void initState() {
     super.initState();
     _subscribeUnreadBadge();
+    _subscribeProfileRealtime();
     _loadFromBackend();
+    if (Backend.useFirebase) {
+      final uid = AuthService.uid;
+      if (uid != null) {
+        _consultSub = ConsultationService.streamForDoctor(uid,
+                includeFinished: true)
+            .listen((_) {
+          _loadFromBackend();
+        });
+        _slotSub = ScheduleService.slotStream(uid).listen((_) {
+          _loadFromBackend();
+        });
+      }
+    }
+  }
+
+  /// Profil realtime: perubahan nama/spesialisasi langsung tampil di beranda
+  /// (mirip pengguna/beranda_page.dart).
+  void _subscribeProfileRealtime() {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    _profileSub = UserService.streamByUid(uid).listen((profile) {
+      if (!mounted || profile == null) return;
+      final name = (profile.name as String?) ?? '';
+      final spec = (profile.specialization as String?) ?? '';
+      if ((name.isNotEmpty && name != _greetingName) ||
+          (spec.isNotEmpty && spec != _specialization)) {
+        setState(() {
+          if (name.isNotEmpty) _greetingName = name;
+          if (spec.isNotEmpty) _specialization = spec;
+        });
+      }
+    }, onError: (_) {});
   }
 
   void _subscribeUnreadBadge() {
@@ -80,9 +117,15 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
     setState(() => _unreadNotif = value);
   }
 
+  StreamSubscription<dynamic>? _slotSub;
+  StreamSubscription<dynamic>? _consultSub;
+
   @override
   void dispose() {
     _unreadListenable?.removeListener(_onUnreadChanged);
+    _profileSub?.cancel();
+    _slotSub?.cancel();
+    _consultSub?.cancel();
     super.dispose();
   }
 
@@ -93,7 +136,7 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
     try {
       final results = await Future.wait<Object?>([
         UserService.loadByUid(uid),
-        ConsultationService.listForDoctor(uid),
+        ConsultationService.listForDoctor(uid, includeFinished: true),
         ScheduleService.listSlots(uid),
       ]);
       final profile = results[0] as dynamic;
