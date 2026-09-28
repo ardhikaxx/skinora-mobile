@@ -1,8 +1,12 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:skinora_app/components/notification_permission.dart';
+import 'package:skinora_app/services/active_chat_registry.dart';
 import 'package:skinora_app/services/notification_payload.dart';
 import 'package:skinora_app/services/notification_router.dart';
+import 'package:skinora_app/services/notification_service.dart';
 import 'package:skinora_app/services/reminder_scheduler.dart';
 
 /// Unit test logika notifikasi murni (tanpa Firebase / plugin).
@@ -10,6 +14,7 @@ import 'package:skinora_app/services/reminder_scheduler.dart';
 /// Mencakup kontrak payload, key idempoten, pemetaan channel, resolver
 /// deep-link per role, dan parser pengingat.
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   group('NotificationEventKey', () {
     test('deterministik untuk type + penerima + entity yang sama', () {
       final a = NotificationEventKey.build(
@@ -59,6 +64,44 @@ void main() {
       expect(key.split('__'), hasLength(3));
       expect(key, 'system__u1__-');
     });
+
+    test('eventId membuat doc ID unik per pesan dalam satu konsultasi', () {
+      final first = NotificationEventKey.build(
+        type: NotificationType.consultationMessage,
+        recipientId: 'doc-1',
+        entityId: 'consult-1',
+        eventId: 'msg-1',
+      );
+      final second = NotificationEventKey.build(
+        type: NotificationType.consultationMessage,
+        recipientId: 'doc-1',
+        entityId: 'consult-1',
+        eventId: 'msg-2',
+      );
+      expect(first, 'consultation_message__doc-1__consult-1--msg-1');
+      expect(first, isNot(second));
+    });
+
+    test('eventId kosong/null tidak mengubah format doc ID lama', () {
+      expect(
+        NotificationEventKey.build(
+          type: NotificationType.consultationMessage,
+          recipientId: 'doc-1',
+          entityId: 'consult-1',
+          eventId: '',
+        ),
+        'consultation_message__doc-1__consult-1',
+      );
+      expect(
+        NotificationEventKey.build(
+          type: NotificationType.consultationMessage,
+          recipientId: 'doc-1',
+          entityId: 'consult-1',
+        ),
+        'consultation_message__doc-1__consult-1',
+      );
+    });
+
   });
 
   group('AppNotification payload', () {
@@ -93,6 +136,40 @@ void main() {
       expect(restored.targetTab, NotificationTab.dokterChat);
       expect(restored.body, n.body);
     });
+
+    test('notifikasi chat per pesan: eventId unik, deep-link tetap sama', () {
+      AppNotification chat(String messageId) =>
+          AppNotification.forRecipient(
+            type: NotificationType.consultationMessage,
+            recipientId: 'doc-1',
+            audienceRole: NotificationRole.dokter,
+            title: 'Pesan Baru',
+            body: 'Anda menerima pesan baru dari pasien.',
+            entityId: 'consult-1',
+            eventId: messageId,
+            consultationId: 'consult-1',
+            createdBy: 'patient-1',
+          );
+
+      final first = chat('msg-1');
+      final second = chat('msg-2');
+
+      // Doc ID berbeda → tiap pesan menghasilkan notifikasi baru.
+      expect(first.id, isNot(second.id));
+      expect(first.eventKey, first.id);
+
+      // Deep-link tetap menunjuk ruang konsultasi yang sama.
+      expect(first.entityId, 'consult-1');
+      expect(second.entityId, 'consult-1');
+      expect(first.consultationId, 'consult-1');
+
+      final restored = AppNotification.fromMap(first.toFirestore());
+      expect(restored.id, first.id);
+      expect(restored.eventId, 'msg-1');
+      expect(restored.consultationId, 'consult-1');
+      expect(restored.entityId, 'consult-1');
+    });
+
 
     test('fromMap menerima payload FCM berbasis string', () {
       final n = AppNotification.fromMap(<Object?, Object?>{
@@ -324,4 +401,231 @@ void main() {
       expect(ReminderScheduler.decode('bukan-json'), isEmpty);
     });
   });
+
+  group('ActiveChatRegistry', () {
+    test('isActiveRoom mendeteksi ruang yang sedang dibuka dan ditutup', () {
+      expect(ActiveChatRegistry.isActiveRoom('consult-123'), isFalse);
+
+      ActiveChatRegistry.open('consult-123');
+      expect(ActiveChatRegistry.isActiveRoom('consult-123'), isTrue);
+      expect(ActiveChatRegistry.isActiveRoom('consult-456'), isFalse);
+
+      ActiveChatRegistry.close('consult-123');
+      expect(ActiveChatRegistry.isActiveRoom('consult-123'), isFalse);
+    });
+
+    test('open dengan null atau string kosong diabaikan dengan aman', () {
+      ActiveChatRegistry.open(null);
+      ActiveChatRegistry.open('');
+      expect(ActiveChatRegistry.isActiveRoom(null), isFalse);
+      expect(ActiveChatRegistry.isActiveRoom(''), isFalse);
+    });
+  });
+
+  group('SeenCache', () {
+    setUp(() {
+      SeenCache.debugClear();
+    });
+
+    test('markIfNew mengembalikan true untuk ID pertama, false untuk duplikat', () async {
+      final isNew1 = await SeenCache.markIfNew('notif-unique-1');
+      expect(isNew1, isTrue);
+
+      final isNewAgain = await SeenCache.markIfNew('notif-unique-1');
+      expect(isNewAgain, isFalse);
+
+      final isNew2 = await SeenCache.markIfNew('notif-unique-2');
+      expect(isNew2, isTrue);
+    });
+
+    test('markIfNew mengabaikan ID kosong', () async {
+      final res = await SeenCache.markIfNew('');
+      expect(res, isFalse);
+    });
+  });
+
+  group('Chat dan Konsultasi Notifikasi Payload', () {
+    test('notifikasi chat dokter -> pengguna memiliki targetRole dan consultationId valid', () {
+      final n = AppNotification.forRecipient(
+        type: NotificationType.consultationMessage,
+        recipientId: 'patient-42',
+        audienceRole: NotificationRole.pengguna,
+        title: 'Pesan Baru dari dr. Anita',
+        body: 'Anda menerima pesan baru dari dr. Anita.',
+        entityId: 'consult-88',
+        eventId: 'msg-99',
+        consultationId: 'consult-88',
+        doctorId: 'doc-1',
+        patientId: 'patient-42',
+        createdBy: 'doc-1',
+      );
+
+      expect(n.type, NotificationType.consultationMessage);
+      expect(n.recipientId, 'patient-42');
+      expect(n.audienceRole, NotificationRole.pengguna);
+      expect(n.consultationId, 'consult-88');
+      expect(n.eventId, 'msg-99');
+      expect(n.title, 'Pesan Baru dari dr. Anita');
+
+      final firestoreMap = n.toFirestore();
+      expect(firestoreMap['consultationId'], 'consult-88');
+      expect(firestoreMap['eventId'], 'msg-99');
+      expect(firestoreMap['recipientUid'], 'patient-42');
+      expect(firestoreMap['audience'], 'user:patient-42');
+
+      final dest = NotificationRouter.resolve(n);
+      expect(dest.kind, NotificationDestinationKind.room);
+      expect(dest.shellRoute, NotificationPageRoute.penggunaShell);
+      expect(dest.entityId, 'consult-88');
+    });
+
+    test('notifikasi chat pengguna -> dokter dibuka di ruang chat dokter', () {
+      final n = AppNotification.forRecipient(
+        type: NotificationType.consultationMessage,
+        recipientId: 'doc-1',
+        audienceRole: NotificationRole.dokter,
+        title: 'Pesan Baru dari Leonita',
+        body: 'Anda menerima pesan baru dari Leonita.',
+        entityId: 'consult-88',
+        eventId: 'msg-100',
+        consultationId: 'consult-88',
+        doctorId: 'doc-1',
+        patientId: 'patient-42',
+        createdBy: 'patient-42',
+      );
+
+      final dest = NotificationRouter.resolve(n);
+      expect(dest.kind, NotificationDestinationKind.room);
+      expect(dest.shellRoute, NotificationPageRoute.dokterShell);
+      expect(dest.entityId, 'consult-88');
+    });
+
+    test('notifikasi booking baru dokter mengarah ke tab Jadwal dokter', () {
+      final n = AppNotification.forRecipient(
+        type: NotificationType.bookingCreated,
+        recipientId: 'doc-1',
+        audienceRole: NotificationRole.dokter,
+        title: 'Konsultasi Baru',
+        body: 'Leonita memesan konsultasi untuk jadwal 2026-08-28 09:00 - 09:30.',
+        entityId: 'consult-88',
+        consultationId: 'consult-88',
+        doctorId: 'doc-1',
+        patientId: 'patient-42',
+        route: NotificationPageRoute.dokterShell,
+        targetTab: NotificationTab.dokterJadwal,
+        createdBy: 'patient-42',
+      );
+
+      expect(n.consultationId, 'consult-88');
+      final dest = NotificationRouter.resolve(n);
+      expect(dest.kind, NotificationDestinationKind.shell);
+      expect(dest.shellRoute, NotificationPageRoute.dokterShell);
+      expect(dest.tabIndex, NotificationTab.dokterJadwal);
+    });
+
+    test('notifikasi konsultasi dimulai mengarah ke ruang konsultasi pengguna', () {
+      final n = AppNotification.forRecipient(
+        type: NotificationType.consultationStarted,
+        recipientId: 'patient-42',
+        audienceRole: NotificationRole.pengguna,
+        title: 'Konsultasi Dimulai',
+        body: 'Konsultasi bersama dr. Anita sudah dimulai. Silakan masuk ke ruang konsultasi.',
+        entityId: 'consult-88',
+        consultationId: 'consult-88',
+        doctorId: 'doc-1',
+        patientId: 'patient-42',
+        createdBy: 'doc-1',
+      );
+
+      expect(n.consultationId, 'consult-88');
+      final dest = NotificationRouter.resolve(n);
+      expect(dest.kind, NotificationDestinationKind.room);
+      expect(dest.shellRoute, NotificationPageRoute.penggunaShell);
+      expect(dest.entityId, 'consult-88');
+    });
+  });
+
+  group('NotificationPermission UI & Gate', () {
+    testWidgets('askNotificationPermission dialog returns false when Nanti is tapped', (tester) async {
+      bool? result;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              return Scaffold(
+                body: ElevatedButton(
+                  onPressed: () async {
+                    result = await askNotificationPermission(context);
+                  },
+                  child: const Text('Show Dialog'),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Show Dialog'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Aktifkan Notifikasi'), findsOneWidget);
+      expect(find.text('Nanti'), findsOneWidget);
+      expect(find.text('Izinkan'), findsOneWidget);
+
+      await tester.tap(find.text('Nanti'));
+      await tester.pumpAndSettle();
+
+      expect(result, isFalse);
+      expect(find.text('Aktifkan Notifikasi'), findsNothing);
+    });
+
+    testWidgets('askNotificationPermission dialog returns true when Izinkan is tapped', (tester) async {
+      bool? result;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              return Scaffold(
+                body: ElevatedButton(
+                  onPressed: () async {
+                    result = await askNotificationPermission(context);
+                  },
+                  child: const Text('Show Dialog'),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Show Dialog'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Izinkan'));
+      await tester.pumpAndSettle();
+
+      expect(result, isTrue);
+      expect(find.text('Aktifkan Notifikasi'), findsNothing);
+    });
+
+    testWidgets('NotificationPermissionGate wraps child and renders cleanly', (tester) async {
+      final navKey = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navKey,
+          builder: (context, child) => NotificationPermissionGate(
+            navigatorKey: navKey,
+            child: child ?? const SizedBox(),
+          ),
+          home: const Scaffold(
+            body: Center(child: Text('Halaman Utama')),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      expect(find.text('Halaman Utama'), findsOneWidget);
+    });
+  });
 }
+
