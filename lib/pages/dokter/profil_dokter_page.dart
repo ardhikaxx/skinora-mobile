@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
@@ -36,10 +38,71 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
   String _statPasien = Backend.useFirebase ? '0' : '4';
   String _statSelesai = Backend.useFirebase ? '0' : '4';
 
+  StreamSubscription<dynamic>? _profileSub;
+  StreamSubscription<dynamic>? _consultSub;
+
   @override
   void initState() {
     super.initState();
+    _subscribeProfileRealtime();
+    _subscribeConsultStatsRealtime();
     _loadFromBackend();
+  }
+
+  /// Profil realtime: perubahan dari edit profil langsung tampil di sini.
+  void _subscribeProfileRealtime() {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    _profileSub = UserService.streamByUid(uid).listen((profile) {
+      if (!mounted || profile == null) return;
+      setState(() {
+        final store = DoctorProfileStore();
+        store.name = (profile.name as String?) ?? store.name;
+        store.email = (profile.email as String?) ?? store.email;
+        store.phone = (profile.phone as String?) ?? store.phone;
+        store.address = (profile.address as String?) ?? store.address;
+        store.specialization =
+            (profile.specialization as String?) ?? store.specialization;
+        store.experience =
+            (profile.experience as String?) ?? store.experience;
+        store.str = (profile.str as String?) ?? store.str;
+        store.bio = (profile.bio as String?) ?? store.bio;
+        store.status = (profile.status as String?) ?? store.status;
+      });
+    }, onError: (_) {});
+  }
+
+  /// Statistik konsultasi realtime: jumlah konsultasi, pasien unik, dan selesai
+  /// langsung terupdate dari Firestore tanpa reload manual.
+  void _subscribeConsultStatsRealtime() {
+    if (!Backend.useFirebase) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    _consultSub = ConsultationService.streamForDoctor(uid, includeFinished: true)
+        .listen((list) {
+      if (!mounted) return;
+      final pasien = list
+          .map((c) => (c['patientId'] as String?) ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .length;
+      final selesai = list
+          .where((c) => ((c['status'] as String?) ?? '') == 'selesai')
+          .length;
+      setState(() {
+        _statKonsultasi = '${list.length}';
+        _statPasien = '$pasien';
+        _statSelesai = '$selesai';
+      });
+    }, onError: (_) {});
+  }
+
+  @override
+  void dispose() {
+    _profileSub?.cancel();
+    _consultSub?.cancel();
+    super.dispose();
   }
 
   /// Muat profile dokter + ringkasan praktik dari Firestore. Tanpa Firebase,
@@ -92,108 +155,6 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
     }
   }
 
-  void _showSuccessDialog(String message) {
-    showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) {
-        return Dialog(
-          backgroundColor: Colors.white,
-          elevation: 4,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24.0),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20.0),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header: Checkmark Icon + Title + Close Button
-                Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFFFD5C8),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          LucideIcons.check,
-                          color: Color(0xFFE65100),
-                          size: 18,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Berhasil',
-                      style: TextStyle(
-                        fontSize: 16.5,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: () => Navigator.pop(dialogContext),
-                      child: const Icon(
-                        LucideIcons.x,
-                        size: 18,
-                        color: Color(0xFF9CA3AF),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                // Body text
-                Text(
-                  message,
-                  style: const TextStyle(
-                    fontSize: 13.5,
-                    color: Color(0xFF4B5563),
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // OK Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 42,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(dialogContext),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryMaroon,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'OK',
-                      style: TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Future<void> _handleEditProfile() async {
     final updated = await Navigator.push<bool>(
       context,
@@ -205,9 +166,11 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
       ),
     );
 
+    // Dialog sukses sudah ditampilkan dari halaman edit — di sini cukup
+    // refresh realtime (stream) + setState agar UI sinkron.
     if (updated == true && mounted) {
-      setState(() {});
-      _showSuccessDialog('Profil dokter berhasil diperbarui');
+      await _loadFromBackend();
+      if (mounted) setState(() {});
     }
   }
 
