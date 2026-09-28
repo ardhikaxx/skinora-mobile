@@ -123,4 +123,4 @@ flutter_launcher_icons:
   # otomatis, aman dari mask launcher bulat/persegi) + latar putih solid.
   # Key harus flat (bukan nested) sesuai flutter_launcher_icons 0.14.x.
   adaptive_icon_foreground: "assets/logo-skinora.png"
-  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_background: "#B23A48"
