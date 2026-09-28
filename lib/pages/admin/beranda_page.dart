@@ -12,7 +12,6 @@ import '../../services/consultation_service.dart';
 import '../../services/notification_controller.dart';
 import '../../services/user_service.dart';
 import '../../utils/app_dates.dart';
-import '../../components/realtime_wib_badge.dart';
 import 'notifikasi_admin_page.dart';
 import 'master_spesialisasi_page.dart';
 import 'laporan_riwayat_page.dart';
@@ -204,117 +203,126 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
   }
 
   /// Header with Title, Subtitle, and Notification Bell with Badge
+  /// Dibungkus dalam card putih dengan border rounded sesuai desain.
   Widget _buildHeader(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Admin Dashboard',
-              style: TextStyle(
-                fontFamily: 'serif',
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: darkText,
-                letterSpacing: -0.3,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _adminName.isEmpty
-                  ? 'Kelola aplikasi Skinora'
-                  : 'Halo, $_adminName',
-              style: const TextStyle(
-                fontSize: 13.5,
-                color: subText,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-            const SizedBox(height: 6),
-            const RealtimeWibBadge(
-              style: RealtimeWibStyle.pill,
-              compact: true,
-              includeSeconds: true,
-            ),
-          ],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFE5E5EA),
+          width: 1.2,
         ),
-        // Notification button with badge
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => NotifikasiAdminPage(
-                      onNavigateTab: widget.onNavigateTab,
-                    ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Title & Subtitle
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Admin Dashboard',
+                  style: TextStyle(
+                    fontFamily: 'serif',
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: darkText,
+                    letterSpacing: -0.3,
                   ),
-                );
-              },
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: const Color(0xFFE5E5EA),
-                    width: 1.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
                 ),
-                child: const Center(
-                  child: Icon(
-                    LucideIcons.bell,
-                    size: 20,
-                    color: Color(0xFF4A1A24),
+                const SizedBox(height: 4),
+                Text(
+                  _adminName.isEmpty
+                      ? 'Kelola aplikasi Skinora'
+                      : 'Halo, $_adminName',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: subText,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Notification bell with badge
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => NotifikasiAdminPage(
+                        onNavigateTab: widget.onNavigateTab,
+                      ),
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: const Color(0xFFE5E5EA),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      LucideIcons.bell,
+                      size: 22,
+                      color: Color(0xFF4A1A24),
+                    ),
                   ),
                 ),
               ),
-            ),
-            // Red badge with count (only when unread > 0)
-            if (_unreadNotif != '0' && _unreadNotif.isNotEmpty)
-              Positioned(
-                top: -3,
-                right: -3,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: primaryMaroon,
-                    shape: BoxShape.circle,
-                  ),
-                  constraints: const BoxConstraints(
-                    minWidth: 18,
-                    minHeight: 18,
-                  ),
-                  child: Center(
-                    child: Text(
-                      _unreadNotif,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        height: 1.0,
+              // Red badge with count (only when unread > 0)
+              if (_unreadNotif != '0' && _unreadNotif.isNotEmpty)
+                Positioned(
+                  top: -4,
+                  right: -4,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: primaryMaroon,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 20,
+                      minHeight: 20,
+                    ),
+                    child: Center(
+                      child: Text(
+                        _unreadNotif,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          height: 1.0,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 
