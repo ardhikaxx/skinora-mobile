@@ -51,6 +51,10 @@ dependencies:
   timezone: 0.11.0
   # Penyimpanan lokal kecil: device id stabil antar sesi + dedupe cache.
   shared_preferences: ^2.5.3
+  # HTTP client untuk API cuaca gratis (Open-Meteo, tanpa API key).
+  http: ^1.2.0
+  # Geolokasi device: koordinat untuk cuaca & fitur lokasi lain.
+  geolocator: ^14.0.0
 
 dev_dependencies:
   flutter_test:
