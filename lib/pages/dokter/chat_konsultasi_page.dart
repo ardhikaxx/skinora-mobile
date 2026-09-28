@@ -189,6 +189,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
           patientName: item.patientName,
           consultationId: item.id,
           dateTime: item.dateTime,
+          status: _backendMeta[item.id]?['status'] as String?,
           onNavigateTab: widget.onNavigateTab,
           showBottomNav: true,
         ),
