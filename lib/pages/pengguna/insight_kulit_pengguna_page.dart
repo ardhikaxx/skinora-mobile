@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/empty_state.dart';
@@ -90,22 +92,73 @@ class _InsightKulitPenggunaPageState extends State<InsightKulitPenggunaPage> {
   int _avgWater = Backend.useFirebase ? 0 : 7;
   int _fullRoutineDays = Backend.useFirebase ? 0 : 4;
 
+  StreamSubscription<List<Map<String, dynamic>>>? _sub;
+
   @override
   void initState() {
     super.initState();
     _loadFromBackend();
   }
 
-  /// Insight 7 hari dari skin daily pengguna. Tanpa Firebase, seed demo
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  /// Insight 7 hari dari skin daily pengguna secara realtime. Tanpa Firebase, seed demo
   /// tetap dipakai agar UI/tes tidak berubah.
-  Future<void> _loadFromBackend() async {
+  void _loadFromBackend() {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
     if (uid == null) return;
-    try {
-      final items = await SkinService.listSkinDailies(uid);
-      if (!mounted) return;
-      if (items.isEmpty) {
+    _sub?.cancel();
+    _sub = SkinService.streamSkinDailies(uid).listen(
+      (items) {
+        if (!mounted) return;
+        if (items.isEmpty) {
+          setState(() {
+            _history7Hari = <DailyInsightHistoryItem>[];
+            _baikCount = 0;
+            _sedangCount = 0;
+            _burukCount = 0;
+            _topSymptom = '-';
+            _topSymptomCount = 0;
+            _avgWater = 0;
+            _fullRoutineDays = 0;
+          });
+          return;
+        }
+        final agg = SkinService.aggregateDailies(items);
+        final recent = (agg['recent'] as List).cast<Map<String, dynamic>>();
+        setState(() {
+          _baikCount = agg['baik'] as int;
+          _sedangCount = agg['sedang'] as int;
+          _burukCount = agg['buruk'] as int;
+          _avgWater = (agg['avgWater'] as double).round();
+          _fullRoutineDays = agg['fullRoutineDays'] as int;
+          final topSymptom = agg['topSymptom'] as String;
+          _topSymptom = topSymptom.split(' (').first;
+          final countMatch =
+              RegExp(r'\((\d+)x').firstMatch(topSymptom);
+          _topSymptomCount =
+              countMatch == null ? 0 : int.tryParse(countMatch.group(1)!) ?? 0;
+          final window = agg['window'] as int;
+          _history7Hari = recent.take(window).map((d) {
+            final symptoms =
+                (d['symptoms'] as List?)?.cast<String>() ?? const <String>[];
+            return DailyInsightHistoryItem(
+              date: (d['dateIso'] as String?) ??
+                  (d['dateDisplay'] as String?) ??
+                  '',
+              symptoms: symptoms.isEmpty ? '-' : symptoms.join(', '),
+              status: (d['status'] as String?) ?? 'Baik',
+            );
+          }).toList();
+        });
+      },
+      onError: (_) {
+        if (!mounted) return;
         setState(() {
           _history7Hari = <DailyInsightHistoryItem>[];
           _baikCount = 0;
@@ -116,48 +169,8 @@ class _InsightKulitPenggunaPageState extends State<InsightKulitPenggunaPage> {
           _avgWater = 0;
           _fullRoutineDays = 0;
         });
-        return;
-      }
-      final agg = SkinService.aggregateDailies(items);
-      final recent = (agg['recent'] as List).cast<Map<String, dynamic>>();
-      setState(() {
-        _baikCount = agg['baik'] as int;
-        _sedangCount = agg['sedang'] as int;
-        _burukCount = agg['buruk'] as int;
-        _avgWater = (agg['avgWater'] as double).round();
-        _fullRoutineDays = agg['fullRoutineDays'] as int;
-        final topSymptom = agg['topSymptom'] as String;
-        _topSymptom = topSymptom.split(' (').first;
-        final countMatch =
-            RegExp(r'\((\d+)x').firstMatch(topSymptom);
-        _topSymptomCount =
-            countMatch == null ? 0 : int.tryParse(countMatch.group(1)!) ?? 0;
-        final window = agg['window'] as int;
-        _history7Hari = recent.take(window).map((d) {
-          final symptoms =
-              (d['symptoms'] as List?)?.cast<String>() ?? const <String>[];
-          return DailyInsightHistoryItem(
-            date: (d['dateIso'] as String?) ??
-                (d['dateDisplay'] as String?) ??
-                '',
-            symptoms: symptoms.isEmpty ? '-' : symptoms.join(', '),
-            status: (d['status'] as String?) ?? 'Baik',
-          );
-        }).toList();
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _history7Hari = <DailyInsightHistoryItem>[];
-        _baikCount = 0;
-        _sedangCount = 0;
-        _burukCount = 0;
-        _topSymptom = '-';
-        _topSymptomCount = 0;
-        _avgWater = 0;
-        _fullRoutineDays = 0;
-      });
-    }
+      },
+    );
   }
 
   @override
