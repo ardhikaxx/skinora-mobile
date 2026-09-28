@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
@@ -40,7 +41,7 @@ class _RegisterPageState extends State<RegisterPage> {
     if (name.isEmpty || email.isEmpty || phone.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Silakan lengkapi semua kolom pendaftaran.'),
+          content: Text('Silahkan lengkapi semua kolom pendaftaran.'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -88,21 +89,21 @@ class _RegisterPageState extends State<RegisterPage> {
       // Pendaftar baru cukup tercatat di activity + muncul di daftar pengguna.
 
       if (!mounted) return;
-      // Registrasi berhasil -> langsung masuk ke shell sesuai role
+      // Registrasi berhasil -> tampilkan dialog dulu, navigasi di onOk
       // (hanya pengguna & dokter; admin tidak bisa register).
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Pendaftaran berhasil! Selamat datang, $name.'),
-          backgroundColor: primaryColor,
-        ),
-      );
-
       final Widget home = role == 'dokter'
           ? const DokterMainPage()
           : const PenggunaMainPage();
-      Navigator.pushReplacement(
+      setState(() => _busy = false);
+      AdminSuccessDialog.show(
         context,
-        MaterialPageRoute(builder: (_) => home),
+        message: 'Pendaftaran berhasil! Selamat datang, $name.',
+        onOk: () {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => home),
+          );
+        },
       );
     } catch (e) {
       if (!mounted) return;
