@@ -300,6 +300,7 @@ class NotificationRouter {
             consultationId: id,
             patientName: (consult?['patientName'] as String?) ?? '',
             dateTime: date.isEmpty ? time : '$date • $time',
+            status: consult?['status'] as String?,
           ),
         ),
       );
