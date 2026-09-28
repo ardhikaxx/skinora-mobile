@@ -934,7 +934,7 @@ class NotificationService {
                   audienceRole: NotificationRole.pengguna,
                   title: 'Konsultasi Dimulai',
                   body:
-                      'Konsultasi bersama $doctorName sudah dimulai. Silakan masuk ke ruang konsultasi.',
+                      'Konsultasi bersama $doctorName sudah dimulai. Silahkan masuk ke ruang konsultasi.',
                   entityId: consultationId,
                   consultationId: consultationId,
                   doctorId: (data['doctorId'] as String?) ?? '',
