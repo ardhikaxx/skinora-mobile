@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/navbottom/admin_navbottom.dart';
+import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/user_service.dart';
@@ -84,6 +86,12 @@ class _EditProfilAdminPageState extends State<EditProfilAdminPage> {
           'phone': updatedData['telepon'],
           'address': updatedData['alamat'],
         });
+        await ActivityService.log(
+          title: 'Mengedit profil admin $nama',
+          tag: 'Profil',
+          actor: nama,
+          actorUid: uid,
+        );
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -94,7 +102,11 @@ class _EditProfilAdminPageState extends State<EditProfilAdminPage> {
     }
 
     if (!mounted) return;
-    Navigator.pop(context, updatedData);
+    AdminSuccessDialog.show(
+      context,
+      message: 'Profil admin berhasil diperbarui',
+      onOk: () => Navigator.pop(context, updatedData),
+    );
   }
 
   @override
