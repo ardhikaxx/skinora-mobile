@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../models/admin_doctor_model.dart';
+import '../../services/activity_service.dart';
+import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/specialization_service.dart';
 import '../../services/user_service.dart';
@@ -131,6 +133,12 @@ class _TambahDokterPageState extends State<TambahDokterPage> {
     if (Backend.useFirebase) {
       try {
         newDoctor = await UserService.createDokter(newDoctor);
+        await ActivityService.log(
+          title: 'Menambah dokter $name',
+          tag: 'Dokter',
+          actor: 'Admin',
+          actorUid: AuthService.uid ?? 'admin',
+        );
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -141,6 +149,7 @@ class _TambahDokterPageState extends State<TambahDokterPage> {
     }
 
     if (!mounted) return;
+    // Dialog sukses ditampilkan pemanggil (ManajemenDokterPage) agar tunggal.
     Navigator.pop(context, newDoctor);
   }
 
