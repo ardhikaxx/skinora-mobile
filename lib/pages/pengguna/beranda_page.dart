@@ -318,13 +318,9 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
   }
 
   String _initials(String name) {
-    final parts =
-        name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    if (parts.isEmpty) return '-';
-    if (parts.length == 1) {
-      return parts.first.substring(0, 1).toUpperCase();
-    }
-    return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return 'P';
+    return trimmed[0].toUpperCase();
   }
 
   @override
@@ -361,131 +357,138 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
   }
 
   /// 1. Top Header: Avatar, Greeting, User Name, and Notification Bell
+  /// Dibungkus dalam card putih dengan border rounded sesuai desain image.png
   Widget _buildHeader() {
-    return Row(
-      children: [
-        // Avatar Initial (dynamic)
-        Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            color: primaryMaroon,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: primaryMaroon.withValues(alpha: 0.25),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFE5E5EA),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          child: Center(
-            child: Text(
-              _initials(_userName),
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Avatar Initial (dynamic dari Firebase)
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: primaryMaroon,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Center(
+              child: Text(
+                _initials(_userName),
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(width: 14),
+          const SizedBox(width: 14),
 
-        // Greeting & Name
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                AppDates.greetingWib(),
-                style: const TextStyle(
-                  fontSize: 13.0,
-                  color: subText,
+          // Greeting & Name (dynamic dari Firebase)
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${AppDates.greetingWib()},',
+                  style: const TextStyle(
+                    fontSize: 14.0,
+                    color: subText,
+                    fontWeight: FontWeight.w400,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                _userName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 17.0,
-                  fontWeight: FontWeight.bold,
-                  color: darkText,
-                  letterSpacing: -0.2,
+                const SizedBox(height: 4),
+                Text(
+                  _userName.isNotEmpty ? _userName : 'Pengguna',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 18.5,
+                    fontWeight: FontWeight.bold,
+                    color: darkText,
+                    letterSpacing: -0.3,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              const RealtimeWibBadge(
-                style: RealtimeWibStyle.minimal,
-                compact: true,
-                includeSeconds: false,
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+          const SizedBox(width: 8),
 
-        // Notification Bell Icon with Badge "2"
-        GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => NotifikasiPenggunaPage(
-                  onNavigateTab: widget.onNavigateTab,
-                ),
-              ),
-            );
-          },
-          child: Stack(
+          // Notification Bell Icon with Badge (dynamic dari Firebase)
+          Stack(
             clipBehavior: Clip.none,
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: const Color(0xFFEEEEEE),
-                    width: 1.0,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.02),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
+              InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => NotifikasiPenggunaPage(
+                        onNavigateTab: widget.onNavigateTab,
+                      ),
                     ),
-                  ],
-                ),
-                child: const Center(
-                  child: Icon(
-                    LucideIcons.bell,
-                    size: 20,
-                    color: darkText,
+                  );
+                },
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: const Color(0xFFE5E5EA),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      LucideIcons.bell,
+                      size: 22,
+                      color: Color(0xFF4A1A24),
+                    ),
                   ),
                 ),
               ),
               if (_unreadNotif > 0)
                 Positioned(
-                  top: -3,
-                  right: -3,
+                  top: -4,
+                  right: -4,
                   child: Container(
-                    width: 18,
-                    height: 18,
-                    decoration: BoxDecoration(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
                       color: primaryMaroon,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 20,
+                      minHeight: 20,
                     ),
                     child: Center(
                       child: Text(
                         '$_unreadNotif',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 9.5,
+                          fontSize: 11,
                           fontWeight: FontWeight.bold,
+                          height: 1.0,
                         ),
                       ),
                     ),
@@ -493,8 +496,8 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
                 ),
             ],
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
