@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../services/activity_service.dart';
@@ -16,6 +18,38 @@ class SkinService {
   ) =>
       _db.collection('users').doc(uid).collection(name);
 
+  // In-memory demo store untuk riwayat skin check ketika Firebase tidak aktif.
+  static final List<Map<String, dynamic>> _demoSkinChecks = [
+    {
+      'id': 'demo-1',
+      'createdDisplay': AppDates.fullDisplayWib(AppDates.nowWib()),
+      'createdIso': AppDates.todayIso(),
+      'resultSkinType': 'Kombinasi',
+      'resultSensitivity': 'Sensitif',
+      'resultAcneRisk': 'Rentan',
+      'createdAt': AppDates.nowWib(),
+      'createdAtMillis': DateTime.now().millisecondsSinceEpoch,
+    },
+    {
+      'id': 'demo-2',
+      'createdDisplay': AppDates.fullDisplayWib(
+        AppDates.nowWib().subtract(const Duration(days: 18, hours: 3)),
+      ),
+      'createdIso': AppDates.iso(
+        AppDates.nowWib().subtract(const Duration(days: 18, hours: 3)),
+      ),
+      'resultSkinType': 'Normal',
+      'resultSensitivity': 'Non-Sensitif',
+      'resultAcneRisk': 'Tidak Rentan',
+      'createdAt': AppDates.nowWib().subtract(const Duration(days: 18, hours: 3)),
+      'createdAtMillis': DateTime.now().subtract(const Duration(days: 18, hours: 3)).millisecondsSinceEpoch,
+    },
+  ];
+
+  static final StreamController<List<Map<String, dynamic>>>
+      _demoSkinChecksController =
+      StreamController<List<Map<String, dynamic>>>.broadcast();
+
   // ---------------------------------------------------------------------------
   // Skin Check
   // ---------------------------------------------------------------------------
@@ -26,19 +60,46 @@ class SkinService {
     required String resultSkinType,
     required String resultSensitivity,
     required String resultAcneRisk,
+    String? createdDisplay,
+    String? createdIso,
   }) async {
-    if (!Backend.useFirebase) return;
     final now = AppDates.nowWib();
-    final createdDisplay = AppDates.fullDisplayWib(now);
-    final createdIso = AppDates.iso(now);
-    await _col(uid, 'skin_checks').add({
-      'createdDisplay': createdDisplay,
-      'createdIso': createdIso,
+    final display = (createdDisplay != null && createdDisplay.trim().isNotEmpty)
+        ? createdDisplay.trim()
+        : AppDates.fullDisplayWib(now);
+    final iso = (createdIso != null && createdIso.trim().isNotEmpty)
+        ? createdIso.trim()
+        : AppDates.iso(now);
+    final millis = DateTime.now().millisecondsSinceEpoch;
+
+    final record = <String, dynamic>{
+      'id': 'sc_$millis',
+      'createdDisplay': display,
+      'createdIso': iso,
+      'createdAt': now,
+      'createdAtMillis': millis,
       ...answers,
       'resultSkinType': resultSkinType,
       'resultSensitivity': resultSensitivity,
       'resultAcneRisk': resultAcneRisk,
       'createdBy': uid,
+    };
+
+    if (!Backend.useFirebase) {
+      _demoSkinChecks.removeWhere((item) => item['id'] == record['id']);
+      _demoSkinChecks.insert(0, record);
+      _demoSkinChecksController.add(List.unmodifiable(_demoSkinChecks));
+      await ActivityService.log(
+        title: 'Melakukan Skin Check',
+        tag: 'Skin Check',
+        actor: name,
+        actorUid: uid,
+      );
+      return;
+    }
+
+    await _col(uid, 'skin_checks').add({
+      ...record,
       'createdAt': FieldValue.serverTimestamp(),
     });
     await ActivityService.log(
@@ -53,7 +114,12 @@ class SkinService {
     String uid, {
     int? limit,
   }) async {
-    if (!Backend.useFirebase || uid.isEmpty) return const [];
+    if (!Backend.useFirebase || uid.isEmpty) {
+      if (limit != null && _demoSkinChecks.length > limit) {
+        return _demoSkinChecks.sublist(0, limit);
+      }
+      return List.unmodifiable(_demoSkinChecks);
+    }
     try {
       var q = _col(uid, 'skin_checks').orderBy('createdAt', descending: true);
       if (limit != null) q = q.limit(limit);
@@ -62,7 +128,21 @@ class SkinService {
     } catch (_) {
       final snap = await _col(uid, 'skin_checks').get();
       final docs = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
-      docs.sort((a, b) => ((b['createdIso'] ?? '') as String).compareTo((a['createdIso'] ?? '') as String));
+      docs.sort((a, b) {
+        final aTime = a['createdAtMillis'] ??
+            (a['createdAt'] is Timestamp
+                ? (a['createdAt'] as Timestamp).millisecondsSinceEpoch
+                : 0);
+        final bTime = b['createdAtMillis'] ??
+            (b['createdAt'] is Timestamp
+                ? (b['createdAt'] as Timestamp).millisecondsSinceEpoch
+                : 0);
+        if (aTime != 0 && bTime != 0) {
+          return (bTime as num).compareTo(aTime as num);
+        }
+        return ((b['createdIso'] ?? '') as String)
+            .compareTo((a['createdIso'] ?? '') as String);
+      });
       if (limit != null && docs.length > limit) return docs.sublist(0, limit);
       return docs;
     }
@@ -73,7 +153,16 @@ class SkinService {
     String uid, {
     int? limit,
   }) {
-    if (!Backend.useFirebase || uid.isEmpty) return const Stream.empty();
+    if (!Backend.useFirebase || uid.isEmpty) {
+      return Stream<List<Map<String, dynamic>>>.multi((controller) {
+        controller.add(List.unmodifiable(_demoSkinChecks));
+        final sub = _demoSkinChecksController.stream.listen(
+          (items) => controller.add(items),
+          onError: (e) => controller.addError(e),
+        );
+        controller.onCancel = () => sub.cancel();
+      });
+    }
     var q = _col(uid, 'skin_checks').orderBy('createdAt', descending: true);
     if (limit != null) q = q.limit(limit);
     return q
@@ -180,6 +269,7 @@ class SkinService {
   // ---------------------------------------------------------------------------
   /// Satu dokumen per user per tanggal (doc ID = dateIso).
   /// Morning dan night menulis ke dokumen yang sama (merge).
+  /// Mendukung simpan pagi saja, malam saja, atau keduanya sekaligus.
   static Future<void> saveSkincare({
     required String uid,
     required String name,
@@ -187,15 +277,22 @@ class SkinService {
     required String dateIso,
     List<String>? morningSteps,
     List<String>? nightSteps,
-    required bool isMorning,
+    bool? isMorning,
+    bool? saveMorning,
+    bool? saveNight,
   }) async {
     if (!Backend.useFirebase) return;
+    final bool doMorning =
+        saveMorning ?? isMorning ?? (morningSteps != null);
+    final bool doNight =
+        saveNight ?? (isMorning != null ? !isMorning : nightSteps != null);
+
     final ref = _col(uid, 'skincare_logs').doc(dateIso);
     final data = <String, dynamic>{
       'dateDisplay': dateDisplay,
       'dateIso': dateIso,
-      if (isMorning) 'morningSteps': morningSteps ?? <String>[],
-      if (!isMorning) 'nightSteps': nightSteps ?? <String>[],
+      if (doMorning) 'morningSteps': morningSteps ?? <String>[],
+      if (doNight) 'nightSteps': nightSteps ?? <String>[],
       'createdBy': uid,
       'updatedAt': FieldValue.serverTimestamp(),
     };
@@ -203,20 +300,27 @@ class SkinService {
     if (existing.exists) {
       await ref.update({
         ...data,
-        'createdAt': existing.data()?['createdAt'] ?? FieldValue.serverTimestamp(),
+        'createdAt':
+            existing.data()?['createdAt'] ?? FieldValue.serverTimestamp(),
       });
     } else {
       await ref.set({
         ...data,
-        if (isMorning) 'nightSteps': <String>[],
-        if (!isMorning) 'morningSteps': <String>[],
+        if (!doMorning) 'morningSteps': <String>[],
+        if (!doNight) 'nightSteps': <String>[],
         'createdAt': FieldValue.serverTimestamp(),
       });
     }
+    final String logTitle;
+    if (doMorning && doNight) {
+      logTitle = 'Mencatat rutinitas skincare pagi & malam';
+    } else if (doMorning) {
+      logTitle = 'Mencatat rutinitas skincare pagi';
+    } else {
+      logTitle = 'Mencatat rutinitas skincare malam';
+    }
     await ActivityService.log(
-      title: isMorning
-          ? 'Mencatat rutinitas skincare pagi'
-          : 'Mencatat rutinitas skincare malam',
+      title: logTitle,
       tag: 'Skincare',
       actor: name,
       actorUid: uid,
