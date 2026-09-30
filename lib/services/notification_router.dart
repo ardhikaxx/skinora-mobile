@@ -301,6 +301,11 @@ class NotificationRouter {
             patientName: (consult?['patientName'] as String?) ?? '',
             dateTime: date.isEmpty ? time : '$date • $time',
             status: consult?['status'] as String?,
+            scheduleDate: consult?['scheduleDate'] as String?,
+            scheduleTime: consult?['scheduleTime'] as String?,
+            dateIso: consult?['dateIso'] as String?,
+            timeStart: consult?['timeStart'] as String?,
+            timeEnd: consult?['timeEnd'] as String?,
           ),
         ),
       );
@@ -314,6 +319,11 @@ class NotificationRouter {
           doctorId: consult?['doctorId'] as String?,
           doctorName: (consult?['doctorName'] as String?) ?? '',
           status: (consult?['status'] as String?) ?? '',
+          scheduleDate: consult?['scheduleDate'] as String?,
+          scheduleTime: consult?['scheduleTime'] as String?,
+          dateIso: consult?['dateIso'] as String?,
+          timeStart: consult?['timeStart'] as String?,
+          timeEnd: consult?['timeEnd'] as String?,
         ),
       ),
     );
