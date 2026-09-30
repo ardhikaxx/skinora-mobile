@@ -699,6 +699,12 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
           status: 'Terjadwal',
           consultationId: consultationId,
           onNavigateTab: widget.onNavigateTab,
+          dateTime: '$dayDate • $time',
+          scheduleDate: (slot != null && slot.date.isNotEmpty) ? slot.date : dayDate,
+          scheduleTime: (slot != null && slot.time.isNotEmpty) ? slot.time : time,
+          dateIso: slot?.dateIso,
+          timeStart: (slot != null && slot.timeStart.isNotEmpty) ? slot.timeStart : time,
+          timeEnd: slot?.timeEnd,
         ),
       ),
     );
