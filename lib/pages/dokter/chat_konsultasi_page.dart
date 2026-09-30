@@ -182,6 +182,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
     }
 
     if (!mounted) return;
+    final meta = _backendMeta[item.id];
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
@@ -189,9 +190,14 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
           patientName: item.patientName,
           consultationId: item.id,
           dateTime: item.dateTime,
-          status: _backendMeta[item.id]?['status'] as String?,
+          status: meta?['status'] as String?,
           onNavigateTab: widget.onNavigateTab,
           showBottomNav: true,
+          scheduleDate: meta?['scheduleDate'] as String?,
+          scheduleTime: meta?['scheduleTime'] as String?,
+          dateIso: meta?['dateIso'] as String?,
+          timeStart: meta?['timeStart'] as String?,
+          timeEnd: meta?['timeEnd'] as String?,
         ),
       ),
     );
