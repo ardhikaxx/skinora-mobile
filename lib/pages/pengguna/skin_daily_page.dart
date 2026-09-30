@@ -158,7 +158,7 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
   Future<void> _pickSleepTime() async {
     final picked = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.now(),
+      initialTime: AppDates.timeOfDayWib(),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
