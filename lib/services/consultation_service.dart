@@ -7,6 +7,7 @@ import '../services/activity_service.dart';
 import '../services/backend.dart';
 import '../services/notification_payload.dart';
 import '../services/notification_service.dart';
+import '../utils/app_dates.dart';
 
 /// Entity konsultasi + chat + booking.
 ///
@@ -367,6 +368,18 @@ class ConsultationService {
     unawaited(NotificationService.refreshChatFeed());
   }
 
+  /// Tandai status konsultasi selesai (persisten ke Firestore saat jam slot berakhir).
+  static Future<void> markSelesai(String id) async {
+    if (!Backend.useFirebase || id.isEmpty) return;
+    try {
+      await _col.doc(id).update({
+        'status': 'selesai',
+        'updatedAt': FieldValue.serverTimestamp(),
+        'completedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {}
+  }
+
   /// Menyelesaikan konsultasi (dokter) + activity log.
   static Future<void> complete({
     required String id,
@@ -470,22 +483,47 @@ class ConsultationService {
     required String time,
   }) async {
     if (!Backend.useFirebase) return;
-    // Kunci pengiriman: sesi yang sudah selesai tidak boleh ada pesan baru.
+    // Kunci pengiriman: sesi yang sudah selesai atau lewat dari jadwal tidak boleh ada pesan baru.
     final consultSnap = await _col.doc(consultationId).get();
     final consultData = consultSnap.data();
-    if (consultData != null &&
-        ((consultData['status'] as String?) ?? '').toLowerCase() == 'selesai') {
-      throw StateError('Sesi konsultasi telah selesai.');
+    if (consultData != null) {
+      final status = ((consultData['status'] as String?) ?? '').toLowerCase();
+      final dateIso = (consultData['dateIso'] as String?) ?? '';
+      final scheduleDate = (consultData['scheduleDate'] as String?) ?? '';
+      final timeEnd = (consultData['timeEnd'] as String?) ?? (consultData['scheduleTime'] as String?) ?? '';
+      final timeStart = (consultData['timeStart'] as String?) ?? '';
+      final isExpired = status == 'selesai' ||
+          AppDates.isConsultationExpired(
+            dateIso: dateIso,
+            scheduleDate: scheduleDate,
+            timeEnd: timeEnd,
+            timeStart: timeStart,
+          );
+
+      if (isExpired) {
+        if (status != 'selesai') {
+          // Tandai selesai otomatis bila jadwal konsultasi telah lampau
+          _col.doc(consultationId).update({
+            'status': 'selesai',
+            'updatedAt': FieldValue.serverTimestamp(),
+            'completedAt': FieldValue.serverTimestamp(),
+          }).catchError((_) {});
+        }
+        throw StateError('Sesi konsultasi telah berakhir sesuai jadwal.');
+      }
     }
     // ID dokumen pesan dipakai sebagai `eventId` notifikasi sehingga **setiap
     // pesan** menghasilkan notifikasi sendiri (bukan hanya pesan pertama per
     // konsultasi), sementara deep-link tetap memakai `consultationId`.
+    final stampedTime = time.trim().isNotEmpty
+        ? AppDates.formatChatTimeWib(time)
+        : AppDates.formatChatTimeWib(AppDates.nowWib());
     final messageRef = await messages(consultationId).add({
       'consultationId': consultationId,
       'senderId': senderId,
       'senderRole': senderRole,
       'text': text,
-      'time': time,
+      'time': stampedTime,
       'createdAt': FieldValue.serverTimestamp(),
     });
 
