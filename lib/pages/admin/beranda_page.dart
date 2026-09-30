@@ -12,6 +12,7 @@ import '../../services/consultation_service.dart';
 import '../../services/notification_controller.dart';
 import '../../services/user_service.dart';
 import '../../utils/app_dates.dart';
+import '../../components/realtime_wib_badge.dart';
 import 'notifikasi_admin_page.dart';
 import 'master_spesialisasi_page.dart';
 import 'laporan_riwayat_page.dart';
@@ -338,14 +339,26 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'STATISTIK',
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.2,
-              color: darkText,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: const [
+              Text(
+                'STATISTIK SISTEM',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                  color: darkText,
+                ),
+              ),
+              RealtimeWibBadge(
+                style: RealtimeWibStyle.pill,
+                compact: true,
+                includeSeconds: true,
+                backgroundColor: Colors.white,
+                borderColor: Color(0xFFFFD4D8),
+              ),
+            ],
           ),
           const SizedBox(height: 14),
           Row(
