@@ -97,9 +97,10 @@ class SkinCheckResultPage extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            createdDisplay ??
-                                AppDates.fullDisplayWib(
-                                    AppDates.nowWib()),
+                            AppDates.formatSkinCheckDateWib(
+                              null,
+                              fallbackDisplay: createdDisplay,
+                            ),
                             style: const TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w600,
