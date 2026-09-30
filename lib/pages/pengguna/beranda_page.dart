@@ -10,7 +10,6 @@ import '../../services/notification_controller.dart';
 import '../../services/skin_service.dart';
 import '../../services/user_service.dart';
 import '../../utils/app_dates.dart';
-import '../../components/realtime_wib_badge.dart';
 import 'notifikasi_pengguna_page.dart';
 import 'konsultasi_dokter_page.dart';
 import 'edukasi_kulit_page.dart';
@@ -283,23 +282,104 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
         _skincareSub = '-';
       }
 
-      // Chat / konsultasi: jadwal aktif berikutnya
-      final upcoming = consults
-          .where((c) {
-            final st = ((c['status'] as String?) ?? '').toLowerCase();
-            return st != 'selesai';
-          })
-          .toList();
-      if (upcoming.isNotEmpty) {
-        _chatValue = 'Jadwal';
-        final c = upcoming.first;
+      // Chat / konsultasi: evaluasi realtime status konsultasi pasien
+      final ongoing = consults.where((c) {
+        final st = ((c['status'] as String?) ?? '').toLowerCase();
+        return st == 'berlangsung';
+      }).toList();
+
+      final upcoming = consults.where((c) {
+        final st = ((c['status'] as String?) ?? '').toLowerCase();
+        if (st != 'terjadwal') return false;
+        final di = (c['dateIso'] as String?) ?? '';
+        final sd = (c['scheduleDate'] as String?) ?? '';
+        final te = (c['timeEnd'] as String?) ?? '';
+        final ts = (c['timeStart'] as String?) ?? '';
+        final isPast = (di.isNotEmpty || sd.isNotEmpty) &&
+            AppDates.isConsultationExpired(
+              dateIso: di,
+              scheduleDate: sd,
+              timeEnd: te,
+              timeStart: ts,
+            );
+        return !isPast;
+      }).toList();
+
+      final finished = consults.where((c) {
+        final st = ((c['status'] as String?) ?? '').toLowerCase();
+        if (st == 'selesai') return true;
+        final di = (c['dateIso'] as String?) ?? '';
+        final sd = (c['scheduleDate'] as String?) ?? '';
+        final te = (c['timeEnd'] as String?) ?? '';
+        final ts = (c['timeStart'] as String?) ?? '';
+        final isPast = (di.isNotEmpty || sd.isNotEmpty) &&
+            AppDates.isConsultationExpired(
+              dateIso: di,
+              scheduleDate: sd,
+              timeEnd: te,
+              timeStart: ts,
+            );
+        return isPast;
+      }).toList();
+
+      bool isConsultToday(Map<String, dynamic> c) {
+        final di = (c['dateIso'] as String?) ?? '';
+        if (di == todayIso || di == localIso) return true;
+        for (final key in ['completedAt', 'updatedAt', 'createdAt']) {
+          final ts = c[key];
+          if (ts != null) {
+            try {
+              final dt =
+                  ts is DateTime ? ts : (ts as dynamic).toDate() as DateTime;
+              final wib = AppDates.toWib(dt);
+              final iso = AppDates.iso(wib);
+              if (iso == todayIso || iso == localIso) return true;
+            } catch (_) {}
+          }
+        }
+        return false;
+      }
+
+      final upcomingToday = upcoming.where(isConsultToday).toList();
+      final finishedToday = finished.where(isConsultToday).toList();
+
+      String formatConsultSubtitle(Map<String, dynamic> c) {
+        final doc = (c['doctorName'] as String?) ?? '';
+        final di = (c['dateIso'] as String?) ?? '';
+        final ts = (c['timeStart'] as String?) ?? '';
+        if (doc.isNotEmpty) {
+          return doc;
+        }
+        if (di.isNotEmpty) {
+          return ts.isEmpty ? di : '$di • ${AppDates.formatChatTimeWib(ts)}';
+        }
+        return (c['scheduleDate'] as String?) ?? '-';
+      }
+
+      String formatScheduleSubtitle(Map<String, dynamic> c) {
         final di = (c['dateIso'] as String?) ?? '';
         final ts = (c['timeStart'] as String?) ?? '';
         if (di.isNotEmpty) {
-          _chatSub = ts.isEmpty ? di : '$di • ${AppDates.formatChatTimeWib(ts)}';
-        } else {
-          _chatSub = ((c['scheduleDate'] as String?) ?? '-');
+          return ts.isEmpty ? di : '$di • ${AppDates.formatChatTimeWib(ts)}';
         }
+        return (c['scheduleDate'] as String?) ?? '-';
+      }
+
+      if (ongoing.isNotEmpty) {
+        _chatValue = 'Berlangsung';
+        _chatSub = formatConsultSubtitle(ongoing.first);
+      } else if (upcomingToday.isNotEmpty) {
+        _chatValue = 'Jadwal';
+        _chatSub = formatScheduleSubtitle(upcomingToday.first);
+      } else if (finishedToday.isNotEmpty) {
+        _chatValue = 'Selesai';
+        _chatSub = formatConsultSubtitle(finishedToday.first);
+      } else if (upcoming.isNotEmpty) {
+        _chatValue = 'Jadwal';
+        _chatSub = formatScheduleSubtitle(upcoming.first);
+      } else if (finished.isNotEmpty) {
+        _chatValue = 'Selesai';
+        _chatSub = formatConsultSubtitle(finished.first);
       } else {
         _chatValue = 'Belum';
         _chatSub = '-';
@@ -513,26 +593,14 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text(
-                'RINGKASAN HARI INI',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
-                  color: darkText,
-                ),
-              ),
-              RealtimeWibBadge(
-                style: RealtimeWibStyle.pill,
-                compact: true,
-                includeSeconds: true,
-                backgroundColor: Colors.white,
-                borderColor: Color(0xFFFFD4D8),
-              ),
-            ],
+          const Text(
+            'RINGKASAN HARI INI',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.8,
+              color: darkText,
+            ),
           ),
           const SizedBox(height: 14),
 
