@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/auth_service.dart';
-import '../../services/backend.dart';
 import '../../services/skin_service.dart';
 import '../../services/weather_service.dart';
 import '../../services/location_service.dart';
@@ -132,34 +131,34 @@ class _SkinCheckQuestion7PageState extends State<SkinCheckQuestion7Page> {
     final sensitivity = _sensitivityResult;
     final acneRisk = _acneRiskResult;
     // Tanggal skin check otomatis: format Indonesia WIB.
-    final createdDisplay = AppDates.fullDisplayWib(AppDates.nowWib());
-    final createdIso = AppDates.todayIso();
+    final now = AppDates.nowWib();
+    final createdDisplay = AppDates.fullDisplayWib(now);
+    final createdIso = AppDates.iso(now);
 
-    if (Backend.useFirebase && AuthService.uid != null) {
-      final uid = AuthService.uid!;
-      try {
-        final profile = await AuthService.loadProfile();
-        await SkinService.saveSkinCheck(
-          uid: uid,
-          name: (profile?.name.isNotEmpty ?? false) ? profile!.name : uid,
-          answers: {
-            'age': widget.age,
-            'gender': widget.gender,
-            'conditionAfterWash': widget.conditionAfterWash,
-            'oilCondition': widget.oilCondition,
-            'sensitivity': widget.sensitivity,
-            'humidity': widget.humidity,
-            'temperature': _tempController.text.trim(),
-            'createdDisplay': createdDisplay,
-            'createdIso': createdIso,
-          },
-          resultSkinType: skinType,
-          resultSensitivity: sensitivity,
-          resultAcneRisk: acneRisk,
-        );
-      } catch (_) {
-        // hasil tetap ditampilkan bila penyimpanan gagal
-      }
+    final uid = AuthService.uid ?? 'demo_user';
+    try {
+      final profile = await AuthService.loadProfile();
+      final name = (profile?.name.isNotEmpty ?? false) ? profile!.name : 'Pengguna';
+      await SkinService.saveSkinCheck(
+        uid: uid,
+        name: name,
+        answers: {
+          'age': widget.age,
+          'gender': widget.gender,
+          'conditionAfterWash': widget.conditionAfterWash,
+          'oilCondition': widget.oilCondition,
+          'sensitivity': widget.sensitivity,
+          'humidity': widget.humidity,
+          'temperature': _tempController.text.trim(),
+        },
+        resultSkinType: skinType,
+        resultSensitivity: sensitivity,
+        resultAcneRisk: acneRisk,
+        createdDisplay: createdDisplay,
+        createdIso: createdIso,
+      );
+    } catch (_) {
+      // hasil tetap ditampilkan bila penyimpanan gagal
     }
     if (!mounted) return;
     Navigator.push(
