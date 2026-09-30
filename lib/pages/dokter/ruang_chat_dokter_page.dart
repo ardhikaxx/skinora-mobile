@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/empty_state.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
+import '../../components/realtime_wib_badge.dart';
 import '../../services/active_chat_registry.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
@@ -31,6 +32,11 @@ class RuangChatDokterPage extends StatefulWidget {
   final String? status;
   final ValueChanged<int>? onNavigateTab;
   final bool showBottomNav;
+  final String? scheduleDate;
+  final String? scheduleTime;
+  final String? dateIso;
+  final String? timeStart;
+  final String? timeEnd;
 
   const RuangChatDokterPage({
     super.key,
@@ -40,6 +46,11 @@ class RuangChatDokterPage extends StatefulWidget {
     this.status,
     this.onNavigateTab,
     this.showBottomNav = true,
+    this.scheduleDate,
+    this.scheduleTime,
+    this.dateIso,
+    this.timeStart,
+    this.timeEnd,
   });
 
   @override
@@ -56,11 +67,92 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
   late List<ChatBubbleModel> _messages;
   StreamSubscription<List<Map<String, dynamic>>>? _msgSub;
   StreamSubscription<Map<String, dynamic>?>? _statusSub;
+  Timer? _scheduleTicker;
+  String _dateIso = '';
+  String _scheduleDate = '';
+  String _scheduleTime = '';
+  String _timeStart = '';
+  String _timeEnd = '';
+  bool _isExpired = false;
   bool _hasText = false;
   bool _isFinished = false;
 
   /// Format jam chat konsisten WIB Indonesia 24 jam: "13.00 WIB".
   String _formatChatTimeWib(String raw) => AppDates.formatChatTimeWib(raw);
+
+  void _parseScheduleString(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return;
+    if (raw.contains('•')) {
+      final parts = raw.split('•');
+      final datePart = parts.first.trim();
+      final timePart = parts.last.trim();
+      _dateIso = datePart;
+      _scheduleTime = AppDates.formatRange(timePart, withWib: true);
+      final rangeParts = timePart.replaceAll(':', '.').split('-');
+      if (rangeParts.isNotEmpty) _timeStart = rangeParts.first.trim();
+      if (rangeParts.length > 1) _timeEnd = rangeParts.last.trim();
+    } else if (raw.contains(' - ') && !raw.startsWith('202')) {
+      final parts = raw.split(' - ');
+      final datePart = parts.first.trim();
+      final timePart = parts.sublist(1).join(' - ').trim();
+      _scheduleDate = datePart;
+      _scheduleTime = AppDates.formatRange(timePart, withWib: true);
+      final rangeParts = timePart.replaceAll(':', '.').split('-');
+      if (rangeParts.isNotEmpty) _timeStart = rangeParts.first.trim();
+      if (rangeParts.length > 1) _timeEnd = rangeParts.last.trim();
+    } else {
+      _scheduleDate = raw;
+    }
+  }
+
+  void _checkScheduleStatus() {
+    if (_dateIso.isEmpty && _scheduleDate.isEmpty) return;
+    final past = AppDates.isPastSlot(
+      dateIso: _dateIso,
+      scheduleDate: _scheduleDate,
+      timeEnd: _timeEnd.isNotEmpty ? _timeEnd : _scheduleTime,
+      timeStart: _timeStart,
+    );
+    if (past != _isExpired) {
+      if (mounted) {
+        setState(() {
+          _isExpired = past;
+          if (past) {
+            _isFinished = true;
+          }
+        });
+      }
+      if (past && Backend.useFirebase && widget.consultationId != null && widget.consultationId!.isNotEmpty) {
+        ConsultationService.markSelesai(widget.consultationId!);
+      }
+    }
+  }
+
+  void _applyConsultationDoc(Map<String, dynamic> doc) {
+    _dateIso = (doc['dateIso'] as String?) ?? _dateIso;
+    _timeStart = (doc['timeStart'] as String?) ?? _timeStart;
+    _timeEnd = (doc['timeEnd'] as String?) ?? _timeEnd;
+    _scheduleDate = (doc['scheduleDate'] as String?) ?? _scheduleDate;
+    final rawSt = (doc['scheduleTime'] as String?) ?? '';
+    if (_timeStart.isNotEmpty && _timeEnd.isNotEmpty) {
+      _scheduleTime =
+          '${AppDates.formatHm(_timeStart)} - ${AppDates.formatHm(_timeEnd)} WIB';
+    } else if (rawSt.isNotEmpty) {
+      _scheduleTime = AppDates.formatRange(rawSt, withWib: true);
+    }
+    final status = ((doc['status'] as String?) ?? '').toLowerCase();
+    final past = AppDates.isPastSlot(
+      dateIso: _dateIso,
+      scheduleDate: _scheduleDate,
+      timeEnd: _timeEnd.isNotEmpty ? _timeEnd : _scheduleTime,
+      timeStart: _timeStart,
+    );
+    _isExpired = past;
+    final finished = status == 'selesai' || past;
+    if (finished != _isFinished && mounted) {
+      setState(() => _isFinished = finished);
+    }
+  }
 
   @override
   void initState() {
@@ -68,6 +160,27 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
     if (widget.status?.toLowerCase() == 'selesai') {
       _isFinished = true;
     }
+    _dateIso = widget.dateIso ?? '';
+    _scheduleDate = widget.scheduleDate ?? '';
+    _timeStart = widget.timeStart ?? '';
+    _timeEnd = widget.timeEnd ?? '';
+    if (widget.scheduleTime != null && widget.scheduleTime!.isNotEmpty) {
+      _scheduleTime = AppDates.formatRange(widget.scheduleTime!, withWib: true);
+    } else if (_timeStart.isNotEmpty && _timeEnd.isNotEmpty) {
+      _scheduleTime =
+          '${AppDates.formatHm(_timeStart)} - ${AppDates.formatHm(_timeEnd)} WIB';
+    }
+    if (widget.dateTime != null && widget.dateTime!.isNotEmpty) {
+      _parseScheduleString(widget.dateTime);
+    }
+    _checkScheduleStatus();
+
+    // Pantau jadwal konsultasi tiap detik secara realtime agar saat jam selesai tercapai,
+    // input otomatis terkunci dan status berakhir secara real-time.
+    _scheduleTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      _checkScheduleStatus();
+    });
+
     _textController.addListener(() {
       final has = _textController.text.trim().isNotEmpty;
       if (has != _hasText && mounted) setState(() => _hasText = has);
@@ -75,56 +188,58 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
     // Anti-spam: pesan masuk di ruang yang sedang dibuka tidak memunculkan
     // native notification (chat realtime sudah memberi feedback visual).
     ActiveChatRegistry.open(widget.consultationId);
-    // Seed demo HANYA tanpa Firebase; dengan Firebase, stream yang mengisi.
+    // Seed demo HANYA tanpa Firebase; jam mengikuti waktu real-time WIB terkini.
+    final now = AppDates.nowWib();
+    final greeting = AppDates.greetingWib();
     _messages = Backend.useFirebase
         ? <ChatBubbleModel>[]
         : <ChatBubbleModel>[
       ChatBubbleModel(
         id: '1',
-        text: 'Selamat pagi, ${widget.patientName.split(' ').first}. Ada yang bisa saya bantu hari ini?',
-        time: '09:01',
+        text: '$greeting, ${widget.patientName.split(' ').first}. Ada yang bisa saya bantu hari ini?',
+        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 7))),
         isFromDoctor: true,
       ),
-      const ChatBubbleModel(
+      ChatBubbleModel(
         id: '2',
         text: 'Selamat pagi Dok. Saya mau tanya soal flek hitam di pipi kiri saya, sudah sekitar 2 minggu ini muncul.',
-        time: '09:02',
+        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 6))),
         isFromDoctor: false,
       ),
-      const ChatBubbleModel(
+      ChatBubbleModel(
         id: '3',
         text: 'Flek hitamnya ukurannya kecil atau sudah melebar? Apakah ada rasa gatal atau perih?',
-        time: '09:03',
+        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 5))),
         isFromDoctor: true,
       ),
-      const ChatBubbleModel(
+      ChatBubbleModel(
         id: '4',
         text: 'Kira-kira sebesar koin, tidak gatal tapi agak kering. Saya juga pakai sunscreen setiap hari.',
-        time: '09:04',
+        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 4))),
         isFromDoctor: false,
       ),
-      const ChatBubbleModel(
+      ChatBubbleModel(
         id: '5',
         text: 'Baik, kemungkinan ini hiperpigmentasi pasca-inflamasi. Saya sarankan pakai serum Vitamin C di pagi hari dan retinol ringan di malam hari.',
-        time: '09:05',
+        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 3))),
         isFromDoctor: true,
       ),
-      const ChatBubbleModel(
+      ChatBubbleModel(
         id: '6',
         text: 'Boleh Dok rekomendasinya? Dan berapa lama biasanya sampai terlihat hasilnya?',
-        time: '09:06',
+        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 2))),
         isFromDoctor: false,
       ),
-      const ChatBubbleModel(
+      ChatBubbleModel(
         id: '7',
         text: 'Untuk hasil optimal biasanya butuh 4-6 minggu. Saya akan kirimkan resepnya setelah konsultasi ini selesai ya.',
-        time: '09:07',
+        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 1))),
         isFromDoctor: true,
       ),
-      const ChatBubbleModel(
+      ChatBubbleModel(
         id: '8',
         text: 'Baik Dok, terima kasih banyak atas penjelasannya!',
-        time: '09:08',
+        time: AppDates.formatChatTimeWib(now),
         isFromDoctor: false,
       ),
     ];
@@ -146,10 +261,11 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
         setState(() {
           _messages = items.map((m) {
             final role = (m['senderRole'] as String?) ?? '';
+            final ts = m['createdAt'] ?? m['time'];
             return ChatBubbleModel(
               id: (m['id'] as String?) ?? '',
               text: (m['text'] as String?) ?? '',
-              time: AppDates.formatChatTimeWib(m['time'], m['createdAt']),
+              time: AppDates.formatChatTimeWib(ts),
               isFromDoctor: role == 'dokter',
             );
           }).toList();
@@ -167,24 +283,21 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
         setState(() => _messages = <ChatBubbleModel>[]);
       },
     );
-    // Cek status saat buka & pantau realtime: jika selesai, kunci input chat.
+    // Cek status saat buka & pantau realtime: jika selesai atau lewat jadwal, kunci input chat.
     ConsultationService.getById(id).then((doc) {
       if (!mounted || doc == null) return;
-      final finished =
-          ((doc['status'] as String?) ?? '').toLowerCase() == 'selesai';
-      if (finished != _isFinished) setState(() => _isFinished = finished);
+      _applyConsultationDoc(doc);
     }).catchError((_) {});
 
     _statusSub = ConsultationService.streamById(id).listen((doc) {
       if (!mounted || doc == null) return;
-      final finished =
-          ((doc['status'] as String?) ?? '').toLowerCase() == 'selesai';
-      if (finished != _isFinished) setState(() => _isFinished = finished);
+      _applyConsultationDoc(doc);
     }, onError: (_) {});
   }
 
   @override
   void dispose() {
+    _scheduleTicker?.cancel();
     _msgSub?.cancel();
     _statusSub?.cancel();
     ActiveChatRegistry.close(widget.consultationId);
@@ -194,11 +307,11 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
   }
 
   Future<void> _sendMessage() async {
-    if (_isFinished) {
+    if (_isFinished || _isExpired) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Sesi konsultasi telah selesai. Anda tidak dapat mengirim pesan lagi.'),
+          content: Text('Sesi konsultasi telah berakhir sesuai jadwal. Anda tidak dapat mengirim pesan lagi.'),
         ),
       );
       return;
@@ -404,7 +517,7 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar: Back icon + Patient Name + "Selesai" button
+            // Top Bar: Back icon + Patient Name & Schedule + Live WIB Badge + "Selesai" button
             Padding(
               padding: const EdgeInsets.only(
                 left: 14.0,
@@ -426,18 +539,43 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text(
-                      widget.patientName,
-                      style: const TextStyle(
-                        fontSize: 16.0,
-                        fontWeight: FontWeight.bold,
-                        color: darkText,
-                        letterSpacing: -0.2,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.patientName,
+                          style: const TextStyle(
+                            fontSize: 16.0,
+                            fontWeight: FontWeight.bold,
+                            color: darkText,
+                            letterSpacing: -0.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (_scheduleTime.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Jadwal: $_scheduleTime',
+                            style: const TextStyle(
+                              fontSize: 11.0,
+                              color: Color(0xFF8E8E93),
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
                     ),
                   ),
+                  const SizedBox(width: 6),
+                  const RealtimeWibBadge(
+                    style: RealtimeWibStyle.minimal,
+                    includeSeconds: true,
+                    showDate: false,
+                  ),
+                  const SizedBox(width: 8),
 
                   // "Selesai" button with check circle icon
                   Material(
@@ -573,7 +711,10 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
 
   /// Bottom Input Bar
   Widget _buildInputBar() {
-    if (_isFinished) {
+    if (_isFinished || _isExpired) {
+      final msg = _scheduleTime.isNotEmpty
+          ? 'Sesi konsultasi telah berakhir sesuai jadwal ($_scheduleTime). Anda tidak dapat mengirim pesan lagi.'
+          : 'Sesi konsultasi telah selesai. Anda tidak dapat mengirim pesan lagi.';
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
         decoration: const BoxDecoration(
@@ -590,10 +731,10 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: const Color(0xFFE5E7EB)),
           ),
-          child: const Text(
-            'Sesi konsultasi telah selesai. Anda tidak dapat mengirim pesan lagi.',
+          child: Text(
+            msg,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12.5, color: Color(0xFF8E8E93)),
+            style: const TextStyle(fontSize: 12.5, color: Color(0xFF8E8E93)),
           ),
         ),
       );
