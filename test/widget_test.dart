@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:skinora_app/pages/pengguna/pengguna_main_page.dart';
+import 'package:skinora_app/pages/pengguna/beranda_page.dart';
 import 'package:skinora_app/pages/pengguna/profil_pengguna_page.dart';
 import 'package:skinora_app/pages/pengguna/edit_profil_pengguna_page.dart';
 import 'package:skinora_app/pages/pengguna/pengaturan_pengguna_page.dart';
@@ -99,6 +100,32 @@ void main() {
     final profilQuick = find.text('Profil').first;
     await tester.tap(profilQuick);
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('Test BerandaPenggunaPage Ringkasan Hari Ini and Chat navigation', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: BerandaPenggunaPage(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('RINGKASAN HARI INI'), findsOneWidget);
+    expect(find.text('Skin Check'), findsWidgets);
+    expect(find.text('Skin Daily'), findsWidgets);
+    expect(find.text('Skincare'), findsWidgets);
+    expect(find.text('Chat'), findsOneWidget);
+
+    // Tap Chat card to navigate to KonsultasiDokterPenggunaPage
+    await tester.tap(find.text('Chat'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Konsultasi'), findsOneWidget);
   });
 
   testWidgets('Test EditProfilPenggunaPage', (tester) async {
@@ -285,6 +312,25 @@ void main() {
 
     // Tap Simpan Pagi
     await tester.tap(find.text('Simpan Pagi'));
+    await tester.pumpAndSettle();
+
+    // Dismiss success dialog
+    expect(find.text('Morning Routine berhasil disimpan'), findsOneWidget);
+    await tester.tap(find.text('OK').first);
+    await tester.pumpAndSettle();
+
+    // Test saving both routines
+    await tester.tap(find.text('Cleanser').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Facial Wash').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Simpan Semua (Pagi & Malam)'), findsOneWidget);
+    await tester.tap(find.text('Simpan Semua (Pagi & Malam)'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Morning & Night Routine berhasil disimpan'), findsOneWidget);
+    await tester.tap(find.text('OK').first);
     await tester.pumpAndSettle();
   });
 
