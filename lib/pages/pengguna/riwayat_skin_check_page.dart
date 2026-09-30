@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/empty_state.dart';
@@ -58,25 +57,27 @@ class _RiwayatSkinCheckPageState extends State<RiwayatSkinCheckPage> {
 
   List<SkinCheckHistoryModel> _historyList = Backend.useFirebase
       ? <SkinCheckHistoryModel>[]
-      : const <SkinCheckHistoryModel>[
-    SkinCheckHistoryModel(
-      id: '1',
-      date: '2026-08-28',
-      skinType: 'Kombinasi',
-      subtitle: 'Sensitif - Rentan',
-      icon: LucideIcons.shield,
-      tags: ['Kombinasi', 'Sensitif', 'Rentan'],
-    ),
-    SkinCheckHistoryModel(
-      id: '2',
-      date: '2026-08-10',
-      skinType: 'Normal',
-      subtitle: 'Non-Sensitif - Tidak Rentan',
-      icon: LucideIcons.sun,
-      tags: ['Normal', 'Non-Sensitif', 'Tidak Rentan'],
-      neutralTags: ['Non-Sensitif'],
-    ),
-  ];
+      : [
+          SkinCheckHistoryModel(
+            id: 'demo-1',
+            date: AppDates.fullDisplayWib(AppDates.nowWib()),
+            skinType: 'Kombinasi',
+            subtitle: 'Sensitif - Rentan',
+            icon: LucideIcons.shield,
+            tags: const ['Kombinasi', 'Sensitif', 'Rentan'],
+          ),
+          SkinCheckHistoryModel(
+            id: 'demo-2',
+            date: AppDates.fullDisplayWib(
+              AppDates.nowWib().subtract(const Duration(days: 18, hours: 3)),
+            ),
+            skinType: 'Normal',
+            subtitle: 'Non-Sensitif - Tidak Rentan',
+            icon: LucideIcons.sun,
+            tags: const ['Normal', 'Non-Sensitif', 'Tidak Rentan'],
+            neutralTags: const ['Non-Sensitif'],
+          ),
+        ];
 
   StreamSubscription<List<Map<String, dynamic>>>? _sub;
 
@@ -92,26 +93,9 @@ class _RiwayatSkinCheckPageState extends State<RiwayatSkinCheckPage> {
     super.dispose();
   }
 
-  String _fmtDate(Object? ts, {Map<String, dynamic>? doc}) {
-    // Prioritas: createdDisplay (format Indonesia WIB) bila ada.
-    final display = (doc?['createdDisplay'] as String?)?.trim() ?? '';
-    if (display.isNotEmpty) return display;
-    final iso = (doc?['createdIso'] as String?)?.trim() ?? '';
-    if (ts is Timestamp) return AppDates.fullDisplayWib(ts.toDate());
-    if (iso.isNotEmpty) {
-      final parsed = AppDates.tryParseIso(iso);
-      if (parsed != null) return AppDates.display(parsed);
-    }
-    if (ts is Timestamp) return AppDates.iso(ts.toDate());
-    return ts?.toString() ?? '';
-  }
-
-  /// Riwayat skin check milik pengguna dari Firestore secara realtime. Tanpa Firebase, seed
-  /// demo tetap dipakai agar UI/tes tidak berubah.
+  /// Riwayat skin check milik pengguna secara realtime (baik mode Firebase maupun demo).
   void _loadFromBackend() {
-    if (!Backend.useFirebase) return;
-    final uid = AuthService.uid;
-    if (uid == null) return;
+    final uid = AuthService.uid ?? 'demo_user';
     _sub?.cancel();
     _sub = SkinService.streamSkinChecks(uid).listen(
       (items) {
@@ -131,7 +115,11 @@ class _RiwayatSkinCheckPageState extends State<RiwayatSkinCheckPage> {
             ];
             return SkinCheckHistoryModel(
               id: (m['id'] as String?) ?? '',
-              date: _fmtDate(m['createdAt'], doc: m),
+              date: AppDates.formatSkinCheckDateWib(
+                m['createdAt'],
+                doc: m,
+                fallbackDisplay: m['createdDisplay'] as String?,
+              ),
               skinType: skinType,
               subtitle:
                   '${nonSens ? 'Non-Sensitif' : sensitivity} - $acneRisk',
