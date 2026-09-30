@@ -74,7 +74,7 @@ class _PengaturanPenggunaPageState extends State<PengaturanPenggunaPage> {
   }
 
   Future<void> _pickTime(TextEditingController controller) async {
-    final now = TimeOfDay.now();
+    final now = AppDates.timeOfDayWib();
     final picked = await showTimePicker(
       context: context,
       initialTime: now,
