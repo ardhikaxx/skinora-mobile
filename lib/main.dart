@@ -285,6 +285,11 @@ class _SkinoraAppState extends State<SkinoraApp> {
               consultationId: args['consultationId'] as String?,
               dateTime: args['dateTime'] as String?,
               status: args['status'] as String?,
+              scheduleDate: args['scheduleDate'] as String?,
+              scheduleTime: args['scheduleTime'] as String?,
+              dateIso: args['dateIso'] as String?,
+              timeStart: args['timeStart'] as String?,
+              timeEnd: args['timeEnd'] as String?,
             );
           }
           return const RuangChatDokterPage();
@@ -326,6 +331,12 @@ class _SkinoraAppState extends State<SkinoraApp> {
               doctorName: (args['doctorName'] as String?) ?? '',
               status: (args['status'] as String?) ?? 'Terjadwal',
               consultationId: args['consultationId'] as String?,
+              dateTime: args['dateTime'] as String?,
+              scheduleDate: args['scheduleDate'] as String?,
+              scheduleTime: args['scheduleTime'] as String?,
+              dateIso: args['dateIso'] as String?,
+              timeStart: args['timeStart'] as String?,
+              timeEnd: args['timeEnd'] as String?,
             );
           }
           return const RuangKonsultasiPenggunaPage();
@@ -337,6 +348,12 @@ class _SkinoraAppState extends State<SkinoraApp> {
               doctorName: (args['doctorName'] as String?) ?? '',
               status: (args['status'] as String?) ?? 'Selesai',
               consultationId: args['consultationId'] as String?,
+              dateTime: args['dateTime'] as String?,
+              scheduleDate: args['scheduleDate'] as String?,
+              scheduleTime: args['scheduleTime'] as String?,
+              dateIso: args['dateIso'] as String?,
+              timeStart: args['timeStart'] as String?,
+              timeEnd: args['timeEnd'] as String?,
             );
           }
           return const RiwayatRuangKonsultasiPage();
