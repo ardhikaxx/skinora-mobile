@@ -25,6 +25,11 @@ class UserConsultationHistoryModel {
   final ConsultationStatus status;
   final String? diagnosis;
   final String? notes;
+  final String? scheduleDate;
+  final String? scheduleTime;
+  final String? dateIso;
+  final String? timeStart;
+  final String? timeEnd;
 
   const UserConsultationHistoryModel({
     required this.id,
@@ -34,6 +39,11 @@ class UserConsultationHistoryModel {
     required this.status,
     this.diagnosis,
     this.notes,
+    this.scheduleDate,
+    this.scheduleTime,
+    this.dateIso,
+    this.timeStart,
+    this.timeEnd,
   });
 }
 
@@ -194,6 +204,11 @@ class _RiwayatKonsultasiPenggunaPageState
               status: _parseStatus((m['status'] as String?) ?? 'terjadwal'),
               diagnosis: m['diagnosis'] as String?,
               notes: m['notes'] as String?,
+              scheduleDate: rawDate,
+              scheduleTime: rawTime,
+              dateIso: dateIso,
+              timeStart: timeStart,
+              timeEnd: timeEnd,
             );
           }).toList();
         });
@@ -336,6 +351,12 @@ class _RiwayatKonsultasiPenggunaPageState
                   status: _statusLabel(item.status),
                   consultationId: item.id,
                   onNavigateTab: widget.onNavigateTab,
+                  dateTime: item.dateTime,
+                  scheduleDate: item.scheduleDate,
+                  scheduleTime: item.scheduleTime,
+                  dateIso: item.dateIso,
+                  timeStart: item.timeStart,
+                  timeEnd: item.timeEnd,
                 ),
               ),
             );
