@@ -66,6 +66,8 @@ class _SkincarePageState extends State<SkincarePage> {
 
   StreamSubscription<dynamic>? _skincareSub;
   List<Map<String, dynamic>> _skincareLogs = [];
+  bool _justSavedMorning = false;
+  bool _justSavedNight = false;
 
   @override
   void initState() {
@@ -85,7 +87,6 @@ class _SkincarePageState extends State<SkincarePage> {
     _skincareSub = SkinService.streamSkincare(AuthService.uid!).listen((logs) {
       if (!mounted) return;
       _skincareLogs = logs;
-      _applyLogsForDate(_selectedDate);
     }, onError: (_) {});
   }
 
@@ -97,17 +98,21 @@ class _SkincarePageState extends State<SkincarePage> {
       final mSteps = (doc['morningSteps'] as List?)?.cast<String>() ?? [];
       final nSteps = (doc['nightSteps'] as List?)?.cast<String>() ?? [];
       setState(() {
-        _selectedMorning
-          ..clear()
-          ..addAll(mSteps);
-        _selectedNight
-          ..clear()
-          ..addAll(nSteps);
+        if (!_justSavedMorning) {
+          _selectedMorning
+            ..clear()
+            ..addAll(mSteps);
+        }
+        if (!_justSavedNight) {
+          _selectedNight
+            ..clear()
+            ..addAll(nSteps);
+        }
       });
     } else {
       setState(() {
-        _selectedMorning.clear();
-        _selectedNight.clear();
+        if (!_justSavedMorning) _selectedMorning.clear();
+        if (!_justSavedNight) _selectedNight.clear();
       });
     }
   }
@@ -135,12 +140,37 @@ class _SkincarePageState extends State<SkincarePage> {
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
+        _justSavedMorning = false;
+        _justSavedNight = false;
       });
       _applyLogsForDate(picked);
     }
   }
 
-  Future<void> _saveRoutine({required bool isMorning}) async {
+  Future<void> _saveRoutine({
+    bool saveMorning = false,
+    bool saveNight = false,
+  }) async {
+    // Validasi pemilihan produk jika ingin menyimpan rutinitas tertentu
+    if (saveMorning && _selectedMorning.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pilih minimal satu langkah untuk Morning Routine'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    if (saveNight && _selectedNight.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pilih minimal satu langkah untuk Night Routine'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     if (Backend.useFirebase && AuthService.uid != null) {
       final uid = AuthService.uid!;
       try {
@@ -150,33 +180,60 @@ class _SkincarePageState extends State<SkincarePage> {
           name: (profile?.name.isNotEmpty ?? false) ? profile!.name : uid,
           dateDisplay: _formatIndonesianDate(_selectedDate),
           dateIso: AppDates.iso(_selectedDate),
-          morningSteps: isMorning ? _selectedMorning.toList() : null,
-          nightSteps: isMorning ? null : _selectedNight.toList(),
-          isMorning: isMorning,
+          morningSteps: saveMorning ? _selectedMorning.toList() : null,
+          nightSteps: saveNight ? _selectedNight.toList() : null,
+          saveMorning: saveMorning,
+          saveNight: saveNight,
         );
       } catch (_) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Gagal menyimpan rutinitas skincare'),
-          duration: Duration(seconds: 2),
-        ),
+          const SnackBar(
+            content: Text('Gagal menyimpan rutinitas skincare'),
+            duration: Duration(seconds: 2),
+          ),
         );
         return;
       }
     }
+
     if (!mounted) return;
+
+    // Kosongkan kembali checkbox yang sudah berhasil disimpan
+    setState(() {
+      if (saveMorning) {
+        _selectedMorning.clear();
+        _justSavedMorning = true;
+      }
+      if (saveNight) {
+        _selectedNight.clear();
+        _justSavedNight = true;
+      }
+    });
+
+    final String message;
+    if (saveMorning && saveNight) {
+      message = 'Morning & Night Routine berhasil disimpan';
+    } else if (saveMorning) {
+      message = 'Morning Routine berhasil disimpan';
+    } else {
+      message = 'Night Routine berhasil disimpan';
+    }
+
     AdminSuccessDialog.show(
       context,
-      message: isMorning
-          ? 'Morning Routine berhasil disimpan'
-          : 'Night Routine berhasil disimpan',
+      message: message,
     );
   }
 
-  Future<void> _saveMorningRoutine() => _saveRoutine(isMorning: true);
+  Future<void> _saveMorningRoutine() =>
+      _saveRoutine(saveMorning: true, saveNight: false);
 
-  Future<void> _saveNightRoutine() => _saveRoutine(isMorning: false);
+  Future<void> _saveNightRoutine() =>
+      _saveRoutine(saveMorning: false, saveNight: true);
+
+  Future<void> _saveAllRoutines() =>
+      _saveRoutine(saveMorning: true, saveNight: true);
 
   String _formatIndonesianDate(DateTime date) {
     const days = [
@@ -317,7 +374,14 @@ class _SkincarePageState extends State<SkincarePage> {
 
                   // 3. Night Routine Card
                   _buildNightRoutineCard(),
-                  const SizedBox(height: 24),
+
+                  if (_selectedMorning.isNotEmpty && _selectedNight.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    _buildSaveBothButton(),
+                    const SizedBox(height: 24),
+                  ] else ...[
+                    const SizedBox(height: 24),
+                  ],
                 ],
               ),
             ),
@@ -470,6 +534,7 @@ class _SkincarePageState extends State<SkincarePage> {
               child: InkWell(
                 onTap: () {
                   setState(() {
+                    _justSavedMorning = false;
                     if (isChecked) {
                       _selectedMorning.remove(item);
                     } else {
@@ -618,6 +683,7 @@ class _SkincarePageState extends State<SkincarePage> {
               child: InkWell(
                 onTap: () {
                   setState(() {
+                    _justSavedNight = false;
                     if (isChecked) {
                       _selectedNight.remove(item);
                     } else {
@@ -702,6 +768,33 @@ class _SkincarePageState extends State<SkincarePage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 4. Button to save both Morning and Night routines at once
+  Widget _buildSaveBothButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: ElevatedButton.icon(
+        onPressed: _saveAllRoutines,
+        icon: const Icon(LucideIcons.checkCheck, size: 18, color: Colors.white),
+        label: const Text(
+          'Simpan Semua (Pagi & Malam)',
+          style: TextStyle(
+            fontSize: 14.0,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryMaroon,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
       ),
     );
   }
