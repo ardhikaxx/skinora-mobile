@@ -349,7 +349,7 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
   Future<void> _pickSlotTime(TextEditingController controller) async {
     final picked = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.now(),
+      initialTime: AppDates.timeOfDayWib(),
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: const ColorScheme.light(
