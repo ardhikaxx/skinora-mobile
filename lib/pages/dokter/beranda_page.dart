@@ -11,6 +11,7 @@ import '../../services/notification_controller.dart';
 import '../../services/schedule_service.dart';
 import '../../services/user_service.dart';
 import '../../utils/app_dates.dart';
+import '../../components/realtime_wib_badge.dart';
 import 'patient_insight_page.dart';
 import 'notifikasi_dokter_page.dart';
 
@@ -363,14 +364,26 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'STATISTIK HARI INI',
-            style: TextStyle(
-              fontSize: 12.0,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.0,
-              color: darkText,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: const [
+              Text(
+                'STATISTIK HARI INI',
+                style: TextStyle(
+                  fontSize: 12.0,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.0,
+                  color: darkText,
+                ),
+              ),
+              RealtimeWibBadge(
+                style: RealtimeWibStyle.pill,
+                compact: true,
+                includeSeconds: true,
+                backgroundColor: Colors.white,
+                borderColor: Color(0xFFFFD4D8),
+              ),
+            ],
           ),
           const SizedBox(height: 14),
           Row(
