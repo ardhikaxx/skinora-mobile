@@ -41,8 +41,7 @@ class _PengaturanPenggunaPageState extends State<PengaturanPenggunaPage> {
     _loadFromBackend();
   }
 
-  /// Pengaturan milik pengguna dari Firestore. Tanpa Firebase, seed demo
-  /// tetap dipakai agar UI/tes tidak berubah.
+  /// Pengaturan milik pengguna dari Firestore.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
