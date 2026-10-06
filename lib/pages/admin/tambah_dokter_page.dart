@@ -32,21 +32,8 @@ class _TambahDokterPageState extends State<TambahDokterPage> {
   final _strController = TextEditingController();
   final _bioController = TextEditingController();
 
-  /// Seed demo HANYA untuk widget test / mode tanpa Firebase.
-  /// Dengan Firebase, dropdown diisi dari master Firestore (boleh kosong).
-  String? _selectedSpecialization =
-      Backend.useFirebase ? null : 'Estetika Kulit';
-  List<String> _specializations = Backend.useFirebase
-      ? <String>[]
-      : <String>[
-          'Estetika Kulit',
-          'Jerawat',
-          'Alergi',
-          'Anti-Aging',
-          'Pigmentasi',
-          'Dermatitis',
-          'Infeksi Kulit',
-        ];
+  String? _selectedSpecialization;
+  List<String> _specializations = <String>[];
 
   @override
   void initState() {
@@ -54,9 +41,7 @@ class _TambahDokterPageState extends State<TambahDokterPage> {
     _loadSpecializations();
   }
 
-  /// Spesialisasi aktif dari master Firestore. Tanpa Firebase (test), seed
-  /// demo tetap dipakai. Dengan Firebase, hasil backend selalu menggantikan
-  /// seed — termasuk saat kosong — agar UI sinkron dengan data asli.
+  /// Spesialisasi aktif dari master Firestore.
   Future<void> _loadSpecializations() async {
     if (!Backend.useFirebase) return;
     try {
@@ -236,7 +221,7 @@ class _TambahDokterPageState extends State<TambahDokterPage> {
                         const SizedBox(height: 8),
                         _buildTextField(
                           controller: _emailController,
-                          hintText: 'email@demo.com',
+                          hintText: 'dokter@email.com',
                           keyboardType: TextInputType.emailAddress,
                         ),
                         const SizedBox(height: 16),
