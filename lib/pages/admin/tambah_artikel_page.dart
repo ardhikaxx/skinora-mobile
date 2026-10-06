@@ -27,8 +27,6 @@ class _TambahArtikelPageState extends State<TambahArtikelPage> {
   final TextEditingController _categoryController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
 
-  ArticleStatus _selectedStatus = ArticleStatus.draf;
-
   @override
   void dispose() {
     _titleController.dispose();
@@ -72,7 +70,7 @@ class _TambahArtikelPageState extends State<TambahArtikelPage> {
       category: category,
       date: dateStr,
       content: content.isEmpty ? 'Tidak ada deskripsi konten.' : content,
-      status: _selectedStatus,
+      status: ArticleStatus.draf,
     );
 
     if (Backend.useFirebase) {
@@ -158,13 +156,6 @@ class _TambahArtikelPageState extends State<TambahArtikelPage> {
                     controller: _categoryController,
                     hintText: 'Kategori artikel...',
                   ),
-
-                  const SizedBox(height: 18),
-
-                  // STATUS
-                  _buildLabel('STATUS'),
-                  const SizedBox(height: 8),
-                  _buildStatusToggle(),
 
                   const SizedBox(height: 18),
 
@@ -285,82 +276,6 @@ class _TambahArtikelPageState extends State<TambahArtikelPage> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildStatusToggle() {
-    final isDraf = _selectedStatus == ArticleStatus.draf;
-    final isDiterbitkan = _selectedStatus == ArticleStatus.diterbitkan;
-
-    return Row(
-      children: [
-        // Draf button
-        Expanded(
-          child: SizedBox(
-            height: 44,
-            child: ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _selectedStatus = ArticleStatus.draf;
-                });
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDraf ? primaryMaroon : Colors.white,
-                foregroundColor: isDraf ? Colors.white : darkText,
-                elevation: 0,
-                side: BorderSide(
-                  color: isDraf ? primaryMaroon : const Color(0xFFE5E7EB),
-                  width: 1.2,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(
-                'Draf',
-                style: TextStyle(
-                  fontSize: 14.0,
-                  fontWeight: isDraf ? FontWeight.bold : FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-
-        // Diterbitkan button
-        Expanded(
-          child: SizedBox(
-            height: 44,
-            child: ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _selectedStatus = ArticleStatus.diterbitkan;
-                });
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDiterbitkan ? primaryMaroon : Colors.white,
-                foregroundColor: isDiterbitkan ? Colors.white : darkText,
-                elevation: 0,
-                side: BorderSide(
-                  color: isDiterbitkan ? primaryMaroon : const Color(0xFFE5E7EB),
-                  width: 1.2,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(
-                'Diterbitkan',
-                style: TextStyle(
-                  fontSize: 14.0,
-                  fontWeight: isDiterbitkan ? FontWeight.bold : FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
