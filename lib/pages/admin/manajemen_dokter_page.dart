@@ -18,7 +18,10 @@ class ManajemenDokterPage extends StatefulWidget {
     super.key,
     this.onNavigateTab,
     this.showBottomNav = false,
+    this.initialDoctors,
   });
+
+  final List<AdminDoctorModel>? initialDoctors;
 
   @override
   State<ManajemenDokterPage> createState() => _ManajemenDokterPageState();
@@ -41,71 +44,22 @@ class _ManajemenDokterPageState extends State<ManajemenDokterPage> {
     'Ditangguhkan',
   ];
 
-  /// Seed demo HANYA untuk widget test / mode tanpa Firebase.
-  /// Dengan Firebase, daftar diisi dari Firestore (boleh kosong).
-  final List<AdminDoctorModel> _doctors = Backend.useFirebase
-      ? <AdminDoctorModel>[]
-      : <AdminDoctorModel>[
-          AdminDoctorModel(
-            id: '1',
-            name: 'dr. Anita Dewi, Sp.KK',
-            email: 'anita@demo.com',
-            phone: '081234567800',
-            specialization: 'Estetika Kulit',
-            experience: '8 tahun',
-            str: 'STR-2018-12345',
-            bio:
-                'Dokter spesialis kulit dan kelamin dengan pengalaman 8 tahun di bidang estetika kulit. Lulusan Fakultas Kedokteran Universitas Indonesia.',
-            status: DoctorStatus.terverifikasi,
-          ),
-          AdminDoctorModel(
-            id: '2',
-            name: 'dr. Andi Pratama, Sp.KK',
-            email: 'andi@demo.com',
-            phone: '081234567801',
-            specialization: 'Jerawat',
-            experience: '5 tahun',
-            str: 'STR-2020-12346',
-            bio:
-                'Spesialis dalam penanganan jerawat parah dan bekas luka jerawat. Lulusan Universitas Airlangga.',
-            status: DoctorStatus.terverifikasi,
-          ),
-          AdminDoctorModel(
-            id: '3',
-            name: 'dr. Sari Wulandari, Sp.KK',
-            email: 'sari@demo.com',
-            phone: '081234567802',
-            specialization: 'Alergi',
-            experience: '3 tahun',
-            str: 'STR-2022-12347',
-            bio:
-                'Dokter spesialis kulit dengan keahlian dalam penanganan alergi kulit dan dermatitis. Lulusan UGM.',
-            status: DoctorStatus.menunggu,
-          ),
-          AdminDoctorModel(
-            id: '4',
-            name: 'dr. Reza Firmansyah, Sp.KK',
-            email: 'reza@demo.com',
-            phone: '081234567803',
-            specialization: 'Anti-Aging',
-            experience: '7 tahun',
-            str: 'STR-2019-12348',
-            bio:
-                'Fokus pada terapi anti-aging dan peremajaan kulit non-invasif. Lulusan Universitas Padjadjaran.',
-            status: DoctorStatus.terverifikasi,
-          ),
-        ];
+  late final List<AdminDoctorModel> _doctors;
 
   StreamSubscription<List<AdminDoctorModel>>? _doctorSub;
 
   @override
   void initState() {
     super.initState();
+    _doctors = widget.initialDoctors != null
+        ? List.from(widget.initialDoctors!)
+        : <AdminDoctorModel>[];
     _loadFromBackend();
   }
 
   /// Ambil data dokter dari Firestore secara realtime.
   void _loadFromBackend() {
+    if (widget.initialDoctors != null) return;
     if (!Backend.useFirebase) return;
     _doctorSub?.cancel();
     _doctorSub = UserService.streamDokter().listen(
