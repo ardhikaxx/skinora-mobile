@@ -66,89 +66,16 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
   static const Color avatarBg = Color(0xFFFCB9B2);
   static const Color timeChipBg = Color(0xFFFED0BB);
 
-  static final Map<String, DoctorProfileDetailModel> _doctorDatabase = {
-    '1': const DoctorProfileDetailModel(
-      id: '1',
-      name: 'dr. Anita Dewi, Sp.KK',
-      specialization: 'Estetika Kulit',
-      experience: 'Pengalaman: 8 tahun',
-      bio:
-          'Dokter spesialis kulit dan kelamin dengan pengalaman 8 tahun di bidang estetika kulit. Lulusan Fakultas Kedokteran Universitas Indonesia.',
-      schedules: [
-        DoctorScheduleModel(
-          dayDate: 'JUMAT, 28 AGUSTUS 2026',
-          timeSlots: ['09:30', '10:00', '14:00', '14:30'],
-        ),
-        DoctorScheduleModel(
-          dayDate: 'SABTU, 29 AGUSTUS 2026',
-          timeSlots: ['09:00'],
-        ),
-      ],
-    ),
-    '2': const DoctorProfileDetailModel(
-      id: '2',
-      name: 'dr. Andi Pratama, Sp.KK',
-      specialization: 'Jerawat',
-      experience: 'Pengalaman: 6 tahun',
-      bio:
-          'Dokter spesialis kulit yang berfokus pada penanganan jerawat aktif, inflamasi, komedo, dan bekas luka jerawat. Lulusan Fakultas Kedokteran Universitas Airlangga.',
-      schedules: [
-        DoctorScheduleModel(
-          dayDate: 'JUMAT, 28 AGUSTUS 2026',
-          timeSlots: ['10:00', '11:00', '14:30', '15:00'],
-        ),
-        DoctorScheduleModel(
-          dayDate: 'SABTU, 29 AGUSTUS 2026',
-          timeSlots: ['09:30', '10:00'],
-        ),
-      ],
-    ),
-    '3': const DoctorProfileDetailModel(
-      id: '3',
-      name: 'dr. Reza Firmansyah, Sp.KK',
-      specialization: 'Anti-Aging',
-      experience: 'Pengalaman: 10 tahun',
-      bio:
-          'Spesialis kulit dan kelamin konsultan estetika medis serta anti-aging. Berpengalaman luas dalam mengatasi garis halus, flek hitam, dan peremajaan skin barrier.',
-      schedules: [
-        DoctorScheduleModel(
-          dayDate: 'JUMAT, 28 AGUSTUS 2026',
-          timeSlots: ['09:30', '10:00', '13:30', '14:00'],
-        ),
-        DoctorScheduleModel(
-          dayDate: 'SABTU, 29 AGUSTUS 2026',
-          timeSlots: ['10:30', '11:00'],
-        ),
-      ],
-    ),
-  };
-
   DoctorProfileDetailModel get _currentDoctor {
-    if (Backend.useFirebase) {
-      if (_liveDoctor != null) return _liveDoctor!;
-      return DoctorProfileDetailModel(
-        id: widget.doctorId ?? '',
-        name: widget.doctorName ?? '-',
-        specialization: widget.specialization ?? '-',
-        experience: '',
-        bio: '',
-        schedules: const [],
-      );
-    }
-    if (widget.doctorId != null &&
-        _doctorDatabase.containsKey(widget.doctorId)) {
-      return _doctorDatabase[widget.doctorId]!;
-    }
     if (_liveDoctor != null) return _liveDoctor!;
-    if (widget.doctorName != null) {
-      for (final doc in _doctorDatabase.values) {
-        if (doc.name.toLowerCase() == widget.doctorName!.toLowerCase()) {
-          return doc;
-        }
-      }
-    }
-    // Default to doctor 1 (dr. Anita Dewi, Sp.KK matching design screenshot)
-    return _doctorDatabase['1']!;
+    return DoctorProfileDetailModel(
+      id: widget.doctorId ?? '',
+      name: widget.doctorName ?? '-',
+      specialization: widget.specialization ?? '-',
+      experience: '',
+      bio: '',
+      schedules: const [],
+    );
   }
 
   DoctorProfileDetailModel? _liveDoctor;
@@ -167,8 +94,7 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
     super.dispose();
   }
 
-  /// Profil dokter sekali + stream slot realtime (slot yang diambil orang
-  /// lain langsung hilang dari daftar). Tanpa Firebase, seed demo dipakai.
+  /// Profil dokter sekali + stream slot realtime dari Firestore.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     final doctorId = widget.doctorId;
