@@ -44,15 +44,15 @@ class _BerandaPenggunaPageState extends State<BerandaPenggunaPage> {
   StreamSubscription<dynamic>? _skincareSubStream;
   StreamSubscription<dynamic>? _consultSubStream;
 
-  // Ringkasan hari ini — seed hanya mode demo; Firebase → data asli / empty.
-  String _skinCheckValue = Backend.useFirebase ? 'Belum' : 'Kombinasi';
-  String _skinCheckSub = Backend.useFirebase ? '-' : '2026-08-28';
-  String _skinDailyValue = Backend.useFirebase ? 'Belum' : 'Terisi';
-  String _skinDailySub = Backend.useFirebase ? '-' : 'Baik';
-  String _skincareValue = Backend.useFirebase ? 'Belum' : 'Tercatat';
-  String _skincareSub = Backend.useFirebase ? '-' : '5 produk';
-  String _chatValue = Backend.useFirebase ? 'Belum' : 'Jadwal';
-  String _chatSub = Backend.useFirebase ? '-' : '2026-08-28';
+  // Ringkasan hari ini dari Firestore.
+  String _skinCheckValue = 'Belum';
+  String _skinCheckSub = '-';
+  String _skinDailyValue = 'Belum';
+  String _skinDailySub = '-';
+  String _skincareValue = 'Belum';
+  String _skincareSub = '-';
+  String _chatValue = 'Belum';
+  String _chatSub = '-';
 
   @override
   void initState() {
