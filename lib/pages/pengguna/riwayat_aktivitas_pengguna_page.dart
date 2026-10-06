@@ -22,10 +22,12 @@ class ActivityItem {
 
 class RiwayatAktivitasPenggunaPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
+  final List<ActivityItem>? initialActivities;
 
   const RiwayatAktivitasPenggunaPage({
     super.key,
     this.onNavigateTab,
+    this.initialActivities,
   });
 
   @override
@@ -43,38 +45,9 @@ class _RiwayatAktivitasPenggunaPageState
   static const Color iconBadgeBg = Color(0xFFFFECEB);
   static const Color iconColor = Color(0xFFD9534F);
 
-  List<ActivityItem> activities = Backend.useFirebase
-      ? <ActivityItem>[]
-      : const <ActivityItem>[
-    ActivityItem(
-      title: 'Mencatat Skin Daily',
-      timestamp: '2026-08-27 08:15',
-    ),
-    ActivityItem(
-      title: 'Login berhasil',
-      timestamp: '2026-08-27 08:00',
-    ),
-    ActivityItem(
-      title: 'Mencatat rutinitas skincare pagi',
-      timestamp: '2026-08-27 07:30',
-    ),
-    ActivityItem(
-      title: 'Booking konsultasi dengan dr. Anita',
-      timestamp: '2026-08-26 14:00',
-    ),
-    ActivityItem(
-      title: 'Melakukan Skin Check',
-      timestamp: '2026-08-25 10:30',
-    ),
-    ActivityItem(
-      title: 'Memberikan review untuk dr. Andi',
-      timestamp: '2026-08-20 15:00',
-    ),
-    ActivityItem(
-      title: 'Konsultasi selesai dengan dr. Andi',
-      timestamp: '2026-08-20 14:30',
-    ),
-  ];
+  late List<ActivityItem> activities = widget.initialActivities != null
+      ? List.from(widget.initialActivities!)
+      : <ActivityItem>[];
 
   StreamSubscription<List<Map<String, dynamic>>>? _sub;
 
@@ -95,8 +68,7 @@ class _RiwayatAktivitasPenggunaPageState
     return ts?.toString() ?? '';
   }
 
-  /// Riwayat aktivitas milik pengguna dari Firestore secara realtime. Tanpa Firebase, seed
-  /// demo tetap dipakai agar UI/tes tidak berubah.
+  /// Riwayat aktivitas milik pengguna dari Firestore secara realtime.
   void _loadFromBackend() {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
