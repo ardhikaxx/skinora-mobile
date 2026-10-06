@@ -18,7 +18,10 @@ class ManajemenPenggunaPage extends StatefulWidget {
     super.key,
     this.onNavigateTab,
     this.showBottomNav = false,
+    this.initialUsers,
   });
+
+  final List<AdminUserModel>? initialUsers;
 
   @override
   State<ManajemenPenggunaPage> createState() => _ManajemenPenggunaPageState();
@@ -32,73 +35,22 @@ class _ManajemenPenggunaPageState extends State<ManajemenPenggunaPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  /// Seed demo HANYA untuk widget test / mode tanpa Firebase.
-  /// Dengan Firebase, daftar diisi dari Firestore (boleh kosong).
-  final List<AdminUserModel> _users = Backend.useFirebase
-      ? <AdminUserModel>[]
-      : <AdminUserModel>[
-          AdminUserModel(
-            id: '1',
-            name: 'Leonita Yulyta Agustin',
-            email: 'leonita@demo.com',
-            phone: '081234567890',
-            address: 'Jl. Sudirman No. 123, Jakarta',
-            birthDate: '1995-06-15',
-            gender: 'Perempuan',
-            status: UserStatus.aktif,
-          ),
-          AdminUserModel(
-            id: '2',
-            name: 'Annida Tri Aulia',
-            email: 'annida@demo.com',
-            phone: '081234567891',
-            address: 'Jl. Melati No. 45, Bandung',
-            birthDate: '1998-03-22',
-            gender: 'Perempuan',
-            status: UserStatus.aktif,
-          ),
-          AdminUserModel(
-            id: '3',
-            name: 'Kafi Khaula Yukisa Zailina',
-            email: 'kafi@demo.com',
-            phone: '081234567892',
-            address: 'Jl. Pahlawan No. 12, Surabaya',
-            birthDate: '2000-11-10',
-            gender: 'Perempuan',
-            status: UserStatus.aktif,
-          ),
-          AdminUserModel(
-            id: '4',
-            name: 'Siti Aisa Nur Apriliana',
-            email: 'siti@demo.com',
-            phone: '081234567893',
-            address: 'Jl. Diponegoro No. 78, Yogyakarta',
-            birthDate: '1997-04-18',
-            gender: 'Perempuan',
-            status: UserStatus.aktif,
-          ),
-          AdminUserModel(
-            id: '5',
-            name: 'Nur Alisa Qiroati Sholeha',
-            email: 'alisa@demo.com',
-            phone: '081234567894',
-            address: 'Jl. Ahmad Yani No. 56, Semarang',
-            birthDate: '1999-08-05',
-            gender: 'Perempuan',
-            status: UserStatus.aktif,
-          ),
-        ];
+  late final List<AdminUserModel> _users;
 
   StreamSubscription<List<AdminUserModel>>? _userSub;
 
   @override
   void initState() {
     super.initState();
+    _users = widget.initialUsers != null
+        ? List.from(widget.initialUsers!)
+        : <AdminUserModel>[];
     _loadFromBackend();
   }
 
   /// Ambil data pengguna dari Firestore secara realtime.
   void _loadFromBackend() {
+    if (widget.initialUsers != null) return;
     if (!Backend.useFirebase) return;
     _userSub?.cancel();
     _userSub = UserService.streamPengguna().listen(
