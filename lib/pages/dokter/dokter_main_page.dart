@@ -11,7 +11,12 @@ import 'riwayat_konsultasi_page.dart';
 import 'profil_dokter_page.dart';
 
 class DokterMainPage extends StatefulWidget {
-  const DokterMainPage({super.key});
+  final List<ConsultationItemModel>? initialConsultations;
+
+  const DokterMainPage({
+    super.key,
+    this.initialConsultations,
+  });
 
   @override
   State<DokterMainPage> createState() => _DokterMainPageState();
@@ -98,6 +103,7 @@ class _DokterMainPageState extends State<DokterMainPage> {
       ChatKonsultasiPage(
         key: ValueKey('chat${_tabEpoch[2]}'),
         onNavigateTab: _changeTab,
+        initialConsultations: widget.initialConsultations,
       ),
       RiwayatKonsultasiPage(
         key: ValueKey('riwayat${_tabEpoch[3]}'),
