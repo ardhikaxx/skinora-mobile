@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
-import '../../services/backend.dart';
 import 'edukasi_kulit_page.dart';
 
 class DetailEdukasiPenggunaPage extends StatelessWidget {
@@ -20,19 +19,8 @@ class DetailEdukasiPenggunaPage extends StatelessWidget {
   static const Color categoryBadgeBg = Color(0xFFFED0BB);
   static const Color bodyTextColor = Color(0xFF4A4A4A);
 
-  /// Fallback artikel demo HANYA mode tanpa Firebase (widget test).
-  /// Dengan Firebase, article==null → tampil empty state, bukan seed palsu.
   static SkinEducationModel? _resolveArticle(SkinEducationModel? article) {
-    if (article != null) return article;
-    if (Backend.useFirebase) return null;
-    return const SkinEducationModel(
-      id: '1',
-      category: 'KULIT DASAR',
-      title: 'Mengenal Tipe Kulit Wajah Anda',
-      snippet:
-          'Pelajari cara mengenali tipe kulit wajah Anda untuk perawatan yang tepat.',
-      date: '1 Agustus 2026',
-    );
+    return article;
   }
 
   @override
@@ -247,94 +235,6 @@ class DetailEdukasiPenggunaPage extends StatelessWidget {
   }
 
   Widget _buildArticleContentCard(SkinEducationModel article) {
-    // Body asli dari Firestore — jangan ditimpa konten hardcode.
-    // Seed "Tipe Kulit" panjang hanya untuk mode demo (tanpa Firebase).
-    final isDemoSeed =
-        !Backend.useFirebase && (article.id == '1' || article.title.contains('Tipe Kulit'));
-    if (isDemoSeed) {
-      return Container(
-        padding: const EdgeInsets.all(18.0),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: const Color(0xFFEEEEEE),
-            width: 1.0,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Intro
-            const Text(
-              'Memahami tipe kulit wajah adalah langkah pertama dalam merawat kulit dengan tepat. Ada empat tipe kulit utama: kering, berminyak, kombinasi, dan normal.',
-              style: TextStyle(
-                fontSize: 13.5,
-                color: bodyTextColor,
-                height: 1.5,
-              ),
-            ),
-
-            const SizedBox(height: 18),
-
-            // Section 1: Kulit Kering
-            _buildSection(
-              title: 'Kulit Kering',
-              content:
-                  'Kulit kering ditandai dengan rasa kencang, terlihat kusam, dan terkadang mengelupas. Pori-pori hampir tidak terlihat. Perawatan yang tepat meliputi penggunaan pelembap intensif dan menghindari produk yang terlalu keras.',
-            ),
-
-            const SizedBox(height: 18),
-
-            // Section 2: Kulit Berminyak
-            _buildSection(
-              title: 'Kulit Berminyak',
-              content:
-                  'Kulit berminyak memiliki pori-pori yang terlihat besar, wajah terasa licin di siang hari, dan cenderung berjerawat. Perawatan meliputi pembersihan rutin dan produk yang mengontrol minyak.',
-            ),
-
-            const SizedBox(height: 18),
-
-            // Section 3: Kulit Kombinasi
-            _buildSection(
-              title: 'Kulit Kombinasi',
-              content:
-                  'Kulit kombinasi memiliki karakteristik berbeda di area T-zone (dahi, hidung, dagu) yang berminyak, sementara area pipi cenderung normal atau kering.',
-            ),
-
-            const SizedBox(height: 18),
-
-            // Section 4: Kulit Normal
-            _buildSection(
-              title: 'Kulit Normal',
-              content:
-                  'Kulit normal memiliki tekstur yang seimbang, pori-pori kecil, dan jarang mengalami masalah kulit.',
-            ),
-
-            const SizedBox(height: 18),
-
-            // Outro
-            const Text(
-              'Penting untuk mengenali tipe kulit Anda agar dapat memilih produk perawatan yang sesuai.',
-              style: TextStyle(
-                fontSize: 13.5,
-                color: bodyTextColor,
-                height: 1.5,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Default card for other articles
     final body = article.content.isNotEmpty ? article.content : article.snippet;
     return Container(
       padding: const EdgeInsets.all(18.0),
@@ -361,57 +261,11 @@ class DetailEdukasiPenggunaPage extends StatelessWidget {
             style: const TextStyle(
               fontSize: 13.5,
               color: bodyTextColor,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 18),
-          _buildSection(
-            title: 'Langkah Awal Perawatan',
-            content:
-                'Menjaga kebersihan dan kelembapan kulit setiap hari secara konsisten adalah kunci utama kesehatan skin barrier.',
-          ),
-          const SizedBox(height: 18),
-          _buildSection(
-            title: 'Tips Penerapan Praktis',
-            content:
-                'Gunakan produk dengan pH seimbang dan lakukan patch test sebelum mencoba produk skincare yang baru.',
-          ),
-          const SizedBox(height: 18),
-          const Text(
-            'Konsultasikan dengan dokter spesialis kulit kami bila Anda mengalami gejala iritasi atau alergi yang berlanjut.',
-            style: TextStyle(
-              fontSize: 13.5,
-              color: bodyTextColor,
-              height: 1.5,
+              height: 1.6,
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSection({required String title, required String content}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 14.5,
-            fontWeight: FontWeight.bold,
-            color: darkText,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          content,
-          style: const TextStyle(
-            fontSize: 13.5,
-            color: bodyTextColor,
-            height: 1.5,
-          ),
-        ),
-      ],
     );
   }
 }
