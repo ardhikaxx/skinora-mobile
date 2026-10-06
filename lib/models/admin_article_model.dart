@@ -15,7 +15,7 @@ class AdminArticleModel {
   String content;
   ArticleStatus status;
 
-  /// Firestore document id (equals [id] in demo mode).
+  /// Firestore document id.
   final String? fsDocId;
 
   AdminArticleModel({
