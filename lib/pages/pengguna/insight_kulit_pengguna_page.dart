@@ -23,11 +23,27 @@ class DailyInsightHistoryItem {
 class InsightKulitPenggunaPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
   final bool showBottomNav;
+  final List<DailyInsightHistoryItem>? initialHistory;
+  final int? initialBaikCount;
+  final int? initialSedangCount;
+  final int? initialBurukCount;
+  final String? initialTopSymptom;
+  final int? initialTopSymptomCount;
+  final int? initialAvgWater;
+  final int? initialFullRoutineDays;
 
   const InsightKulitPenggunaPage({
     super.key,
     this.onNavigateTab,
     this.showBottomNav = true,
+    this.initialHistory,
+    this.initialBaikCount,
+    this.initialSedangCount,
+    this.initialBurukCount,
+    this.initialTopSymptom,
+    this.initialTopSymptomCount,
+    this.initialAvgWater,
+    this.initialFullRoutineDays,
   });
 
   @override
@@ -44,53 +60,17 @@ class _InsightKulitPenggunaPageState extends State<InsightKulitPenggunaPage> {
   static const Color pinkBurukBg = Color(0xFFFFCCD2);
   static const Color redBurukText = Color(0xFFD32F2F);
 
-  List<DailyInsightHistoryItem> _history7Hari = Backend.useFirebase
-      ? <DailyInsightHistoryItem>[]
-      : const <DailyInsightHistoryItem>[
-    DailyInsightHistoryItem(
-      date: '2026-08-28',
-      symptoms: 'Berminyak, Komedo',
-      status: 'Baik',
-    ),
-    DailyInsightHistoryItem(
-      date: '2026-08-26',
-      symptoms: 'Jerawat, Kemerahan',
-      status: 'Sedang',
-    ),
-    DailyInsightHistoryItem(
-      date: '2026-08-25',
-      symptoms: 'Normal',
-      status: 'Baik',
-    ),
-    DailyInsightHistoryItem(
-      date: '2026-08-24',
-      symptoms: 'Berminyak',
-      status: 'Baik',
-    ),
-    DailyInsightHistoryItem(
-      date: '2026-08-23',
-      symptoms: 'Jerawat, Kemerahan, Beruntusan',
-      status: 'Buruk',
-    ),
-    DailyInsightHistoryItem(
-      date: '2026-08-22',
-      symptoms: 'Kusam',
-      status: 'Sedang',
-    ),
-    DailyInsightHistoryItem(
-      date: '2026-08-21',
-      symptoms: 'Normal, Kombinasi',
-      status: 'Baik',
-    ),
-  ];
+  late List<DailyInsightHistoryItem> _history7Hari = widget.initialHistory != null
+      ? List.from(widget.initialHistory!)
+      : <DailyInsightHistoryItem>[];
 
-  int _baikCount = Backend.useFirebase ? 0 : 4;
-  int _sedangCount = Backend.useFirebase ? 0 : 2;
-  int _burukCount = Backend.useFirebase ? 0 : 1;
-  String _topSymptom = Backend.useFirebase ? '-' : 'Berminyak';
-  int _topSymptomCount = Backend.useFirebase ? 0 : 2;
-  int _avgWater = Backend.useFirebase ? 0 : 7;
-  int _fullRoutineDays = Backend.useFirebase ? 0 : 4;
+  late int _baikCount = widget.initialBaikCount ?? 0;
+  late int _sedangCount = widget.initialSedangCount ?? 0;
+  late int _burukCount = widget.initialBurukCount ?? 0;
+  late String _topSymptom = widget.initialTopSymptom ?? '-';
+  late int _topSymptomCount = widget.initialTopSymptomCount ?? 0;
+  late int _avgWater = widget.initialAvgWater ?? 0;
+  late int _fullRoutineDays = widget.initialFullRoutineDays ?? 0;
 
   StreamSubscription<List<Map<String, dynamic>>>? _sub;
 
@@ -106,12 +86,11 @@ class _InsightKulitPenggunaPageState extends State<InsightKulitPenggunaPage> {
     super.dispose();
   }
 
-  /// Insight 7 hari dari skin daily pengguna secara realtime. Tanpa Firebase, seed demo
-  /// tetap dipakai agar UI/tes tidak berubah.
+  /// Insight 7 hari dari skin daily pengguna secara realtime dari Firestore.
   void _loadFromBackend() {
-    if (!Backend.useFirebase) return;
-    final uid = AuthService.uid;
-    if (uid == null) return;
+    if (widget.initialHistory != null) return;
+    final uid = AuthService.uid ?? '';
+    if (Backend.useFirebase && uid.isEmpty) return;
     _sub?.cancel();
     _sub = SkinService.streamSkinDailies(uid).listen(
       (items) {
