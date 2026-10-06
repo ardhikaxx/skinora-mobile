@@ -48,7 +48,10 @@ class RiwayatRuangKonsultasiPage extends StatefulWidget {
     this.dateIso,
     this.timeStart,
     this.timeEnd,
+    this.initialMessages,
   });
+
+  final List<ConsultationChatMessage>? initialMessages;
 
   @override
   State<RiwayatRuangKonsultasiPage> createState() =>
@@ -188,67 +191,9 @@ class _RiwayatRuangKonsultasiPageState
     // native notification (chat realtime sudah memberi feedback visual).
     ActiveChatRegistry.open(widget.consultationId);
 
-    // Seed demo dengan timestamp realtime WIB
-    final now = AppDates.nowWib();
-    final greeting = AppDates.greetingWib();
-    _messages = Backend.useFirebase
-        ? <ConsultationChatMessage>[]
-        : <ConsultationChatMessage>[
-      ConsultationChatMessage(
-        id: '1',
-        text: '$greeting, Leonita. Ada yang bisa saya bantu hari ini?',
-        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 7))),
-        isFromUser: false,
-      ),
-      ConsultationChatMessage(
-        id: '2',
-        text:
-            'Selamat pagi Dok. Saya mau tanya soal flek hitam di pipi kiri saya, sudah sekitar 2 minggu ini muncul.',
-        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 6))),
-        isFromUser: true,
-      ),
-      ConsultationChatMessage(
-        id: '3',
-        text:
-            'Flek hitamnya ukurannya kecil atau sudah melebar? Apakah ada rasa gatal atau perih?',
-        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 5))),
-        isFromUser: false,
-      ),
-      ConsultationChatMessage(
-        id: '4',
-        text:
-            'Kira-kira sebesar koin, tidak gatal tapi agak kering. Saya juga pakai sunscreen setiap hari.',
-        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 4))),
-        isFromUser: true,
-      ),
-      ConsultationChatMessage(
-        id: '5',
-        text:
-            'Baik, kemungkinan ini hiperpigmentasi pasca-inflamasi. Saya sarankan pakai serum Vitamin C di pagi hari dan retinol ringan di malam hari.',
-        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 3))),
-        isFromUser: false,
-      ),
-      ConsultationChatMessage(
-        id: '6',
-        text:
-            'Boleh Dok rekomendasinya? Dan berapa lama biasanya sampai terlihat hasilnya?',
-        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 2))),
-        isFromUser: true,
-      ),
-      ConsultationChatMessage(
-        id: '7',
-        text:
-            'Untuk hasil optimal biasanya butuh 4-6 minggu. Saya akan kirimkan resepnya setelah konsultasi ini selesai ya.',
-        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 1))),
-        isFromUser: false,
-      ),
-      ConsultationChatMessage(
-        id: '8',
-        text: 'Baik Dok, terima kasih banyak atas penjelasannya!',
-        time: AppDates.formatChatTimeWib(now),
-        isFromUser: true,
-      ),
-    ];
+    _messages = widget.initialMessages != null
+        ? List.from(widget.initialMessages!)
+        : <ConsultationChatMessage>[];
 
     _scheduleTicker = Timer.periodic(const Duration(seconds: 1), (_) {
       _checkScheduleStatus();
@@ -257,9 +202,9 @@ class _RiwayatRuangKonsultasiPageState
     _loadFromBackend();
   }
 
-  /// Streaming pesan konsultasi dari Firestore. Tanpa Firebase, seed demo
-  /// tetap dipakai agar UI/tes tidak berubah.
+  /// Streaming pesan konsultasi dari Firestore.
   void _loadFromBackend() {
+    if (widget.initialMessages != null) return;
     if (!Backend.useFirebase) return;
     final consultationId = widget.consultationId;
     if (consultationId == null ||
