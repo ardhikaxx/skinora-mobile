@@ -29,11 +29,13 @@ class ConsultationItemModel {
 class ChatKonsultasiPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
   final bool showBottomNav;
+  final List<ConsultationItemModel>? initialConsultations;
 
   const ChatKonsultasiPage({
     super.key,
     this.onNavigateTab,
     this.showBottomNav = false,
+    this.initialConsultations,
   });
 
   @override
@@ -50,42 +52,10 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
   static const Color ongoingBadgeBg = Color(0xFFDCFCE7);
   static const Color ongoingBadgeText = Color(0xFF16A34A);
 
-  // Seed demo HANYA untuk widget test / mode tanpa Firebase.
-  // Dengan Firebase, daftar diisi dari Firestore (boleh kosong).
-  final List<ConsultationItemModel> _consultations = Backend.useFirebase
-      ? <ConsultationItemModel>[]
-      : <ConsultationItemModel>[
-          ConsultationItemModel(
-            id: '1',
-            patientName: 'Leonita Yulyta Agustin',
-            dateTime: '2026-08-28 • 09:00 - 09:30',
-            status: 'Terjadwal',
-          ),
-          ConsultationItemModel(
-            id: '2',
-            patientName: 'Annida Tri Aulia',
-            dateTime: '2026-08-28 • 09:30 - 10:00',
-            status: 'Berlangsung',
-          ),
-          ConsultationItemModel(
-            id: '3',
-            patientName: 'Annida Tri Aulia',
-            dateTime: '2026-08-29 • 09:00 - 09:30',
-            status: 'Terjadwal',
-          ),
-          ConsultationItemModel(
-            id: '4',
-            patientName: 'Siti Aisa Nur Apriliana',
-            dateTime: '2026-08-29 • 09:30 - 10:00',
-            status: 'Terjadwal',
-          ),
-          ConsultationItemModel(
-            id: '5',
-            patientName: 'Leonita Yulyta Agustin',
-            dateTime: '2026-08-30 • 14:00 - 14:30',
-            status: 'Terjadwal',
-          ),
-        ];
+  late final List<ConsultationItemModel> _consultations =
+      widget.initialConsultations != null
+          ? List.from(widget.initialConsultations!)
+          : <ConsultationItemModel>[];
 
   // id Firestore -> data mentah untuk persist aksi status.
   final Map<String, Map<String, dynamic>> _backendMeta = {};
@@ -115,9 +85,9 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
     }
   }
 
-  /// Streaming konsultasi aktif dokter. Tanpa Firebase, seed demo
-  /// tetap dipakai agar UI/tes tidak berubah.
+  /// Streaming konsultasi aktif dokter dari Firestore.
   void _loadFromBackend() {
+    if (widget.initialConsultations != null) return;
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
     if (uid == null) return;
@@ -230,8 +200,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
       setState(() {
         _consultations.removeWhere((c) => c.id == item.id);
       });
-      // Seed lokal utk demo saja. Dengan Firebase, riwayat berasal dari
-      // Firestore — jangan tulis diagnosis dummy ke store.
+      // Simpan ke local store untuk sesi lokal saat tanpa Firestore.
       if (!Backend.useFirebase) {
         DoctorConsultationStore().addCompletedConsultation(
           patientName: item.patientName,
