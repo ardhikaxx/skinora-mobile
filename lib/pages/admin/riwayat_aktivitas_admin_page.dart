@@ -20,10 +20,12 @@ class AdminActivityItem {
 
 class RiwayatAktivitasAdminPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
+  final List<AdminActivityItem>? initialActivities;
 
   const RiwayatAktivitasAdminPage({
     super.key,
     this.onNavigateTab,
+    this.initialActivities,
   });
 
   @override
@@ -37,30 +39,16 @@ class _RiwayatAktivitasAdminPageState extends State<RiwayatAktivitasAdminPage> {
   static const Color orangeIconBg = Color(0xFFFFD5C8);
   static const Color orangeIconColor = Color(0xFFE65100);
 
-  /// Seed demo HANYA untuk widget test / mode tanpa Firebase.
-  /// Dengan Firebase, daftar diisi dari Firestore (boleh kosong).
-  final List<AdminActivityItem> _activities = Backend.useFirebase
-      ? <AdminActivityItem>[]
-      : <AdminActivityItem>[
-          AdminActivityItem(
-            title: 'Login admin berhasil',
-            time: '2026-08-27 07:55',
-          ),
-          AdminActivityItem(
-            title: 'Memverifikasi dr. Anita Dewi',
-            time: '2026-08-15 10:00',
-          ),
-          AdminActivityItem(
-            title: 'Mempublikasikan artikel:\nMengenal Tipe Kulit',
-            time: '2026-08-01 12:00',
-          ),
-        ];
+  late final List<AdminActivityItem> _activities;
 
   StreamSubscription<List<Map<String, dynamic>>>? _activitySub;
 
   @override
   void initState() {
     super.initState();
+    _activities = widget.initialActivities != null
+        ? List.from(widget.initialActivities!)
+        : <AdminActivityItem>[];
     _loadFromBackend();
   }
 
@@ -77,6 +65,7 @@ class _RiwayatAktivitasAdminPageState extends State<RiwayatAktivitasAdminPage> {
 
   /// Riwayat aktivitas global (admin) dari Firestore secara realtime.
   void _loadFromBackend() {
+    if (widget.initialActivities != null) return;
     if (!Backend.useFirebase) return;
     _activitySub?.cancel();
     _activitySub = ActivityService.streamAll().listen(
