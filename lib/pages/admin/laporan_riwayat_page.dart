@@ -31,10 +31,14 @@ class ActivityLogModel {
 
 class LaporanRiwayatPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
+  final List<ActivityLogModel>? initialActivities;
+  final Map<String, String>? initialStats;
 
   const LaporanRiwayatPage({
     super.key,
     this.onNavigateTab,
+    this.initialActivities,
+    this.initialStats,
   });
 
   @override
@@ -54,24 +58,22 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
   final TextEditingController _searchController = TextEditingController();
   StreamSubscription<dynamic>? _activitySub;
 
-  // Angka ringkasan — seed demo HANYA tanpa Firebase. Dengan Firebase,
-  // default '0'/'0%' hingga data asli dimuat dari Firestore.
-  String _ringTotalKonsultasi = Backend.useFirebase ? '0' : '13';
-  String _ringDokterAktif = Backend.useFirebase ? '0' : '3';
-  String _ringPengguna = Backend.useFirebase ? '0' : '5';
-  String _ringArtikel = Backend.useFirebase ? '0' : '7';
-  String _statusTerjadwal = Backend.useFirebase ? '0' : '3';
-  String _statusBerlangsung = Backend.useFirebase ? '0' : '3';
-  String _statusSelesai = Backend.useFirebase ? '0' : '7';
-  String _statusBatal = Backend.useFirebase ? '0' : '0';
-  String _pctTerjadwal = Backend.useFirebase ? '0%' : '23%';
-  String _pctBerlangsung = Backend.useFirebase ? '0%' : '23%';
-  String _pctSelesai = Backend.useFirebase ? '0%' : '54%';
-  String _pctBatal = Backend.useFirebase ? '0%' : '0%';
-  String _topLogin = Backend.useFirebase ? '0' : '3';
-  String _topSkinDaily = Backend.useFirebase ? '0' : '2';
-  String _topSkinCheck = Backend.useFirebase ? '0' : '1';
-  String _topSkincare = Backend.useFirebase ? '0' : '1';
+  late String _ringTotalKonsultasi = widget.initialStats?['totalKonsultasi'] ?? '0';
+  late String _ringDokterAktif = widget.initialStats?['dokterAktif'] ?? '0';
+  late String _ringPengguna = widget.initialStats?['pengguna'] ?? '0';
+  late String _ringArtikel = widget.initialStats?['artikel'] ?? '0';
+  late String _statusTerjadwal = widget.initialStats?['terjadwal'] ?? '0';
+  late String _statusBerlangsung = widget.initialStats?['berlangsung'] ?? '0';
+  late String _statusSelesai = widget.initialStats?['selesai'] ?? '0';
+  late String _statusBatal = widget.initialStats?['batal'] ?? '0';
+  late String _pctTerjadwal = widget.initialStats?['pctTerjadwal'] ?? '0%';
+  late String _pctBerlangsung = widget.initialStats?['pctBerlangsung'] ?? '0%';
+  late String _pctSelesai = widget.initialStats?['pctSelesai'] ?? '0%';
+  late String _pctBatal = widget.initialStats?['pctBatal'] ?? '0%';
+  late String _topLogin = widget.initialStats?['topLogin'] ?? '0';
+  late String _topSkinDaily = widget.initialStats?['topSkinDaily'] ?? '0';
+  late String _topSkinCheck = widget.initialStats?['topSkinCheck'] ?? '0';
+  late String _topSkincare = widget.initialStats?['topSkincare'] ?? '0';
 
   String _pctOf(int count, int total) {
     if (total <= 0) return '0%';
@@ -91,96 +93,7 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
     'Artikel',
   ];
 
-  /// Seed log demo HANYA untuk widget test / mode tanpa Firebase.
-  /// Dengan Firebase, log diisi dari Firestore (boleh kosong).
-  final List<ActivityLogModel> _allActivities = Backend.useFirebase
-      ? <ActivityLogModel>[]
-      : <ActivityLogModel>[
-    ActivityLogModel(
-      title: 'Login berhasil',
-      tag: 'Login',
-      actor: 'Leonita Vidya Agustin',
-      time: '2026-08-27 08:00',
-      icon: LucideIcons.zap,
-    ),
-    ActivityLogModel(
-      title: 'Melakukan Skin Check',
-      tag: 'Skin Check',
-      actor: 'Leonita Vidya Agustin',
-      time: '2026-08-25 10:30',
-      icon: LucideIcons.scan,
-    ),
-    ActivityLogModel(
-      title: 'Mencatat Skin Daily',
-      tag: 'Skin Daily',
-      actor: 'Leonita Vidya Agustin',
-      time: '2026-08-27 08:15',
-      icon: LucideIcons.fileText,
-    ),
-    ActivityLogModel(
-      title: 'Mencatat rutinitas skincare pagi',
-      tag: 'Skincare',
-      actor: 'Leonita Vidya Agustin',
-      time: '2026-08-27 07:30',
-      icon: LucideIcons.sparkles,
-    ),
-    ActivityLogModel(
-      title: 'Booking konsultasi dengan dr. Anita',
-      tag: 'Booking',
-      actor: 'Leonita Vidya Agustin',
-      time: '2026-08-26 14:00',
-      icon: LucideIcons.calendar,
-    ),
-    ActivityLogModel(
-      title: 'Konsultasi selesai dengan dr. Andi',
-      tag: 'Konsultasi',
-      actor: 'Leonita Vidya Agustin',
-      time: '2026-08-20 14:30',
-      icon: LucideIcons.circleCheck,
-    ),
-    ActivityLogModel(
-      title: 'Memberikan review untuk dr. Andi',
-      tag: 'Review',
-      actor: 'Leonita Vidya Agustin',
-      time: '2026-08-20 15:00',
-      icon: LucideIcons.trendingUp,
-    ),
-    ActivityLogModel(
-      title: 'Login berhasil',
-      tag: 'Login',
-      actor: 'Annisa Tri Aulia',
-      time: '2026-08-27 06:00',
-      icon: LucideIcons.zap,
-    ),
-    ActivityLogModel(
-      title: 'Mencatat Skin Daily',
-      tag: 'Skin Daily',
-      actor: 'Annisa Tri Aulia',
-      time: '2026-08-27 09:10',
-      icon: LucideIcons.fileText,
-    ),
-    ActivityLogModel(
-      title: 'Login admin berhasil',
-      tag: 'Login',
-      actor: 'Admin 1',
-      time: '2026-08-27 05:00',
-      icon: LucideIcons.zap,
-    ),
-    ActivityLogModel(
-      title: 'Memverifikasi dr. Anita Dewi',
-      tag: 'Verifikasi',
-      actor: 'Admin 1',
-      time: '2026-08-26 10:00',
-      icon: LucideIcons.shieldCheck,
-    ),
-    ActivityLogModel(
-      title: 'Mempublikasikan artikel: Mengenal Tipe Kulit',
-      tag: 'Artikel',
-      actor: 'Admin 1',
-      time: '2026-08-21 11:30',
-      icon: LucideIcons.fileText,
-    ),
-  ];
+  late List<ActivityLogModel> _allActivities;
 
   List<ActivityLogModel> get _filteredActivities {
     return _allActivities.where((activity) {
@@ -197,8 +110,11 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
   @override
   void initState() {
     super.initState();
+    _allActivities = widget.initialActivities != null
+        ? List.from(widget.initialActivities!)
+        : <ActivityLogModel>[];
     _loadFromBackend();
-    if (Backend.useFirebase) {
+    if (Backend.useFirebase && widget.initialActivities == null) {
       _activitySub = ActivityService.streamAll(limit: 50).listen((_) {
         _loadFromBackend();
       }, onError: (_) {});
@@ -235,10 +151,9 @@ class _LaporanRiwayatPageState extends State<LaporanRiwayatPage> {
     }
   }
 
-  /// Muat statistik + log aktivitas global dari Firestore. Tanpa Firebase
-  /// (test), seed demo tetap dipakai. Dengan Firebase, hasil backend selalu
-  /// menggantikan seed — termasuk saat kosong — agar UI sinkron data asli.
+  /// Muat statistik + log aktivitas global dari Firestore.
   Future<void> _loadFromBackend() async {
+    if (widget.initialActivities != null) return;
     if (!Backend.useFirebase) return;
     try {
       final results = await Future.wait<Object?>([
