@@ -22,11 +22,13 @@ class DoctorActivityItem {
 class RiwayatAktivitasDokterPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
   final bool showBottomNav;
+  final List<DoctorActivityItem>? initialActivities;
 
   const RiwayatAktivitasDokterPage({
     super.key,
     this.onNavigateTab,
     this.showBottomNav = true,
+    this.initialActivities,
   });
 
   @override
@@ -42,30 +44,16 @@ class _RiwayatAktivitasDokterPageState
   static const Color clockBg = Color(0xFFFFD5C8);
   static const Color clockColor = Color(0xFFE65100);
 
-  // Seed demo HANYA untuk widget test / mode tanpa Firebase.
-  // Dengan Firebase, daftar diisi dari Firestore (boleh kosong).
-  List<DoctorActivityItem> activities = Backend.useFirebase
-      ? const <DoctorActivityItem>[]
-      : const [
-          DoctorActivityItem(
-            title: 'Konsultasi selesai dengan Annida Tri Aulia',
-            timestamp: '2026-08-29 10:30',
-          ),
-          DoctorActivityItem(
-            title: 'Login berhasil',
-            timestamp: '2026-08-29 08:00',
-          ),
-          DoctorActivityItem(
-            title: 'Konsultasi selesai dengan Leonita Yulyta Agustin',
-            timestamp: '2026-08-28 14:00',
-          ),
-        ];
+  late List<DoctorActivityItem> activities;
 
   StreamSubscription<List<Map<String, dynamic>>>? _activitySub;
 
   @override
   void initState() {
     super.initState();
+    activities = widget.initialActivities != null
+        ? List.from(widget.initialActivities!)
+        : const <DoctorActivityItem>[];
     _loadFromBackend();
   }
 
@@ -82,6 +70,7 @@ class _RiwayatAktivitasDokterPageState
 
   /// Riwayat aktivitas milik dokter dari Firestore secara realtime.
   void _loadFromBackend() {
+    if (widget.initialActivities != null) return;
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
     if (uid == null) return;
