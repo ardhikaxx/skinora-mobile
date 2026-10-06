@@ -18,36 +18,19 @@ class SkinService {
   ) =>
       _db.collection('users').doc(uid).collection(name);
 
-  // In-memory demo store untuk riwayat skin check ketika Firebase tidak aktif.
-  static final List<Map<String, dynamic>> _demoSkinChecks = [
-    {
-      'id': 'demo-1',
-      'createdDisplay': AppDates.fullDisplayWib(AppDates.nowWib()),
-      'createdIso': AppDates.todayIso(),
-      'resultSkinType': 'Kombinasi',
-      'resultSensitivity': 'Sensitif',
-      'resultAcneRisk': 'Rentan',
-      'createdAt': AppDates.nowWib(),
-      'createdAtMillis': DateTime.now().millisecondsSinceEpoch,
-    },
-    {
-      'id': 'demo-2',
-      'createdDisplay': AppDates.fullDisplayWib(
-        AppDates.nowWib().subtract(const Duration(days: 18, hours: 3)),
-      ),
-      'createdIso': AppDates.iso(
-        AppDates.nowWib().subtract(const Duration(days: 18, hours: 3)),
-      ),
-      'resultSkinType': 'Normal',
-      'resultSensitivity': 'Non-Sensitif',
-      'resultAcneRisk': 'Tidak Rentan',
-      'createdAt': AppDates.nowWib().subtract(const Duration(days: 18, hours: 3)),
-      'createdAtMillis': DateTime.now().subtract(const Duration(days: 18, hours: 3)).millisecondsSinceEpoch,
-    },
-  ];
-
+  static final List<Map<String, dynamic>> _cachedSkinChecks = [];
   static final StreamController<List<Map<String, dynamic>>>
-      _demoSkinChecksController =
+      _cachedSkinChecksController =
+      StreamController<List<Map<String, dynamic>>>.broadcast();
+
+  static final List<Map<String, dynamic>> _cachedSkinDailies = [];
+  static final StreamController<List<Map<String, dynamic>>>
+      _cachedSkinDailiesController =
+      StreamController<List<Map<String, dynamic>>>.broadcast();
+
+  static final List<Map<String, dynamic>> _cachedSkincareLogs = [];
+  static final StreamController<List<Map<String, dynamic>>>
+      _cachedSkincareLogsController =
       StreamController<List<Map<String, dynamic>>>.broadcast();
 
   // ---------------------------------------------------------------------------
@@ -86,9 +69,9 @@ class SkinService {
     };
 
     if (!Backend.useFirebase) {
-      _demoSkinChecks.removeWhere((item) => item['id'] == record['id']);
-      _demoSkinChecks.insert(0, record);
-      _demoSkinChecksController.add(List.unmodifiable(_demoSkinChecks));
+      _cachedSkinChecks.removeWhere((item) => item['id'] == record['id']);
+      _cachedSkinChecks.insert(0, record);
+      _cachedSkinChecksController.add(List.unmodifiable(_cachedSkinChecks));
       await ActivityService.log(
         title: 'Melakukan Skin Check',
         tag: 'Skin Check',
@@ -115,10 +98,10 @@ class SkinService {
     int? limit,
   }) async {
     if (!Backend.useFirebase || uid.isEmpty) {
-      if (limit != null && _demoSkinChecks.length > limit) {
-        return _demoSkinChecks.sublist(0, limit);
+      if (limit != null && _cachedSkinChecks.length > limit) {
+        return _cachedSkinChecks.sublist(0, limit);
       }
-      return List.unmodifiable(_demoSkinChecks);
+      return List.unmodifiable(_cachedSkinChecks);
     }
     try {
       var q = _col(uid, 'skin_checks').orderBy('createdAt', descending: true);
@@ -155,8 +138,8 @@ class SkinService {
   }) {
     if (!Backend.useFirebase || uid.isEmpty) {
       return Stream<List<Map<String, dynamic>>>.multi((controller) {
-        controller.add(List.unmodifiable(_demoSkinChecks));
-        final sub = _demoSkinChecksController.stream.listen(
+        controller.add(List.unmodifiable(_cachedSkinChecks));
+        final sub = _cachedSkinChecksController.stream.listen(
           (items) => controller.add(items),
           onError: (e) => controller.addError(e),
         );
@@ -218,6 +201,29 @@ class SkinService {
       'createdBy': uid,
       'updatedAt': FieldValue.serverTimestamp(),
     };
+
+    if (!Backend.useFirebase) {
+      final idx = _cachedSkinDailies.indexWhere((item) => item['dateIso'] == dateIso);
+      final record = <String, dynamic>{
+        'id': dateIso,
+        ...data,
+        'createdAt': AppDates.nowWib(),
+      };
+      if (idx != -1) {
+        _cachedSkinDailies[idx] = record;
+      } else {
+        _cachedSkinDailies.insert(0, record);
+      }
+      _cachedSkinDailiesController.add(List.unmodifiable(_cachedSkinDailies));
+      await ActivityService.log(
+        title: 'Mencatat Skin Daily',
+        tag: 'Skin Daily',
+        actor: name,
+        actorUid: uid,
+      );
+      return;
+    }
+
     final existing = await ref.get();
     if (existing.exists) {
       await ref.update({
@@ -241,7 +247,9 @@ class SkinService {
   static Future<List<Map<String, dynamic>>> listSkinDailies(
     String uid,
   ) async {
-    if (!Backend.useFirebase || uid.isEmpty) return const [];
+    if (!Backend.useFirebase || uid.isEmpty) {
+      return List.unmodifiable(_cachedSkinDailies);
+    }
     try {
       final snap = await _col(uid, 'skin_dailies')
           .orderBy('createdAt', descending: true)
@@ -257,7 +265,16 @@ class SkinService {
 
   /// Stream riwayat skin daily milik pengguna secara realtime.
   static Stream<List<Map<String, dynamic>>> streamSkinDailies(String uid) {
-    if (!Backend.useFirebase || uid.isEmpty) return const Stream.empty();
+    if (!Backend.useFirebase || uid.isEmpty) {
+      return Stream<List<Map<String, dynamic>>>.multi((controller) {
+        controller.add(List.unmodifiable(_cachedSkinDailies));
+        final sub = _cachedSkinDailiesController.stream.listen(
+          (items) => controller.add(items),
+          onError: (e) => controller.addError(e),
+        );
+        controller.onCancel = () => sub.cancel();
+      });
+    }
     return _col(uid, 'skin_dailies')
         .orderBy('createdAt', descending: true)
         .snapshots()
@@ -281,21 +298,69 @@ class SkinService {
     bool? saveMorning,
     bool? saveNight,
   }) async {
-    if (!Backend.useFirebase) return;
     final bool doMorning =
         saveMorning ?? isMorning ?? (morningSteps != null);
     final bool doNight =
         saveNight ?? (isMorning != null ? !isMorning : nightSteps != null);
 
-    final ref = _col(uid, 'skincare_logs').doc(dateIso);
     final data = <String, dynamic>{
       'dateDisplay': dateDisplay,
       'dateIso': dateIso,
       if (doMorning) 'morningSteps': morningSteps ?? <String>[],
+      if (doMorning) 'morningSaved': true,
       if (doNight) 'nightSteps': nightSteps ?? <String>[],
+      if (doNight) 'nightSaved': true,
       'createdBy': uid,
       'updatedAt': FieldValue.serverTimestamp(),
     };
+
+    final String logTitle;
+    if (doMorning && doNight) {
+      logTitle = 'Mencatat rutinitas skincare pagi & malam';
+    } else if (doMorning) {
+      logTitle = 'Mencatat rutinitas skincare pagi';
+    } else {
+      logTitle = 'Mencatat rutinitas skincare malam';
+    }
+
+    if (!Backend.useFirebase) {
+      final idx = _cachedSkincareLogs.indexWhere((item) => item['dateIso'] == dateIso);
+      final existing = idx != -1 ? _cachedSkincareLogs[idx] : <String, dynamic>{};
+      final merged = <String, dynamic>{
+        'id': dateIso,
+        'dateDisplay': dateDisplay,
+        'dateIso': dateIso,
+        'morningSteps': doMorning
+            ? (morningSteps ?? <String>[])
+            : (existing['morningSteps'] ?? <String>[]),
+        'morningSaved': doMorning
+            ? true
+            : (existing['morningSaved'] == true),
+        'nightSteps': doNight
+            ? (nightSteps ?? <String>[])
+            : (existing['nightSteps'] ?? <String>[]),
+        'nightSaved': doNight
+            ? true
+            : (existing['nightSaved'] == true),
+        'createdBy': uid,
+        'createdAt': existing['createdAt'] ?? AppDates.nowWib(),
+      };
+      if (idx != -1) {
+        _cachedSkincareLogs[idx] = merged;
+      } else {
+        _cachedSkincareLogs.insert(0, merged);
+      }
+      _cachedSkincareLogsController.add(List.unmodifiable(_cachedSkincareLogs));
+      await ActivityService.log(
+        title: logTitle,
+        tag: 'Skincare',
+        actor: name,
+        actorUid: uid,
+      );
+      return;
+    }
+
+    final ref = _col(uid, 'skincare_logs').doc(dateIso);
     final existing = await ref.get();
     if (existing.exists) {
       await ref.update({
@@ -307,18 +372,13 @@ class SkinService {
       await ref.set({
         ...data,
         if (!doMorning) 'morningSteps': <String>[],
+        if (!doMorning) 'morningSaved': false,
         if (!doNight) 'nightSteps': <String>[],
+        if (!doNight) 'nightSaved': false,
         'createdAt': FieldValue.serverTimestamp(),
       });
     }
-    final String logTitle;
-    if (doMorning && doNight) {
-      logTitle = 'Mencatat rutinitas skincare pagi & malam';
-    } else if (doMorning) {
-      logTitle = 'Mencatat rutinitas skincare pagi';
-    } else {
-      logTitle = 'Mencatat rutinitas skincare malam';
-    }
+
     await ActivityService.log(
       title: logTitle,
       tag: 'Skincare',
@@ -330,7 +390,9 @@ class SkinService {
   static Future<List<Map<String, dynamic>>> listSkincare(
     String uid,
   ) async {
-    if (!Backend.useFirebase || uid.isEmpty) return const [];
+    if (!Backend.useFirebase || uid.isEmpty) {
+      return List.unmodifiable(_cachedSkincareLogs);
+    }
     try {
       final snap = await _col(uid, 'skincare_logs')
           .orderBy('createdAt', descending: true)
@@ -346,7 +408,16 @@ class SkinService {
 
   /// Stream riwayat skincare milik pengguna secara realtime.
   static Stream<List<Map<String, dynamic>>> streamSkincare(String uid) {
-    if (!Backend.useFirebase || uid.isEmpty) return const Stream.empty();
+    if (!Backend.useFirebase || uid.isEmpty) {
+      return Stream<List<Map<String, dynamic>>>.multi((controller) {
+        controller.add(List.unmodifiable(_cachedSkincareLogs));
+        final sub = _cachedSkincareLogsController.stream.listen(
+          (items) => controller.add(items),
+          onError: (e) => controller.addError(e),
+        );
+        controller.onCancel = () => sub.cancel();
+      });
+    }
     return _col(uid, 'skincare_logs')
         .orderBy('createdAt', descending: true)
         .snapshots()
