@@ -135,30 +135,32 @@ class _SkinCheckQuestion7PageState extends State<SkinCheckQuestion7Page> {
     final createdDisplay = AppDates.fullDisplayWib(now);
     final createdIso = AppDates.iso(now);
 
-    final uid = AuthService.uid ?? 'demo_user';
-    try {
-      final profile = await AuthService.loadProfile();
-      final name = (profile?.name.isNotEmpty ?? false) ? profile!.name : 'Pengguna';
-      await SkinService.saveSkinCheck(
-        uid: uid,
-        name: name,
-        answers: {
-          'age': widget.age,
-          'gender': widget.gender,
-          'conditionAfterWash': widget.conditionAfterWash,
-          'oilCondition': widget.oilCondition,
-          'sensitivity': widget.sensitivity,
-          'humidity': widget.humidity,
-          'temperature': _tempController.text.trim(),
-        },
-        resultSkinType: skinType,
-        resultSensitivity: sensitivity,
-        resultAcneRisk: acneRisk,
-        createdDisplay: createdDisplay,
-        createdIso: createdIso,
-      );
-    } catch (_) {
-      // hasil tetap ditampilkan bila penyimpanan gagal
+    final uid = AuthService.uid;
+    if (uid != null) {
+      try {
+        final profile = await AuthService.loadProfile();
+        final name = (profile?.name.isNotEmpty ?? false) ? profile!.name : 'Pengguna';
+        await SkinService.saveSkinCheck(
+          uid: uid,
+          name: name,
+          answers: {
+            'age': widget.age,
+            'gender': widget.gender,
+            'conditionAfterWash': widget.conditionAfterWash,
+            'oilCondition': widget.oilCondition,
+            'sensitivity': widget.sensitivity,
+            'humidity': widget.humidity,
+            'temperature': _tempController.text.trim(),
+          },
+          resultSkinType: skinType,
+          resultSensitivity: sensitivity,
+          resultAcneRisk: acneRisk,
+          createdDisplay: createdDisplay,
+          createdIso: createdIso,
+        );
+      } catch (_) {
+        // hasil tetap ditampilkan bila penyimpanan gagal
+      }
     }
     if (!mounted) return;
     Navigator.push(
