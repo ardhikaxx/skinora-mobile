@@ -19,10 +19,14 @@ import 'laporan_riwayat_page.dart';
 
 class BerandaAdminPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
+  final List<Map<String, String>>? initialActivities;
+  final Map<String, String>? initialStats;
 
   const BerandaAdminPage({
     super.key,
     this.onNavigateTab,
+    this.initialActivities,
+    this.initialStats,
   });
 
   @override
@@ -37,13 +41,11 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
   static const Color peachIconBg = Color(0xFFFFE3D8);
   static const Color activityIconBg = Color(0xFFFFD9CC);
 
-  /// Seed demo HANYA untuk widget test / mode tanpa Firebase.
-  /// Dengan Firebase, angka default '0' dan daftar aktivitas kosong.
-  String _statTerjadwal = Backend.useFirebase ? '0' : '3';
-  String _statSelesai = Backend.useFirebase ? '0' : '7';
-  String _statPengguna = Backend.useFirebase ? '0' : '5';
-  String _statDokter = Backend.useFirebase ? '0' : '4';
-  String _unreadNotif = Backend.useFirebase ? '0' : '2';
+  late String _statTerjadwal = widget.initialStats?['terjadwal'] ?? '0';
+  late String _statSelesai = widget.initialStats?['selesai'] ?? '0';
+  late String _statPengguna = widget.initialStats?['pengguna'] ?? '0';
+  late String _statDokter = widget.initialStats?['dokter'] ?? '0';
+  late String _unreadNotif = widget.initialStats?['unread'] ?? '0';
 
   /// Badge lonceng realtime (shared listener — lihat NotificationController).
   ValueListenable<int>? _unreadListenable;
@@ -52,20 +54,14 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
   String _adminName = '';
   StreamSubscription<dynamic>? _profileSub;
 
-  List<Map<String, String>> _activities = Backend.useFirebase
-      ? const <Map<String, String>>[]
-      : const <Map<String, String>>[
-    {'title': 'Login berhasil', 'time': '2026-08-27 08:00'},
-    {'title': 'Melakukan Skin Check', 'time': '2026-08-25 10:30'},
-    {'title': 'Mencatat Skin Daily', 'time': '2026-08-27 08:15'},
-    {'title': 'Mencatat rutinitas skincare pagi', 'time': '2026-08-27 07:30'},
-    {'title': 'Booking konsultasi dengan dr. Anita', 'time': '2026-08-26 14:00'},
-    {'title': 'Konsultasi selesai dengan dr. Andi', 'time': '2026-08-20 14:30'},
-  ];
+  late List<Map<String, String>> _activities;
 
   @override
   void initState() {
     super.initState();
+    _activities = widget.initialActivities != null
+        ? List.from(widget.initialActivities!)
+        : const <Map<String, String>>[];
     _subscribeUnreadBadge();
     _subscribeProfileRealtime();
     _loadFromBackend();
@@ -126,6 +122,7 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
 
   /// Ambil statistik + aktivitas terbaru dari Firestore secara realtime.
   void _loadFromBackend() {
+    if (widget.initialActivities != null) return;
     if (!Backend.useFirebase) return;
     _activitySub?.cancel();
     _activitySub = ActivityService.streamAll(limit: 6).listen(
