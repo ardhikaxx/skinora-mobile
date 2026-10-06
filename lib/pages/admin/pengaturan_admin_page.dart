@@ -34,8 +34,7 @@ class _PengaturanAdminPageState extends State<PengaturanAdminPage> {
     _loadSettings();
   }
 
-  /// Ambil `settings.notificationsEnabled` milik admin. Tanpa Firebase,
-  /// nilai default demo dipertahankan agar UI/tes tidak berubah.
+  /// Ambil `settings.notificationsEnabled` milik admin dari backend.
   Future<void> _loadSettings() async {
     if (!Backend.useFirebase) return;
     try {
