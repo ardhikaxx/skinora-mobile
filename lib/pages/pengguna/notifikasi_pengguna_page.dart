@@ -20,7 +20,7 @@ class PenggunaNotificationModel {
   bool isUnread;
 
   /// Salinan dokumen Firestore — dipakai NotificationRouter.open() ketika
-  /// user mengetuk notifikasi. Kosong untuk seed demo.
+  /// user mengetuk notifikasi.
   final Map<String, dynamic> raw;
 
   PenggunaNotificationModel({
@@ -36,10 +36,12 @@ class PenggunaNotificationModel {
 
 class NotifikasiPenggunaPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
+  final List<PenggunaNotificationModel>? initialNotifications;
 
   const NotifikasiPenggunaPage({
     super.key,
     this.onNavigateTab,
+    this.initialNotifications,
   });
 
   @override
@@ -53,42 +55,10 @@ class _NotifikasiPenggunaPageState extends State<NotifikasiPenggunaPage> {
   static const Color dateText = Color(0xFF8E8E93);
   static const Color peachIconBg = Color(0xFFFFD5C3);
 
-  final List<PenggunaNotificationModel> _notifications = Backend.useFirebase
-      ? <PenggunaNotificationModel>[]
-      : <PenggunaNotificationModel>[
-    PenggunaNotificationModel(
-      id: '1',
-      title: 'Konsultasi Hari Ini',
-      description: 'Anda memiliki konsultasi dengan dr. Anita Dewi jam 09:00',
-      time: '2026-08-28 07:00',
-      icon: LucideIcons.messageSquare,
-      isUnread: true,
-    ),
-    PenggunaNotificationModel(
-      id: '2',
-      title: 'Skin Daily',
-      description: 'Jangan lupa mencatat Skin Daily hari ini!',
-      time: '2026-08-28 08:00',
-      icon: LucideIcons.bell,
-      isUnread: true,
-    ),
-    PenggunaNotificationModel(
-      id: '3',
-      title: 'Tips Kulit',
-      description: 'Minum minimal 8 gelas air putih sehari untuk kulit sehat',
-      time: '2026-08-27 10:00',
-      icon: LucideIcons.bell,
-      isUnread: false,
-    ),
-    PenggunaNotificationModel(
-      id: '4',
-      title: 'Konsultasi Selesai',
-      description: 'Konsultasi dengan dr. Andi telah selesai. Berikan rating!',
-      time: '2026-08-20 15:00',
-      icon: LucideIcons.messageSquare,
-      isUnread: false,
-    ),
-  ];
+  late final List<PenggunaNotificationModel> _notifications =
+      widget.initialNotifications != null
+          ? List.from(widget.initialNotifications!)
+          : <PenggunaNotificationModel>[];
 
   @override
   void initState() {
@@ -198,7 +168,6 @@ class _NotifikasiPenggunaPageState extends State<NotifikasiPenggunaPage> {
   }
 
   /// Notifikasi audience pengguna di-stream realtime oleh [_subscribeFeed].
-  /// Tanpa Firebase, seed demo tetap dipakai agar UI/tes tidak berubah.
 
   @override
   Widget build(BuildContext context) {
@@ -339,8 +308,7 @@ class _NotifikasiPenggunaPageState extends State<NotifikasiPenggunaPage> {
                 item.isUnread = false;
               });
             }
-            final isDemoItem = item.id.contains(RegExp(r'^\d+$'));
-            if (Backend.useFirebase && !isDemoItem) {
+            if (Backend.useFirebase) {
               NotificationService.markRead(AuthService.uid ?? '', item.id).catchError((_) {});
               if (item.raw.isNotEmpty) {
                 NotificationRouter.open(AppNotification.fromMap(item.raw))
