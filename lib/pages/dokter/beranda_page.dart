@@ -18,9 +18,22 @@ import 'notifikasi_dokter_page.dart';
 class BerandaDokterPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
 
+  final String? initialGreetingName;
+  final String? initialSpecialization;
+  final String? initialStatHariIni;
+  final String? initialStatMenunggu;
+  final String? initialStatSelesai;
+  final List<Map<String, String>>? initialTodaySlots;
+
   const BerandaDokterPage({
     super.key,
     this.onNavigateTab,
+    this.initialGreetingName,
+    this.initialSpecialization,
+    this.initialStatHariIni,
+    this.initialStatMenunggu,
+    this.initialStatSelesai,
+    this.initialTodaySlots,
   });
 
   @override
@@ -34,28 +47,22 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
   static const Color statSectionBg = Color(0xFFFFD5C3);
   static const Color bookedSlotBg = Color(0xFFFFBCAE);
 
-  // Seed demo HANYA untuk widget test / mode tanpa Firebase.
-  // Dengan Firebase, dashboard diisi dari Firestore (boleh kosong/0).
-  String _greetingName =
-      Backend.useFirebase ? '' : 'dr. Anita Dewi, Sp.KK';
-  String _specialization = Backend.useFirebase ? '' : 'Estetika Kulit';
+  late String _greetingName =
+      widget.initialGreetingName ?? (AuthService.currentUser?.displayName ?? '');
+  late String _specialization = widget.initialSpecialization ?? '';
   int _unreadNotif = 0;
 
   /// Badge lonceng realtime (shared listener — lihat NotificationController).
   ValueListenable<int>? _unreadListenable;
   StreamSubscription<dynamic>? _profileSub;
 
-  String _statHariIni = Backend.useFirebase ? '0' : '2';
-  String _statMenunggu = Backend.useFirebase ? '0' : '1';
-  String _statSelesai = Backend.useFirebase ? '0' : '1';
+  late String _statHariIni = widget.initialStatHariIni ?? '0';
+  late String _statMenunggu = widget.initialStatMenunggu ?? '0';
+  late String _statSelesai = widget.initialStatSelesai ?? '0';
 
-  List<Map<String, String>> _todaySlots = Backend.useFirebase
-      ? const []
-      : const [
-          {'time': '09:00 - 09:30', 'status': 'Tersedia', 'badge': 'Kosong', 'booked': 'false'},
-          {'time': '09:30 - 10:00', 'status': 'Terjadwal', 'badge': 'Terjadwal', 'booked': 'true', 'bookedBy': 'Dibooking oleh user-4'},
-          {'time': '10:00 - 10:30', 'status': 'Terjadwal', 'badge': 'Terjadwal', 'booked': 'true', 'bookedBy': 'Dibooking oleh user-3'},
-        ];
+  late List<Map<String, String>> _todaySlots = widget.initialTodaySlots != null
+      ? List.from(widget.initialTodaySlots!)
+      : const [];
 
   ValueChanged<int>? get onNavigateTab => widget.onNavigateTab;
 
@@ -628,7 +635,7 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
           ),
           const SizedBox(height: 14),
 
-          // Dynamic slots for today (demo seed when backend empty)
+          // Dynamic slots for today from Firestore
           if (_todaySlots.isEmpty)
             const CompactEmptyState(
               icon: LucideIcons.calendarDays,
