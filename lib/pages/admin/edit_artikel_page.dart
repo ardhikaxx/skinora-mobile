@@ -27,7 +27,6 @@ class _EditArtikelPageState extends State<EditArtikelPage> {
   late final TextEditingController _titleController;
   late final TextEditingController _categoryController;
   late final TextEditingController _contentController;
-  late ArticleStatus _selectedStatus;
 
   @override
   void initState() {
@@ -35,7 +34,6 @@ class _EditArtikelPageState extends State<EditArtikelPage> {
     _titleController = TextEditingController(text: widget.article.title);
     _categoryController = TextEditingController(text: widget.article.category);
     _contentController = TextEditingController(text: widget.article.content);
-    _selectedStatus = widget.article.status;
   }
 
   @override
@@ -75,7 +73,7 @@ class _EditArtikelPageState extends State<EditArtikelPage> {
       title: title,
       category: category,
       content: content.isEmpty ? widget.article.content : content,
-      status: _selectedStatus,
+      status: widget.article.status,
     );
 
     if (Backend.useFirebase) {
@@ -161,13 +159,6 @@ class _EditArtikelPageState extends State<EditArtikelPage> {
                     controller: _categoryController,
                     hintText: 'Kategori artikel...',
                   ),
-
-                  const SizedBox(height: 18),
-
-                  // STATUS
-                  _buildLabel('STATUS'),
-                  const SizedBox(height: 8),
-                  _buildStatusToggle(),
 
                   const SizedBox(height: 18),
 
@@ -288,82 +279,6 @@ class _EditArtikelPageState extends State<EditArtikelPage> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildStatusToggle() {
-    final isDraf = _selectedStatus == ArticleStatus.draf;
-    final isDiterbitkan = _selectedStatus == ArticleStatus.diterbitkan;
-
-    return Row(
-      children: [
-        // Draf button
-        Expanded(
-          child: SizedBox(
-            height: 44,
-            child: ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _selectedStatus = ArticleStatus.draf;
-                });
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDraf ? primaryMaroon : Colors.white,
-                foregroundColor: isDraf ? Colors.white : darkText,
-                elevation: 0,
-                side: BorderSide(
-                  color: isDraf ? primaryMaroon : const Color(0xFFE5E7EB),
-                  width: 1.2,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(
-                'Draf',
-                style: TextStyle(
-                  fontSize: 14.0,
-                  fontWeight: isDraf ? FontWeight.bold : FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-
-        // Diterbitkan button
-        Expanded(
-          child: SizedBox(
-            height: 44,
-            child: ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _selectedStatus = ArticleStatus.diterbitkan;
-                });
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDiterbitkan ? primaryMaroon : Colors.white,
-                foregroundColor: isDiterbitkan ? Colors.white : darkText,
-                elevation: 0,
-                side: BorderSide(
-                  color: isDiterbitkan ? primaryMaroon : const Color(0xFFE5E7EB),
-                  width: 1.2,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(
-                'Diterbitkan',
-                style: TextStyle(
-                  fontSize: 14.0,
-                  fontWeight: isDiterbitkan ? FontWeight.bold : FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
