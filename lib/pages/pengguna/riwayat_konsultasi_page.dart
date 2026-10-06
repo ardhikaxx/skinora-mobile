@@ -49,10 +49,12 @@ class UserConsultationHistoryModel {
 
 class RiwayatKonsultasiPenggunaPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
+  final List<UserConsultationHistoryModel>? initialHistory;
 
   const RiwayatKonsultasiPenggunaPage({
     super.key,
     this.onNavigateTab,
+    this.initialHistory,
   });
 
   @override
@@ -74,67 +76,10 @@ class _RiwayatKonsultasiPenggunaPageState
   static const Color badgeSelesaiText = Color(0xFF6B5E5E);
   static const Color badgeSelesaiBorder = Color(0xFFE5E5EA);
 
-  List<UserConsultationHistoryModel> _historyList = Backend.useFirebase
-      ? <UserConsultationHistoryModel>[]
-      : const <UserConsultationHistoryModel>[
-    UserConsultationHistoryModel(
-      id: '1',
-      doctorName: 'dr. Anita Dewi, Sp.KK',
-      specialization: 'Estetika Kulit',
-      dateTime: '2026-08-28 - 09:00 - 09:30',
-      status: ConsultationStatus.terjadwal,
-      notes:
-          'Konsultasi daring mengenai perawatan kulit wajah dan evaluasi kemerahan pada pipi.',
-    ),
-    UserConsultationHistoryModel(
-      id: '2',
-      doctorName: 'dr. Andi Pratama, Sp.KK',
-      specialization: 'Jerawat & Masalah Pori',
-      dateTime: '2026-08-20 - 14:00 - 14:30',
-      status: ConsultationStatus.selesai,
-      diagnosis: 'Acne Vulgaris derajat ringan & komedo tertutup',
-      notes:
-          'Gunakan pembersih wajah lembut, serum Salicylic Acid 2% secara berkala, dan pelembap berbasis gel.',
-    ),
-    UserConsultationHistoryModel(
-      id: '3',
-      doctorName: 'dr. Anita Dewi, Sp.KK',
-      specialization: 'Estetika Kulit',
-      dateTime: '2026-08-15 - 09:00 - 09:30',
-      status: ConsultationStatus.selesai,
-      diagnosis: 'Skin barrier sensitif dengan kecenderungan dehidrasi',
-      notes:
-          'Hindari scrub atau eksfoliasi fisik berlebih. Gunakan krim pelembap yang mengandung Ceramide dan Hyaluronic Acid.',
-    ),
-    UserConsultationHistoryModel(
-      id: '4',
-      doctorName: 'dr. Andi Pratama, Sp.KK',
-      specialization: 'Jerawat & Masalah Pori',
-      dateTime: '2026-08-28 - 11:00 - 11:30',
-      status: ConsultationStatus.terjadwal,
-      notes:
-          'Sesi konsultasi evaluasi progres pemakaian skincare mingguan dan rekomendasi penyesuaian produk.',
-    ),
-    UserConsultationHistoryModel(
-      id: '5',
-      doctorName: 'dr. Reza Firmansyah, Sp.KK',
-      specialization: 'Anti-Aging & Peremajaan Kulit',
-      dateTime: '2026-08-28 - 09:30 - 10:00',
-      status: ConsultationStatus.selesai,
-      diagnosis: 'Garis halus ringan dan hiperpigmentasi ringan akibat sinar UV',
-      notes:
-          'Disarankan rutin mengaplikasikan sunscreen SPF 50+ PA++++ setiap 3-4 jam dan serum vitamin C pada pagi hari.',
-    ),
-    UserConsultationHistoryModel(
-      id: '6',
-      doctorName: 'dr. Anita Dewi, Sp.KK',
-      specialization: 'Estetika Kulit',
-      dateTime: '2026-08-30 - 14:00 - 14:30',
-      status: ConsultationStatus.terjadwal,
-      notes:
-          'Sesi konsultasi tindak lanjut persiapan perawatan rutin bulanan.',
-    ),
-  ];
+  late List<UserConsultationHistoryModel> _historyList =
+      widget.initialHistory != null
+          ? List.from(widget.initialHistory!)
+          : <UserConsultationHistoryModel>[];
 
   StreamSubscription<List<Map<String, dynamic>>>? _sub;
 
@@ -173,8 +118,7 @@ class _RiwayatKonsultasiPenggunaPageState
     }
   }
 
-  /// Streaming riwayat konsultasi milik pasien. Tanpa Firebase, seed
-  /// demo tetap dipakai agar UI/tes tidak berubah.
+  /// Streaming riwayat konsultasi milik pasien dari Firestore.
   void _loadFromBackend() {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
