@@ -87,7 +87,7 @@ class _LoginPageState extends State<LoginPage> {
 
     if (input.isEmpty) {
       setState(() {
-        _errorMessage = 'Silahkan masukkan email / role Anda';
+        _errorMessage = 'Silahkan masukkan email Anda';
       });
       return;
     }
