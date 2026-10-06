@@ -12,19 +12,15 @@ class DoctorProfileStore {
   factory DoctorProfileStore() => _instance;
   DoctorProfileStore._internal();
 
-  // Seed demo HANYA untuk widget test / mode tanpa Firebase.
-  // Dengan Firebase, field default kosong — diisi dari Firestore.
-  String name = Backend.useFirebase ? '' : 'dr. Anita Dewi, Sp.KK';
-  String email = Backend.useFirebase ? '' : 'anita@demo.com';
-  String phone = Backend.useFirebase ? '' : '081234567800';
-  String address = Backend.useFirebase ? '' : 'Jl. Melati No. 10, Jakarta';
-  String specialization = Backend.useFirebase ? '' : 'Estetika Kulit';
-  String experience = Backend.useFirebase ? '' : '8 tahun';
-  String str = Backend.useFirebase ? '' : 'STR-2018-12345';
-  String status = Backend.useFirebase ? '' : 'terverifikasi';
-  String bio = Backend.useFirebase
-      ? ''
-      : 'Dokter spesialis kulit dan kelamin berpengalaman dalam perawatan estetika dan peremajaan kulit.';
+  String name = '';
+  String email = '';
+  String phone = '';
+  String address = '';
+  String specialization = '';
+  String experience = '';
+  String str = '';
+  String status = '';
+  String bio = '';
 
   void clear() {
     name = '';
@@ -52,18 +48,20 @@ class DoctorProfileStore {
     if (firstChar.isNotEmpty) {
       return firstChar[0].toUpperCase();
     }
-    return Backend.useFirebase ? '' : 'DA';
+    return '';
   }
 }
 
 class EditProfilDokterPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
   final bool showBottomNav;
+  final String? initialName;
 
   const EditProfilDokterPage({
     super.key,
     this.onNavigateTab,
     this.showBottomNav = true,
+    this.initialName,
   });
 
   @override
@@ -82,13 +80,16 @@ class _EditProfilDokterPageState extends State<EditProfilDokterPage> {
   late TextEditingController _addressController;
   late TextEditingController _bioController;
 
-  String _currentInitials = Backend.useFirebase ? '' : 'DA';
+  String _currentInitials = '';
   bool _loadFailed = false;
 
   @override
   void initState() {
     super.initState();
     final store = DoctorProfileStore();
+    if (widget.initialName != null) {
+      store.name = widget.initialName!;
+    }
     _nameController = TextEditingController(text: store.name);
     _specializationController =
         TextEditingController(text: store.specialization);
@@ -113,10 +114,9 @@ class _EditProfilDokterPageState extends State<EditProfilDokterPage> {
     _currentInitials = store.initials;
   }
 
-  /// Isi form dari Firestore bila sesi aktif. Tanpa Firebase, seed demo
-  /// tetap dipakai agar UI/tes tidak berubah. Dengan Firebase, hasil backend
-  /// selalu diterapkan — dan kegagalan mengosongkan form (bukan seed).
+  /// Isi form dari Firestore bila sesi aktif.
   Future<void> _loadFromBackend() async {
+    if (widget.initialName != null) return;
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
     if (uid == null) {
