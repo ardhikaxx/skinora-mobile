@@ -15,11 +15,33 @@ import 'patient_insight_page.dart';
 class DetailPatientInsightPage extends StatefulWidget {
   final PatientInsightModel? patient;
   final ValueChanged<int>? onNavigateTab;
+  final List<PatientInsightModel>? initialPatients;
+  final List<Map<String, dynamic>>? initialSkinChecks;
+  final List<Map<String, dynamic>>? initialSkinDailies;
+  final List<Map<String, dynamic>>? initialSkincareLogs;
+  final List<Map<String, String>>? initialTopConditions;
+  final String? initialAvgWater;
+  final String? initialAvgSleep;
+  final String? initialSkincarePct;
+  final String? initialInsightSkincare;
+  final String? initialInsightWater;
+  final String? initialInsightSleep;
 
   const DetailPatientInsightPage({
     super.key,
     this.patient,
     this.onNavigateTab,
+    this.initialPatients,
+    this.initialSkinChecks,
+    this.initialSkinDailies,
+    this.initialSkincareLogs,
+    this.initialTopConditions,
+    this.initialAvgWater,
+    this.initialAvgSleep,
+    this.initialSkincarePct,
+    this.initialInsightSkincare,
+    this.initialInsightWater,
+    this.initialInsightSleep,
   });
 
   @override
@@ -36,31 +58,21 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
   late PatientInsightModel _currentPatient;
 
   // Data kesehatan pasien dari Firestore (kosong = empty state).
-  List<Map<String, dynamic>> _skinChecks = const [];
-  List<Map<String, dynamic>> _skinDailies = const [];
-  List<Map<String, dynamic>> _skincareLogs = const [];
+  late List<Map<String, dynamic>> _skinChecks =
+      widget.initialSkinChecks != null ? List.from(widget.initialSkinChecks!) : const [];
+  late List<Map<String, dynamic>> _skinDailies =
+      widget.initialSkinDailies != null ? List.from(widget.initialSkinDailies!) : const [];
+  late List<Map<String, dynamic>> _skincareLogs =
+      widget.initialSkincareLogs != null ? List.from(widget.initialSkincareLogs!) : const [];
 
-  // Ringkasan insight — seed demo HANYA tanpa Firebase; dengan Firebase
-  // default kosong/0 dan dihitung dari data asli.
-  List<Map<String, String>> _topConditions = Backend.useFirebase
-      ? <Map<String, String>>[]
-      : <Map<String, String>>[
-          {'name': 'Berminyak', 'count': '2x'},
-          {'name': 'Jerawat', 'count': '2x'},
-          {'name': 'Kemerahan', 'count': '2x'},
-        ];
-  String _avgWater = Backend.useFirebase ? '0' : '6.6';
-  String _avgSleep = Backend.useFirebase ? '0' : '0';
-  String _skincarePct = Backend.useFirebase ? '0%' : '57%';
-  String _insightSkincare = Backend.useFirebase
-      ? 'Belum ada data'
-      : 'Pasien memiliki kepatuhan skincare 57% dalam 7 hari terakhir';
-  String _insightWater = Backend.useFirebase
-      ? 'Belum ada data'
-      : 'Rata-rata konsumsi air: 6.6 gelas per hari';
-  String _insightSleep = Backend.useFirebase
-      ? 'Belum ada data'
-      : 'Rata-rata tidur: 0 jam per malam';
+  late List<Map<String, String>> _topConditions =
+      widget.initialTopConditions != null ? List.from(widget.initialTopConditions!) : const [];
+  late String _avgWater = widget.initialAvgWater ?? '0';
+  late String _avgSleep = widget.initialAvgSleep ?? '0';
+  late String _skincarePct = widget.initialSkincarePct ?? '0%';
+  late String _insightSkincare = widget.initialInsightSkincare ?? 'Belum ada data';
+  late String _insightWater = widget.initialInsightWater ?? 'Belum ada data';
+  late String _insightSleep = widget.initialInsightSleep ?? 'Belum ada data';
 
   static PatientInsightModel get _emptyPatient => PatientInsightModel(
         id: '',
@@ -156,52 +168,10 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
     _insightSleep = 'Rata-rata tidur: $_avgSleep jam per malam';
   }
 
-  // Seed demo HANYA untuk widget test / mode tanpa Firebase.
-  // Dengan Firebase, daftar pasien diisi dari Firestore (boleh kosong).
-  final List<PatientInsightModel> _allPatients = Backend.useFirebase
-      ? <PatientInsightModel>[]
-      : <PatientInsightModel>[
-          PatientInsightModel(
-            id: '1',
-            name: 'Annida Tri Aulia',
-            consultationCount: '3 konsultasi',
-            skinType: 'Berminyak & Acne-prone',
-            primaryConcern: 'Jerawat aktif & bekas noda jerawat',
-            lastConsultation: '27 Agu 2026',
-          ),
-          PatientInsightModel(
-            id: '2',
-            name: 'Leonita Yulyta Agustin',
-            consultationCount: '3 konsultasi',
-            skinType: 'Kombinasi',
-            primaryConcern: 'Skin barrier rusak & kemerahan',
-            lastConsultation: '26 Agu 2026',
-          ),
-          PatientInsightModel(
-            id: '3',
-            name: 'Kafi Khaula Yukisa Zailina',
-            consultationCount: '2 konsultasi',
-            skinType: 'Kering & Sensitif',
-            primaryConcern: 'Kulit bersisik & dehidrasi',
-            lastConsultation: '22 Agu 2026',
-          ),
-          PatientInsightModel(
-            id: '4',
-            name: 'Siti Aisa Nur Apriliana',
-            consultationCount: '2 konsultasi',
-            skinType: 'Normal ke Kering',
-            primaryConcern: 'Hiperpigmentasi & flek hitam',
-            lastConsultation: '19 Agu 2026',
-          ),
-          PatientInsightModel(
-            id: '5',
-            name: 'Nur Alisa Qiroati Sholeha',
-            consultationCount: '3 konsultasi',
-            skinType: 'Berminyak',
-            primaryConcern: 'Pori-pori besar & komedo',
-            lastConsultation: '15 Agu 2026',
-          ),
-        ];
+  late final List<PatientInsightModel> _allPatients =
+      widget.initialPatients != null
+          ? List.from(widget.initialPatients!)
+          : <PatientInsightModel>[];
 
   StreamSubscription<dynamic>? _consultSub;
 
@@ -211,10 +181,7 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
     if (widget.patient != null) {
       _currentPatient = widget.patient!;
     } else if (_allPatients.isNotEmpty) {
-      _currentPatient = _allPatients.firstWhere(
-        (p) => p.name == 'Leonita Yulyta Agustin',
-        orElse: () => _allPatients.first,
-      );
+      _currentPatient = _allPatients.first;
     } else {
       _currentPatient = _emptyPatient;
     }
@@ -233,10 +200,9 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
     super.dispose();
   }
 
-  /// Muat daftar pasien konsultasi + data skin subcollection. Tanpa Firebase,
-  /// seed demo tetap dipakai agar UI/tes tidak berubah. Dengan Firebase,
-  /// hasil backend selalu menggantikan seed — termasuk saat kosong.
+  /// Muat daftar pasien konsultasi + data skin subcollection dari Firestore.
   Future<void> _loadFromBackend() async {
+    if (widget.initialPatients != null) return;
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
     if (uid == null) return;
@@ -336,7 +302,7 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
     if (!Backend.useFirebase || patientId.isEmpty) return;
     final isSeedId = int.tryParse(patientId) != null;
     if (isSeedId) {
-      // id seed demo bukan uid Firestore → tampilkan kosong.
+      // ID numerik bukan uid Firestore → tampilkan kosong.
       if (!mounted) return;
       setState(() {
         _skinChecks = const [];
@@ -1053,28 +1019,7 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
         }).toList(),
       );
     }
-    // Tanpa data → seed hanya untuk demo non-Firebase; production kosong.
-    if (Backend.useFirebase) return _buildEmptyData();
-    return Column(
-      children: [
-        // Check 1: 2026-08-28 (Kombinasi, Sensitif, Rentan)
-        _buildSkinCheckCard(
-          date: '2026-08-28',
-          tipeKulit: 'Kombinasi',
-          sensitivitas: 'Sensitif',
-          jerawat: 'Rentan',
-        ),
-        const SizedBox(height: 12),
-
-        // Check 2: 2026-08-10 (Normal, Non-Sensitif, Tidak Rentan)
-        _buildSkinCheckCard(
-          date: '2026-08-10',
-          tipeKulit: 'Normal',
-          sensitivitas: 'Non-\nSensitif',
-          jerawat: 'Tidak\nRentan',
-        ),
-      ],
-    );
+    return _buildEmptyData();
   }
 
   Widget _buildSkinCheckCard({
@@ -1189,10 +1134,12 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
               badgeBg = const Color(0xFFFFD5C8);
               badgeColor = const Color(0xFFC2410C);
           }
-          final locations =
-              (m['locations'] as List?)?.cast<String>() ?? const <String>[];
-          final symptoms =
-              (m['symptoms'] as List?)?.cast<String>() ?? const <String>[];
+          final locations = (m['locations'] as List?)?.cast<String>() ??
+              (m['gejala'] as List?)?.cast<String>() ??
+              const <String>[];
+          final symptoms = (m['symptoms'] as List?)?.cast<String>() ??
+              (m['kondisi'] as List?)?.cast<String>() ??
+              const <String>[];
           var date = (m['dateIso'] as String?) ?? '';
           if (date.isEmpty) date = (m['dateDisplay'] as String?) ?? '-';
           final pagiOk = m['skincarePagi'] as bool? ?? false;
@@ -1247,14 +1194,20 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
                   ],
                 ),
                 const SizedBox(height: 6),
-                if (locations.isNotEmpty || symptoms.isNotEmpty) ...[
+                if (locations.isNotEmpty) ...[
                   Text(
-                    [
-                      if (locations.isNotEmpty)
-                        'Letak Gejala: ${locations.join(', ')}',
-                      if (symptoms.isNotEmpty)
-                        'Kondisi: ${symptoms.join(', ')}',
-                    ].join('\n'),
+                    'Letak Gejala: ${locations.join(', ')}',
+                    style: const TextStyle(
+                      fontSize: 13.0,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF333333),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                if (symptoms.isNotEmpty) ...[
+                  Text(
+                    'Kondisi: ${symptoms.join(', ')}',
                     style: const TextStyle(
                       fontSize: 13.0,
                       color: Color(0xFF555555),
@@ -1318,240 +1271,7 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
         }).toList(),
       );
     }
-    // Tanpa data → seed hanya untuk demo non-Firebase; production kosong.
-    if (Backend.useFirebase) return _buildEmptyData();
-    final entries = [
-      {
-        'date': '2026-08-28',
-        'badge': 'Baik',
-        'badgeBg': const Color(0xFFFFD5C8),
-        'badgeColor': const Color(0xFFC2410C),
-        'gejala': 'Letak Gejala: Hidung, Dahi',
-        'kondisi': 'Kondisi: Berminyak, Komedo',
-        'tidur': 'Tidur: 23:00',
-        'air': 'Air: 8 gelas',
-        'makan': 'Makan: Nasi, ayam panggang, salad, buah',
-        'pagiOk': true,
-        'malamOk': false,
-      },
-      {
-        'date': '2026-08-26',
-        'badge': 'Sedang',
-        'badgeBg': const Color(0xFFFFE0B2),
-        'badgeColor': const Color(0xFFE65100),
-        'gejala': 'Letak Gejala: Pipi Kanan, Dahi',
-        'kondisi': 'Kondisi: Jerawat, Kemerahan',
-        'tidur': 'Tidur: 01:00',
-        'air': 'Air: 5 gelas',
-        'makan': 'Makan: Nasi goreng, mie instan',
-        'pagiOk': true,
-        'malamOk': true,
-      },
-      {
-        'date': '2026-08-25',
-        'badge': 'Baik',
-        'badgeBg': const Color(0xFFFFD5C8),
-        'badgeColor': const Color(0xFFC2410C),
-        'gejala': null,
-        'kondisi': 'Kondisi: Normal',
-        'tidur': 'Tidur: 22:30',
-        'air': 'Air: 8 gelas',
-        'makan': 'Makan: Nasi, ikan bakar, sayur',
-        'pagiOk': true,
-        'malamOk': true,
-      },
-      {
-        'date': '2026-08-24',
-        'badge': 'Baik',
-        'badgeBg': const Color(0xFFFFD5C8),
-        'badgeColor': const Color(0xFFC2410C),
-        'gejala': 'Letak Gejala: Pipi Kanan, Dahi',
-        'kondisi': 'Kondisi: Berminyak',
-        'tidur': 'Tidur: 23:30',
-        'air': 'Air: 7 gelas',
-        'makan': 'Makan: Nasi, ayam goreng, sup',
-        'pagiOk': true,
-        'malamOk': true,
-      },
-      {
-        'date': '2026-08-23',
-        'badge': 'Buruk',
-        'badgeBg': const Color(0xFFFFCDD2),
-        'badgeColor': const Color(0xFFD32F2F),
-        'gejala': 'Letak Gejala: Pipi Kanan, Dahi',
-        'kondisi': 'Kondisi: Jerawat, Kemerahan, Beruntusan',
-        'tidur': 'Tidur: 02:00',
-        'air': 'Air: 3 gelas',
-        'makan': 'Makan: Junk food, es krim, kopi',
-        'pagiOk': false,
-        'malamOk': false,
-      },
-      {
-        'date': '2026-08-22',
-        'badge': 'Sedang',
-        'badgeBg': const Color(0xFFFFE0B2),
-        'badgeColor': const Color(0xFFE65100),
-        'gejala': 'Letak Gejala: Pipi Kanan, Dahi',
-        'kondisi': 'Kondisi: Kusam',
-        'tidur': 'Tidur: 00:00',
-        'air': 'Air: 5 gelas',
-        'makan': 'Makan: Nasi, tempe, sayur',
-        'pagiOk': true,
-        'malamOk': false,
-      },
-    ];
-
-    return Column(
-      children: entries.map((entry) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12.0),
-          padding: const EdgeInsets.all(16.0),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: cardBorder,
-              width: 1.0,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Date & Status Badge
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    entry['date'] as String,
-                    style: const TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E1E1E),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10.0,
-                      vertical: 3.5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: entry['badgeBg'] as Color,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      entry['badge'] as String,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: entry['badgeColor'] as Color,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-
-              // Gejala (if any)
-              if (entry['gejala'] != null) ...[
-                Text(
-                  entry['gejala'] as String,
-                  style: const TextStyle(
-                    fontSize: 13.0,
-                    color: Color(0xFF555555),
-                  ),
-                ),
-                const SizedBox(height: 2),
-              ],
-
-              // Kondisi
-              Text(
-                entry['kondisi'] as String,
-                style: const TextStyle(
-                  fontSize: 13.0,
-                  color: Color(0xFF555555),
-                ),
-              ),
-              const SizedBox(height: 4),
-
-              // Sleep & Water Info
-              Row(
-                children: [
-                  const Icon(
-                    LucideIcons.moon,
-                    size: 13,
-                    color: Color(0xFF757575),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    entry['tidur'] as String,
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      color: Color(0xFF757575),
-                    ),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 6.0),
-                    child: Text(
-                      '•',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: Color(0xFF757575),
-                      ),
-                    ),
-                  ),
-                  const Icon(
-                    LucideIcons.droplets,
-                    size: 13,
-                    color: Color(0xFF757575),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    entry['air'] as String,
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      color: Color(0xFF757575),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-
-              // Makan Info
-              Text(
-                entry['makan'] as String,
-                style: const TextStyle(
-                  fontSize: 13.0,
-                  color: Color(0xFF555555),
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              // Routine Pills: Pagi & Malam
-              Row(
-                children: [
-                  _buildRoutinePill(
-                    isMorning: true,
-                    isDone: entry['pagiOk'] as bool,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildRoutinePill(
-                    isMorning: false,
-                    isDone: entry['malamOk'] as bool,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      }).toList(),
-    );
+    return _buildEmptyData();
   }
 
   Widget _buildRoutinePill({
@@ -1612,49 +1332,7 @@ class _DetailPatientInsightPageState extends State<DetailPatientInsightPage> {
         }).toList(),
       );
     }
-    // Tanpa data → seed hanya untuk demo non-Firebase; production kosong.
-    if (Backend.useFirebase) return _buildEmptyData();
-    return Column(
-      children: [
-        // Routine 1: 2026-08-28
-        _buildSkincareRoutineCard(
-          date: '2026-08-28',
-          morningItems: [
-            'Cleanser',
-            'Toner',
-            'Serum',
-            'Moisturizer',
-            'Sunscreen',
-          ],
-          nightItems: [
-            'Cleanser',
-            'Toner',
-            'Serum',
-            'Moisturizer',
-            'Night Cream',
-          ],
-        ),
-        const SizedBox(height: 12),
-
-        // Routine 2: 2026-08-27
-        _buildSkincareRoutineCard(
-          date: '2026-08-27',
-          morningItems: [
-            'Cleanser',
-            'Toner',
-            'Serum',
-            'Moisturizer',
-            'Sunscreen',
-          ],
-          nightItems: [
-            'Cleanser',
-            'Toner',
-            'Moisturizer',
-            'Sleeping Mask',
-          ],
-        ),
-      ],
-    );
+    return _buildEmptyData();
   }
 
   Widget _buildSkincareRoutineCard({
