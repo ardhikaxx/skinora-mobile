@@ -32,7 +32,10 @@ class RiwayatSkincarePage extends StatefulWidget {
     super.key,
     this.onNavigateTab,
     this.showBottomNav = true,
+    this.initialEntries,
   });
+
+  final List<SkincareHistoryEntry>? initialEntries;
 
   @override
   State<RiwayatSkincarePage> createState() => _RiwayatSkincarePageState();
@@ -45,102 +48,12 @@ class _RiwayatSkincarePageState extends State<RiwayatSkincarePage> {
   static const Color cardBorder = Color(0xFFEEEEEE);
   static const Color peachBadgeBg = Color(0xFFFFD5C8);
 
-  // Default expanded index 0 (Jumat, 28 Agustus 2026) matching image copy 4.png
+  // Default expanded index 0
   final Set<int> _expandedIndices = {0};
 
-  List<SkincareHistoryEntry> _entries = Backend.useFirebase
-      ? <SkincareHistoryEntry>[]
-      : const <SkincareHistoryEntry>[
-    SkincareHistoryEntry(
-      date: 'Jumat, 28 Agustus 2026',
-      pagiCount: 5,
-      malamCount: 5,
-      pagiItems: [
-        'Cleanser',
-        'Toner',
-        'Serum',
-        'Moisturizer',
-        'Sunscreen',
-      ],
-      malamItems: [
-        'Cleanser',
-        'Toner',
-        'Serum',
-        'Moisturizer',
-        'Night Cream',
-      ],
-    ),
-    SkincareHistoryEntry(
-      date: 'Kamis, 27 Agustus 2026',
-      pagiCount: 5,
-      malamCount: 4,
-      pagiItems: [
-        'Cleanser',
-        'Facial Wash',
-        'Toner',
-        'Moisturizer',
-        'Sunscreen',
-      ],
-      malamItems: [
-        'Cleanser',
-        'Toner',
-        'Serum',
-        'Night Cream',
-      ],
-    ),
-    SkincareHistoryEntry(
-      date: 'Rabu, 26 Agustus 2026',
-      pagiCount: 5,
-      malamCount: 5,
-      pagiItems: [
-        'Cleanser',
-        'Toner',
-        'Serum',
-        'Moisturizer',
-        'Sunscreen',
-      ],
-      malamItems: [
-        'Cleanser',
-        'Facial Wash',
-        'Serum',
-        'Moisturizer',
-        'Night Cream',
-      ],
-    ),
-    SkincareHistoryEntry(
-      date: 'Selasa, 25 Agustus 2026',
-      pagiCount: 4,
-      malamCount: 3,
-      pagiItems: [
-        'Facial Wash',
-        'Toner',
-        'Moisturizer',
-        'Sunscreen',
-      ],
-      malamItems: [
-        'Facial Wash',
-        'Toner',
-        'Night Cream',
-      ],
-    ),
-    SkincareHistoryEntry(
-      date: 'Senin, 24 Agustus 2026',
-      pagiCount: 4,
-      malamCount: 4,
-      pagiItems: [
-        'Cleanser',
-        'Toner',
-        'Moisturizer',
-        'Sunscreen',
-      ],
-      malamItems: [
-        'Cleanser',
-        'Facial Wash',
-        'Moisturizer',
-        'Sleeping Mask',
-      ],
-    ),
-  ];
+  late List<SkincareHistoryEntry> _entries = widget.initialEntries != null
+      ? List.from(widget.initialEntries!)
+      : <SkincareHistoryEntry>[];
 
   StreamSubscription<List<Map<String, dynamic>>>? _sub;
 
@@ -156,12 +69,11 @@ class _RiwayatSkincarePageState extends State<RiwayatSkincarePage> {
     super.dispose();
   }
 
-  /// Riwayat skincare milik pengguna dari Firestore secara realtime. Tanpa Firebase, seed
-  /// demo tetap dipakai agar UI/tes tidak berubah.
+  /// Riwayat skincare milik pengguna dari Firestore secara realtime.
   void _loadFromBackend() {
-    if (!Backend.useFirebase) return;
-    final uid = AuthService.uid;
-    if (uid == null) return;
+    if (widget.initialEntries != null) return;
+    final uid = AuthService.uid ?? '';
+    if (Backend.useFirebase && uid.isEmpty) return;
     _sub?.cancel();
     _sub = SkinService.streamSkincare(uid).listen(
       (items) {
