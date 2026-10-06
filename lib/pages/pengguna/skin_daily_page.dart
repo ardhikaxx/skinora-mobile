@@ -180,6 +180,13 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
 
   List<Map<String, dynamic>> _dailyLogs = [];
 
+  bool get _isSavedForSelectedDate {
+    final iso = AppDates.iso(_selectedDate);
+    final isToday = iso == AppDates.iso(AppDates.nowWib());
+    return _dailyLogs.any((l) => (l['dateIso'] as String?) == iso) ||
+        (_justSaved && isToday);
+  }
+
   void _applyLogForDate(DateTime date) {
     final iso = AppDates.iso(date);
     final match = _dailyLogs.where((l) => (l['dateIso'] as String?) == iso);
@@ -202,17 +209,18 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
         _isSkincarePagi = doc['skincarePagi'] == true;
         _isSkincareMalam = doc['skincareMalam'] == true;
       });
+    } else {
+      if (_justSaved && iso == AppDates.iso(AppDates.nowWib())) {
+        return;
+      }
+      _resetForm();
     }
   }
 
   /// Hitung progress harian 0/7 s.d. 7/7 secara realtime dari tanggal unik yang terisi.
   void _loadProgress() {
-    if (!Backend.useFirebase || AuthService.uid == null) {
-      if (mounted) setState(() => _filledDays = 0);
-      return;
-    }
     _sub?.cancel();
-    _sub = SkinService.streamSkinDailies(AuthService.uid!).listen((items) {
+    _sub = SkinService.streamSkinDailies(AuthService.uid ?? '').listen((items) {
       if (!mounted) return;
       _dailyLogs = items;
       final uniq = items
@@ -220,9 +228,7 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
           .where((e) => e.isNotEmpty)
           .toSet();
       setState(() => _filledDays = uniq.length.clamp(0, 7));
-      if (!_justSaved) {
-        _applyLogForDate(_selectedDate);
-      }
+      _applyLogForDate(_selectedDate);
     }, onError: (_) {});
   }
 
@@ -275,11 +281,26 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
         );
         return;
       }
+    } else {
+      await SkinService.saveSkinDaily(
+        uid: AuthService.uid ?? 'user',
+        name: 'Pengguna',
+        dateDisplay: dateDisplay,
+        dateIso: dateIso,
+        locations: locations,
+        symptoms: symptoms,
+        kebiasaan: _kebiasaanController.text.trim(),
+        jamTidur: _jamTidurController.text.trim(),
+        air: _airController.text.trim(),
+        makanan: _makananController.text.trim(),
+        aktivitas: _aktivitasController.text.trim(),
+        skincarePagi: _isSkincarePagi,
+        skincareMalam: _isSkincareMalam,
+      );
     }
     if (!mounted) return;
     setState(() => _justSaved = true);
-    _resetForm();
-    if (!mounted) return;
+    // Pertahankan isian yang baru disimpan dan jangan panggil _resetForm()
     AdminSuccessDialog.show(
       context,
       message: 'Jurnal harian berhasil disimpan',
@@ -677,15 +698,17 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
             return Container(
               margin: EdgeInsets.only(bottom: isLast ? 0 : 10.0),
               child: InkWell(
-                onTap: () {
-                  setState(() {
-                    if (isChecked) {
-                      _selectedLocations.remove(loc);
-                    } else {
-                      _selectedLocations.add(loc);
-                    }
-                  });
-                },
+                onTap: _isSavedForSelectedDate
+                    ? null
+                    : () {
+                        setState(() {
+                          if (isChecked) {
+                            _selectedLocations.remove(loc);
+                          } else {
+                            _selectedLocations.add(loc);
+                          }
+                        });
+                      },
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
                   height: 48,
@@ -778,15 +801,17 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
               final isSelected = _selectedSymptoms.contains(symptom);
 
               return InkWell(
-                onTap: () {
-                  setState(() {
-                    if (isSelected) {
-                      _selectedSymptoms.remove(symptom);
-                    } else {
-                      _selectedSymptoms.add(symptom);
-                    }
-                  });
-                },
+                onTap: _isSavedForSelectedDate
+                    ? null
+                    : () {
+                        setState(() {
+                          if (isSelected) {
+                            _selectedSymptoms.remove(symptom);
+                          } else {
+                            _selectedSymptoms.add(symptom);
+                          }
+                        });
+                      },
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -851,6 +876,7 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
           // Multi-line Text Area
           TextField(
             controller: _kebiasaanController,
+            readOnly: _isSavedForSelectedDate,
             maxLines: 4,
             minLines: 3,
             style: const TextStyle(fontSize: 13.5, color: darkText),
@@ -915,7 +941,7 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
                 ),
                 const SizedBox(height: 10),
                 GestureDetector(
-                  onTap: _pickSleepTime,
+                  onTap: _isSavedForSelectedDate ? null : _pickSleepTime,
                   child: SizedBox(
                     height: 46,
                     child: AbsorbPointer(
@@ -994,6 +1020,7 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
                   height: 46,
                   child: TextField(
                     controller: _airController,
+                    readOnly: _isSavedForSelectedDate,
                     keyboardType: TextInputType.number,
                     style: const TextStyle(fontSize: 14.0, color: darkText),
                     decoration: InputDecoration(
@@ -1056,6 +1083,7 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
 
           TextField(
             controller: _makananController,
+            readOnly: _isSavedForSelectedDate,
             maxLines: 3,
             minLines: 2,
             style: const TextStyle(fontSize: 13.5, color: darkText),
@@ -1117,6 +1145,7 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
 
           TextField(
             controller: _aktivitasController,
+            readOnly: _isSavedForSelectedDate,
             maxLines: 3,
             minLines: 2,
             style: const TextStyle(fontSize: 13.5, color: darkText),
@@ -1206,11 +1235,13 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
                   scale: 0.82,
                   child: Switch(
                     value: _isSkincarePagi,
-                    onChanged: (val) {
-                      setState(() {
-                        _isSkincarePagi = val;
-                      });
-                    },
+                    onChanged: _isSavedForSelectedDate
+                        ? null
+                        : (val) {
+                            setState(() {
+                              _isSkincarePagi = val;
+                            });
+                          },
                     activeThumbColor: primaryMaroon,
                     activeTrackColor: primaryMaroon.withValues(alpha: 0.3),
                     inactiveThumbColor: Colors.white,
@@ -1252,11 +1283,13 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
                   scale: 0.82,
                   child: Switch(
                     value: _isSkincareMalam,
-                    onChanged: (val) {
-                      setState(() {
-                        _isSkincareMalam = val;
-                      });
-                    },
+                    onChanged: _isSavedForSelectedDate
+                        ? null
+                        : (val) {
+                            setState(() {
+                              _isSkincareMalam = val;
+                            });
+                          },
                     activeThumbColor: primaryMaroon,
                     activeTrackColor: primaryMaroon.withValues(alpha: 0.3),
                     inactiveThumbColor: Colors.white,
@@ -1277,11 +1310,15 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
       width: double.infinity,
       height: 48,
       child: ElevatedButton.icon(
-        onPressed: _saveDailyJournal,
-        icon: const Icon(LucideIcons.save, size: 18, color: Colors.white),
-        label: const Text(
-          'Simpan',
-          style: TextStyle(
+        onPressed: _isSavedForSelectedDate ? null : _saveDailyJournal,
+        icon: Icon(
+          _isSavedForSelectedDate ? LucideIcons.checkCheck : LucideIcons.save,
+          size: 18,
+          color: Colors.white,
+        ),
+        label: Text(
+          _isSavedForSelectedDate ? 'Tersimpan' : 'Simpan',
+          style: const TextStyle(
             fontSize: 15.0,
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -1290,6 +1327,8 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryMaroon,
+          disabledBackgroundColor: const Color(0xFFD6D6D6),
+          disabledForegroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
