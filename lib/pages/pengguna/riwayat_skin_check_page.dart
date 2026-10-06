@@ -33,10 +33,12 @@ class SkinCheckHistoryModel {
 
 class RiwayatSkinCheckPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
+  final List<SkinCheckHistoryModel>? initialHistory;
 
   const RiwayatSkinCheckPage({
     super.key,
     this.onNavigateTab,
+    this.initialHistory,
   });
 
   @override
@@ -55,29 +57,9 @@ class _RiwayatSkinCheckPageState extends State<RiwayatSkinCheckPage> {
   static const Color chipNeutralBorder = Color(0xFFE5E5EA);
   static const Color chipNeutralText = Color(0xFF6B5E5E);
 
-  List<SkinCheckHistoryModel> _historyList = Backend.useFirebase
-      ? <SkinCheckHistoryModel>[]
-      : [
-          SkinCheckHistoryModel(
-            id: 'demo-1',
-            date: AppDates.fullDisplayWib(AppDates.nowWib()),
-            skinType: 'Kombinasi',
-            subtitle: 'Sensitif - Rentan',
-            icon: LucideIcons.shield,
-            tags: const ['Kombinasi', 'Sensitif', 'Rentan'],
-          ),
-          SkinCheckHistoryModel(
-            id: 'demo-2',
-            date: AppDates.fullDisplayWib(
-              AppDates.nowWib().subtract(const Duration(days: 18, hours: 3)),
-            ),
-            skinType: 'Normal',
-            subtitle: 'Non-Sensitif - Tidak Rentan',
-            icon: LucideIcons.sun,
-            tags: const ['Normal', 'Non-Sensitif', 'Tidak Rentan'],
-            neutralTags: const ['Non-Sensitif'],
-          ),
-        ];
+  late List<SkinCheckHistoryModel> _historyList = widget.initialHistory != null
+      ? List.from(widget.initialHistory!)
+      : <SkinCheckHistoryModel>[];
 
   StreamSubscription<List<Map<String, dynamic>>>? _sub;
 
@@ -93,9 +75,11 @@ class _RiwayatSkinCheckPageState extends State<RiwayatSkinCheckPage> {
     super.dispose();
   }
 
-  /// Riwayat skin check milik pengguna secara realtime (baik mode Firebase maupun demo).
+  /// Riwayat skin check milik pengguna secara realtime dari Firestore.
   void _loadFromBackend() {
-    final uid = AuthService.uid ?? 'demo_user';
+    if (widget.initialHistory != null) return;
+    final uid = AuthService.uid ?? '';
+    if (Backend.useFirebase && uid.isEmpty) return;
     _sub?.cancel();
     _sub = SkinService.streamSkinChecks(uid).listen(
       (items) {
