@@ -16,11 +16,31 @@ import '../../components/dialogs/logout_dialog.dart';
 class ProfilDokterPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
   final bool showBottomNav;
+  final String? initialName;
+  final String? initialPhone;
+  final String? initialEmail;
+  final String? initialSpecialization;
+  final String? initialExperience;
+  final String? initialStr;
+  final String? initialAddress;
+  final String? initialBio;
+  final Map<String, String>? initialStats;
+  final List<DoctorActivityItem>? initialActivities;
 
   const ProfilDokterPage({
     super.key,
     this.onNavigateTab,
     this.showBottomNav = false,
+    this.initialName,
+    this.initialPhone,
+    this.initialEmail,
+    this.initialSpecialization,
+    this.initialExperience,
+    this.initialStr,
+    this.initialAddress,
+    this.initialBio,
+    this.initialStats,
+    this.initialActivities,
   });
 
   @override
@@ -34,9 +54,9 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
   static const Color statSectionBg = Color(0xFFFFD5C8);
   static const Color badgeBg = Color(0xFFFFD5C8);
 
-  String _statKonsultasi = Backend.useFirebase ? '0' : '9';
-  String _statPasien = Backend.useFirebase ? '0' : '4';
-  String _statSelesai = Backend.useFirebase ? '0' : '4';
+  late String _statKonsultasi = widget.initialStats?['konsultasi'] ?? '0';
+  late String _statPasien = widget.initialStats?['pasien'] ?? '0';
+  late String _statSelesai = widget.initialStats?['selesai'] ?? '0';
 
   StreamSubscription<dynamic>? _profileSub;
   StreamSubscription<dynamic>? _consultSub;
@@ -44,6 +64,30 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialName != null) {
+      DoctorProfileStore().name = widget.initialName!;
+    }
+    if (widget.initialPhone != null) {
+      DoctorProfileStore().phone = widget.initialPhone!;
+    }
+    if (widget.initialEmail != null) {
+      DoctorProfileStore().email = widget.initialEmail!;
+    }
+    if (widget.initialSpecialization != null) {
+      DoctorProfileStore().specialization = widget.initialSpecialization!;
+    }
+    if (widget.initialExperience != null) {
+      DoctorProfileStore().experience = widget.initialExperience!;
+    }
+    if (widget.initialStr != null) {
+      DoctorProfileStore().str = widget.initialStr!;
+    }
+    if (widget.initialAddress != null) {
+      DoctorProfileStore().address = widget.initialAddress!;
+    }
+    if (widget.initialBio != null) {
+      DoctorProfileStore().bio = widget.initialBio!;
+    }
     _subscribeProfileRealtime();
     _subscribeConsultStatsRealtime();
     _loadFromBackend();
@@ -105,9 +149,9 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
     super.dispose();
   }
 
-  /// Muat profile dokter + ringkasan praktik dari Firestore. Tanpa Firebase,
-  /// seed demo tetap dipakai agar UI/tes tidak berubah.
+  /// Muat profile dokter + ringkasan praktik dari Firestore.
   Future<void> _loadFromBackend() async {
+    if (widget.initialName != null) return;
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
     if (uid == null) return;
@@ -337,6 +381,20 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
                   ],
                 ),
               ],
+            ),
+          ),
+
+          // Panah di sebelah data profile untuk akses edit profile
+          InkWell(
+            onTap: _handleEditProfile,
+            borderRadius: BorderRadius.circular(20),
+            child: const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: Icon(
+                LucideIcons.chevronRight,
+                size: 20,
+                color: primaryMaroon,
+              ),
             ),
           ),
         ],
@@ -665,6 +723,7 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
               builder: (context) => RiwayatAktivitasDokterPage(
                 onNavigateTab: widget.onNavigateTab,
                 showBottomNav: true,
+                initialActivities: widget.initialActivities,
               ),
             ),
           );
