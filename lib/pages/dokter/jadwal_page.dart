@@ -39,11 +39,13 @@ class DayScheduleModel {
 class JadwalDokterPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
   final bool showBottomNav;
+  final List<DayScheduleModel>? initialScheduleDays;
 
   const JadwalDokterPage({
     super.key,
     this.onNavigateTab,
     this.showBottomNav = false,
+    this.initialScheduleDays,
   });
 
   @override
@@ -59,8 +61,7 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
   bool _isReady = false; // false = "Sibuk", true = "Siap"
   bool _isFormOpen = false;
 
-  final TextEditingController _dateController = TextEditingController(
-      text: Backend.useFirebase ? '' : 'Jumat, 28 Agustus 2026');
+  late final TextEditingController _dateController;
   final TextEditingController _startTimeController = TextEditingController();
   final TextEditingController _endTimeController = TextEditingController();
 
@@ -73,97 +74,16 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
   @override
   void initState() {
     super.initState();
-    // Seed demo HANYA untuk widget test / mode tanpa Firebase.
-    _scheduleDays = Backend.useFirebase
-        ? <DayScheduleModel>[]
-        : <DayScheduleModel>[
-      // 1. Jumat, 28 Agustus 2026
-      DayScheduleModel(
-        date: 'Jumat, 28 Agustus 2026',
-        slots: [
-          ScheduleSlotModel(
-            id: '1-1',
-            time: '09:00 - 09:30',
-            patientName: 'Leonita Yulyta Agustin',
-            isBooked: true,
-          ),
-          ScheduleSlotModel(
-            id: '1-2',
-            time: '09:30 - 10:00',
-            patientName: 'Annida Tri Aulia',
-            isBooked: false,
-          ),
-          ScheduleSlotModel(
-            id: '1-3',
-            time: '10:00 - 10:30',
-            patientName: 'Kafi Khaula Yukisa Zailina',
-            isBooked: false,
-          ),
-          ScheduleSlotModel(
-            id: '1-4',
-            time: '10:30 - 11:00',
-            patientName: null,
-            isBooked: false,
-          ),
-          ScheduleSlotModel(
-            id: '1-5',
-            time: '14:00 - 14:30',
-            patientName: 'Kafi Khaula Yukisa Zailina',
-            isBooked: false,
-          ),
-          ScheduleSlotModel(
-            id: '1-6',
-            time: '14:30 - 15:00',
-            patientName: 'Annida Tri Aulia',
-            isBooked: false,
-          ),
-        ],
-      ),
-
-      // 2. Sabtu, 29 Agustus 2026
-      DayScheduleModel(
-        date: 'Sabtu, 29 Agustus 2026',
-        slots: [
-          ScheduleSlotModel(
-            id: '2-1',
-            time: '09:00 - 09:30',
-            patientName: 'Annida Tri Aulia',
-            isBooked: false,
-          ),
-          ScheduleSlotModel(
-            id: '2-2',
-            time: '09:30 - 10:00',
-            patientName: 'Siti Aisa Nur Apriliana',
-            isBooked: true,
-          ),
-          ScheduleSlotModel(
-            id: '2-3',
-            time: '10:00 - 10:30',
-            patientName: 'Kafi Khaula Yukisa Zailina',
-            isBooked: true,
-          ),
-        ],
-      ),
-
-      // 3. Minggu, 30 Agustus 2026
-      DayScheduleModel(
-        date: 'Minggu, 30 Agustus 2026',
-        slots: [
-          ScheduleSlotModel(
-            id: '3-1',
-            time: '14:00 - 14:30',
-            patientName: 'Leonita Yulyta Agustin',
-            isBooked: true,
-          ),
-        ],
-      ),
-    ];
+    _dateController = TextEditingController(text: AppDates.display(DateTime.now()));
+    _scheduleDays = widget.initialScheduleDays != null
+        ? List.from(widget.initialScheduleDays!)
+        : <DayScheduleModel>[];
     _loadFromBackend();
   }
 
   /// Stream slot realtime dokter (booking pasien langsung terlihat).
-  /// Tanpa Firebase, seed demo tetap dipakai agar UI/tes tidak berubah.
   void _loadFromBackend() {
+    if (widget.initialScheduleDays != null) return;
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
     if (uid == null) return;
@@ -711,15 +631,11 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
 
                   // 4. Grouped Schedule Cards (Days)
                   if (_scheduleDays.isEmpty)
-                    EmptyStateWidget(
+                    const EmptyStateWidget(
                       icon: LucideIcons.calendarDays,
                       title: 'Belum ada jadwal konsultasi',
                       description:
                           'Tambahkan slot jadwal agar pasien dapat memesan konsultasi dengan Anda.',
-                      actionLabel: 'Tambah Slot Baru',
-                      onAction: () {
-                        setState(() => _isFormOpen = true);
-                      },
                     )
                   else
                     ..._scheduleDays.map((dayGroup) {
