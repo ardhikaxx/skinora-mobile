@@ -68,11 +68,14 @@ class _SkincarePageState extends State<SkincarePage> {
   List<Map<String, dynamic>> _skincareLogs = [];
   bool _justSavedMorning = false;
   bool _justSavedNight = false;
+  bool _isMorningSaved = false;
+  bool _isNightSaved = false;
 
   @override
   void initState() {
     super.initState();
     _subscribeSkincare();
+    _applyLogsForDate(_selectedDate);
   }
 
   @override
@@ -87,6 +90,7 @@ class _SkincarePageState extends State<SkincarePage> {
     _skincareSub = SkinService.streamSkincare(AuthService.uid!).listen((logs) {
       if (!mounted) return;
       _skincareLogs = logs;
+      _applyLogsForDate(_selectedDate);
     }, onError: (_) {});
   }
 
@@ -97,7 +101,11 @@ class _SkincarePageState extends State<SkincarePage> {
       final doc = match.first;
       final mSteps = (doc['morningSteps'] as List?)?.cast<String>() ?? [];
       final nSteps = (doc['nightSteps'] as List?)?.cast<String>() ?? [];
+      final mSaved = doc['morningSaved'] == true || mSteps.isNotEmpty;
+      final nSaved = doc['nightSaved'] == true || nSteps.isNotEmpty;
       setState(() {
+        _isMorningSaved = mSaved || _justSavedMorning;
+        _isNightSaved = nSaved || _justSavedNight;
         if (!_justSavedMorning) {
           _selectedMorning
             ..clear()
@@ -111,6 +119,8 @@ class _SkincarePageState extends State<SkincarePage> {
       });
     } else {
       setState(() {
+        _isMorningSaved = _justSavedMorning;
+        _isNightSaved = _justSavedNight;
         if (!_justSavedMorning) _selectedMorning.clear();
         if (!_justSavedNight) _selectedNight.clear();
       });
@@ -199,15 +209,15 @@ class _SkincarePageState extends State<SkincarePage> {
 
     if (!mounted) return;
 
-    // Kosongkan kembali checkbox yang sudah berhasil disimpan
+    // Pertahankan kondisi checkbox yang sudah dipilih dan tandai sebagai tersimpan (disabled)
     setState(() {
       if (saveMorning) {
-        _selectedMorning.clear();
         _justSavedMorning = true;
+        _isMorningSaved = true;
       }
       if (saveNight) {
-        _selectedNight.clear();
         _justSavedNight = true;
+        _isNightSaved = true;
       }
     });
 
@@ -375,7 +385,10 @@ class _SkincarePageState extends State<SkincarePage> {
                   // 3. Night Routine Card
                   _buildNightRoutineCard(),
 
-                  if (_selectedMorning.isNotEmpty && _selectedNight.isNotEmpty) ...[
+                  if (!_isMorningSaved &&
+                      !_isNightSaved &&
+                      _selectedMorning.isNotEmpty &&
+                      _selectedNight.isNotEmpty) ...[
                     const SizedBox(height: 16),
                     _buildSaveBothButton(),
                     const SizedBox(height: 24),
@@ -532,16 +545,18 @@ class _SkincarePageState extends State<SkincarePage> {
             return Container(
               margin: const EdgeInsets.only(bottom: 10.0),
               child: InkWell(
-                onTap: () {
-                  setState(() {
-                    _justSavedMorning = false;
-                    if (isChecked) {
-                      _selectedMorning.remove(item);
-                    } else {
-                      _selectedMorning.add(item);
-                    }
-                  });
-                },
+                onTap: _isMorningSaved
+                    ? null
+                    : () {
+                        setState(() {
+                          _justSavedMorning = false;
+                          if (isChecked) {
+                            _selectedMorning.remove(item);
+                          } else {
+                            _selectedMorning.add(item);
+                          }
+                        });
+                      },
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
                   height: 48,
@@ -599,7 +614,7 @@ class _SkincarePageState extends State<SkincarePage> {
             width: double.infinity,
             height: 46,
             child: ElevatedButton.icon(
-              onPressed: _saveMorningRoutine,
+              onPressed: _isMorningSaved ? null : _saveMorningRoutine,
               icon: const Icon(LucideIcons.save, size: 16, color: Colors.white),
               label: const Text(
                 'Simpan Pagi',
@@ -611,6 +626,8 @@ class _SkincarePageState extends State<SkincarePage> {
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryMaroon,
+                disabledBackgroundColor: const Color(0xFFD6D6D6),
+                disabledForegroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -681,16 +698,18 @@ class _SkincarePageState extends State<SkincarePage> {
             return Container(
               margin: const EdgeInsets.only(bottom: 10.0),
               child: InkWell(
-                onTap: () {
-                  setState(() {
-                    _justSavedNight = false;
-                    if (isChecked) {
-                      _selectedNight.remove(item);
-                    } else {
-                      _selectedNight.add(item);
-                    }
-                  });
-                },
+                onTap: _isNightSaved
+                    ? null
+                    : () {
+                        setState(() {
+                          _justSavedNight = false;
+                          if (isChecked) {
+                            _selectedNight.remove(item);
+                          } else {
+                            _selectedNight.add(item);
+                          }
+                        });
+                      },
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
                   height: 48,
@@ -748,7 +767,7 @@ class _SkincarePageState extends State<SkincarePage> {
             width: double.infinity,
             height: 46,
             child: ElevatedButton.icon(
-              onPressed: _saveNightRoutine,
+              onPressed: _isNightSaved ? null : _saveNightRoutine,
               icon: const Icon(LucideIcons.save, size: 16, color: Colors.white),
               label: const Text(
                 'Simpan Malam',
@@ -760,6 +779,8 @@ class _SkincarePageState extends State<SkincarePage> {
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryMaroon,
+                disabledBackgroundColor: const Color(0xFFD6D6D6),
+                disabledForegroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
