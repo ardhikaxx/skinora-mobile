@@ -19,7 +19,7 @@ class DoctorNotificationModel {
   final IconData icon;
   bool isUnread;
 
-  /// Salinan dokumen Firestore untuk deep-link (kosong di mode demo).
+  /// Salinan dokumen Firestore untuk deep-link.
   final Map<String, dynamic> raw;
 
   DoctorNotificationModel({
@@ -35,10 +35,12 @@ class DoctorNotificationModel {
 
 class NotifikasiDokterPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
+  final List<DoctorNotificationModel>? initialNotifications;
 
   const NotifikasiDokterPage({
     super.key,
     this.onNavigateTab,
+    this.initialNotifications,
   });
 
   @override
@@ -52,32 +54,14 @@ class _NotifikasiDokterPageState extends State<NotifikasiDokterPage> {
   static const Color dateText = Color(0xFF9E9E9E);
   static const Color peachIconBg = Color(0xFFFFD5C8);
 
-  // Seed demo HANYA untuk widget test / mode tanpa Firebase.
-  // Dengan Firebase, daftar diisi dari Firestore (boleh kosong).
-  final List<DoctorNotificationModel> _notifications = Backend.useFirebase
-      ? <DoctorNotificationModel>[]
-      : <DoctorNotificationModel>[
-          DoctorNotificationModel(
-            id: '1',
-            title: 'Booking Baru',
-            description: 'Leonita booking jadwal konsultasi untuk hari ini',
-            time: '2026-08-28 08:30',
-            icon: LucideIcons.calendar,
-            isUnread: true,
-          ),
-          DoctorNotificationModel(
-            id: '2',
-            title: 'Jadwal Hari Ini',
-            description: 'Anda memiliki 3 konsultasi hari ini',
-            time: '2026-08-28 07:00',
-            icon: LucideIcons.messageSquare,
-            isUnread: false,
-          ),
-        ];
+  late final List<DoctorNotificationModel> _notifications;
 
   @override
   void initState() {
     super.initState();
+    _notifications = widget.initialNotifications != null
+        ? List.from(widget.initialNotifications!)
+        : <DoctorNotificationModel>[];
     _subscribeFeed();
     _scroll.addListener(_onScroll);
   }
@@ -187,7 +171,6 @@ class _NotifikasiDokterPageState extends State<NotifikasiDokterPage> {
   }
 
   /// Feed notifikasi audience dokter di-stream realtime oleh [_subscribeFeed].
-  /// Tanpa Firebase, seed demo tetap dipakai agar UI/tes tidak berubah.
 
   @override
   Widget build(BuildContext context) {
@@ -433,11 +416,7 @@ class _NotifikasiDokterPageState extends State<NotifikasiDokterPage> {
           .catchError((_) {});
       return;
     }
-    // Fallback lama untuk seed demo (judul mengandung kata kunci).
-    if (item.title.contains('Booking')) {
-      Navigator.pop(context);
-      widget.onNavigateTab?.call(1); // Go to Jadwal
-    } else if (item.title.contains('Jadwal')) {
+    if (item.title.contains('Booking') || item.title.contains('Jadwal')) {
       Navigator.pop(context);
       widget.onNavigateTab?.call(1); // Go to Jadwal
     }
