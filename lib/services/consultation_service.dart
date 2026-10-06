@@ -44,7 +44,7 @@ class ConsultationService {
     required String timeEnd,
   }) async {
     if (!Backend.useFirebase) {
-      return 'demo-consultation';
+      throw StateError('Firebase belum terhubung.');
     }
     // ID deterministik: satu konsultasi per slot (mencegah double dokumen).
     final consultationRef = _col.doc(slotId);
