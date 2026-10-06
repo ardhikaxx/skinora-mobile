@@ -51,7 +51,10 @@ class RuangChatDokterPage extends StatefulWidget {
     this.dateIso,
     this.timeStart,
     this.timeEnd,
+    this.initialMessages,
   });
+
+  final List<ChatBubbleModel>? initialMessages;
 
   @override
   State<RuangChatDokterPage> createState() => _RuangChatDokterPageState();
@@ -188,67 +191,15 @@ class _RuangChatDokterPageState extends State<RuangChatDokterPage> {
     // Anti-spam: pesan masuk di ruang yang sedang dibuka tidak memunculkan
     // native notification (chat realtime sudah memberi feedback visual).
     ActiveChatRegistry.open(widget.consultationId);
-    // Seed demo HANYA tanpa Firebase; jam mengikuti waktu real-time WIB terkini.
-    final now = AppDates.nowWib();
-    final greeting = AppDates.greetingWib();
-    _messages = Backend.useFirebase
-        ? <ChatBubbleModel>[]
-        : <ChatBubbleModel>[
-      ChatBubbleModel(
-        id: '1',
-        text: '$greeting, ${widget.patientName.split(' ').first}. Ada yang bisa saya bantu hari ini?',
-        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 7))),
-        isFromDoctor: true,
-      ),
-      ChatBubbleModel(
-        id: '2',
-        text: 'Selamat pagi Dok. Saya mau tanya soal flek hitam di pipi kiri saya, sudah sekitar 2 minggu ini muncul.',
-        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 6))),
-        isFromDoctor: false,
-      ),
-      ChatBubbleModel(
-        id: '3',
-        text: 'Flek hitamnya ukurannya kecil atau sudah melebar? Apakah ada rasa gatal atau perih?',
-        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 5))),
-        isFromDoctor: true,
-      ),
-      ChatBubbleModel(
-        id: '4',
-        text: 'Kira-kira sebesar koin, tidak gatal tapi agak kering. Saya juga pakai sunscreen setiap hari.',
-        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 4))),
-        isFromDoctor: false,
-      ),
-      ChatBubbleModel(
-        id: '5',
-        text: 'Baik, kemungkinan ini hiperpigmentasi pasca-inflamasi. Saya sarankan pakai serum Vitamin C di pagi hari dan retinol ringan di malam hari.',
-        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 3))),
-        isFromDoctor: true,
-      ),
-      ChatBubbleModel(
-        id: '6',
-        text: 'Boleh Dok rekomendasinya? Dan berapa lama biasanya sampai terlihat hasilnya?',
-        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 2))),
-        isFromDoctor: false,
-      ),
-      ChatBubbleModel(
-        id: '7',
-        text: 'Untuk hasil optimal biasanya butuh 4-6 minggu. Saya akan kirimkan resepnya setelah konsultasi ini selesai ya.',
-        time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 1))),
-        isFromDoctor: true,
-      ),
-      ChatBubbleModel(
-        id: '8',
-        text: 'Baik Dok, terima kasih banyak atas penjelasannya!',
-        time: AppDates.formatChatTimeWib(now),
-        isFromDoctor: false,
-      ),
-    ];
+    _messages = widget.initialMessages != null
+        ? List.from(widget.initialMessages!)
+        : <ChatBubbleModel>[];
     _loadFromBackend();
   }
 
-  /// Streaming pesan dari Firestore. Tanpa Firebase, seed demo tetap
-  /// dipakai agar UI/tes tidak berubah.
+  /// Streaming pesan dari Firestore.
   void _loadFromBackend() {
+    if (widget.initialMessages != null) return;
     if (!Backend.useFirebase) return;
     final id = widget.consultationId;
     if (id == null || id.isEmpty) {
