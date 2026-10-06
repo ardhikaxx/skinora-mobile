@@ -18,7 +18,7 @@ class NotificationModel {
   final String time;
   bool isUnread;
 
-  /// Salinan dokumen Firestore untuk deep-link (kosong di mode demo).
+  /// Salinan dokumen Firestore untuk deep-link.
   final Map<String, dynamic> raw;
 
   NotificationModel({
@@ -33,10 +33,12 @@ class NotificationModel {
 
 class NotifikasiAdminPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
+  final List<NotificationModel>? initialNotifications;
 
   const NotifikasiAdminPage({
     super.key,
     this.onNavigateTab,
+    this.initialNotifications,
   });
 
   @override
@@ -50,37 +52,14 @@ class _NotifikasiAdminPageState extends State<NotifikasiAdminPage> {
   static const Color dateText = Color(0xFF9E9E9E);
   static const Color coralIconBg = Color(0xFFFFB0A3);
 
-  /// Seed demo HANYA untuk widget test / mode tanpa Firebase.
-  /// Dengan Firebase, daftar diisi dari Firestore (boleh kosong).
-  final List<NotificationModel> _notifications = Backend.useFirebase
-      ? <NotificationModel>[]
-      : <NotificationModel>[
-          NotificationModel(
-            id: '1',
-            title: 'Dokter Pending',
-            description: 'dr. Sari Wulandari menunggu verifikasi',
-            time: '2026-08-28 09:00',
-            isUnread: true,
-          ),
-          NotificationModel(
-            id: '2',
-            title: 'Konsultasi Baru',
-            description: 'Rina Sari memesan konsultasi dengan dr. Anita',
-            time: '2026-08-28 08:30',
-            isUnread: true,
-          ),
-          NotificationModel(
-            id: '3',
-            title: 'User Baru',
-            description: 'Maya Putri telah mendaftar sebagai pengguna baru',
-            time: '2026-08-27 14:00',
-            isUnread: false,
-          ),
-        ];
+  late final List<NotificationModel> _notifications;
 
   @override
   void initState() {
     super.initState();
+    _notifications = widget.initialNotifications != null
+        ? List.from(widget.initialNotifications!)
+        : <NotificationModel>[];
     _subscribeFeed();
     _scroll.addListener(_onScroll);
   }
@@ -394,7 +373,6 @@ class _NotifikasiAdminPageState extends State<NotifikasiAdminPage> {
           .catchError((_) {});
       return;
     }
-    // Fallback lama untuk seed demo.
     if (item.title.contains('Dokter')) {
       Navigator.pop(context);
       widget.onNavigateTab?.call(1);
