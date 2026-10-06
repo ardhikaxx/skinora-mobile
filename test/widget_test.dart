@@ -235,6 +235,10 @@ void main() {
     // Tap Simpan
     await tester.tap(find.text('Simpan'));
     await tester.pumpAndSettle();
+    expect(find.text('Jurnal harian berhasil disimpan'), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tersimpan'), findsOneWidget);
   });
 
   testWidgets('Test RiwayatSkinDailyPage', (tester) async {
@@ -245,7 +249,36 @@ void main() {
 
     await tester.pumpWidget(
       const MaterialApp(
-        home: RiwayatSkinDailyPage(),
+        home: RiwayatSkinDailyPage(
+          initialEntries: [
+            DailyHistoryEntry(
+              date: 'Jumat, 28 Agustus 2026',
+              status: 'Baik',
+              previewText: 'Berminyak  Komedo',
+              locations: ['Hidung', 'Dahi'],
+              symptoms: ['Berminyak', 'Komedo'],
+              sleepTime: '23:00',
+              waterGlasses: '8 gelas',
+              food: 'Nasi, ayam panggang, salad, buah',
+              activity: 'Kerja di kantor, meeting online',
+              routinePagi: true,
+              routineMalam: false,
+            ),
+            DailyHistoryEntry(
+              date: 'Rabu, 26 Agustus 2026',
+              status: 'Sedang',
+              previewText: 'Jerawat  Kemerahan',
+              locations: ['Pipi Kiri', 'Dagu'],
+              symptoms: ['Jerawat', 'Kemerahan'],
+              sleepTime: '23:30',
+              waterGlasses: '6 gelas',
+              food: 'Mie goreng, telur, jus jeruk',
+              activity: 'Kuliah, tugas di kafe',
+              routinePagi: true,
+              routineMalam: true,
+            ),
+          ],
+        ),
       ),
     );
     expect(find.text('Riwayat Skin Daily'), findsOneWidget);
@@ -273,7 +306,32 @@ void main() {
 
     await tester.pumpWidget(
       const MaterialApp(
-        home: InsightKulitPenggunaPage(),
+        home: InsightKulitPenggunaPage(
+          initialHistory: [
+            DailyInsightHistoryItem(
+              date: '2026-08-28',
+              symptoms: 'Berminyak, Komedo',
+              status: 'Baik',
+            ),
+            DailyInsightHistoryItem(
+              date: '2026-08-26',
+              symptoms: 'Jerawat, Kemerahan',
+              status: 'Sedang',
+            ),
+            DailyInsightHistoryItem(
+              date: '2026-08-23',
+              symptoms: 'Jerawat, Kemerahan, Beruntusan',
+              status: 'Buruk',
+            ),
+          ],
+          initialBaikCount: 4,
+          initialSedangCount: 2,
+          initialBurukCount: 1,
+          initialTopSymptom: 'Berminyak',
+          initialTopSymptomCount: 2,
+          initialAvgWater: 7,
+          initialFullRoutineDays: 4,
+        ),
       ),
     );
     expect(find.text('Insight Kulit'), findsOneWidget);
@@ -306,7 +364,7 @@ void main() {
     expect(find.text('Simpan Pagi'), findsOneWidget);
     expect(find.text('Simpan Malam'), findsOneWidget);
 
-    // Tap a checkbox
+    // Tap a checkbox in Morning Routine
     await tester.tap(find.text('Cleanser').first);
     await tester.pumpAndSettle();
 
@@ -319,17 +377,18 @@ void main() {
     await tester.tap(find.text('OK').first);
     await tester.pumpAndSettle();
 
-    // Test saving both routines
+    // Morning routine is now saved and disabled: tapping Cleanser again does not deselect
     await tester.tap(find.text('Cleanser').first);
     await tester.pumpAndSettle();
+
+    // Night routine can still be filled and saved separately
     await tester.tap(find.text('Facial Wash').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Simpan Semua (Pagi & Malam)'), findsOneWidget);
-    await tester.tap(find.text('Simpan Semua (Pagi & Malam)'));
+    await tester.tap(find.text('Simpan Malam'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Morning & Night Routine berhasil disimpan'), findsOneWidget);
+    expect(find.text('Night Routine berhasil disimpan'), findsOneWidget);
     await tester.tap(find.text('OK').first);
     await tester.pumpAndSettle();
   });
@@ -342,7 +401,47 @@ void main() {
 
     await tester.pumpWidget(
       const MaterialApp(
-        home: RiwayatSkincarePage(),
+        home: RiwayatSkincarePage(
+          initialEntries: [
+            SkincareHistoryEntry(
+              date: 'Jumat, 28 Agustus 2026',
+              pagiCount: 5,
+              malamCount: 5,
+              pagiItems: [
+                'Cleanser',
+                'Toner',
+                'Serum',
+                'Moisturizer',
+                'Sunscreen',
+              ],
+              malamItems: [
+                'Cleanser',
+                'Toner',
+                'Serum',
+                'Moisturizer',
+                'Night Cream',
+              ],
+            ),
+            SkincareHistoryEntry(
+              date: 'Kamis, 27 Agustus 2026',
+              pagiCount: 5,
+              malamCount: 4,
+              pagiItems: [
+                'Cleanser',
+                'Facial Wash',
+                'Toner',
+                'Moisturizer',
+                'Sunscreen',
+              ],
+              malamItems: [
+                'Cleanser',
+                'Toner',
+                'Serum',
+                'Night Cream',
+              ],
+            ),
+          ],
+        ),
       ),
     );
     expect(find.text('Riwayat Skincare'), findsOneWidget);
@@ -406,8 +505,13 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: MasterSpesialisasiPage(),
+      MaterialApp(
+        home: MasterSpesialisasiPage(
+          initialSpecializations: [
+            SpesialisasiModel(id: '1', name: 'Jerawat', isActive: true),
+            SpesialisasiModel(id: '2', name: 'Estetika Kulit', isActive: true),
+          ],
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -494,8 +598,45 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: ManajemenDokterPage(showBottomNav: true),
+      MaterialApp(
+        home: ManajemenDokterPage(
+          showBottomNav: true,
+          initialDoctors: [
+            AdminDoctorModel(
+              id: '1',
+              name: 'dr. Anita Dewi, Sp.KK',
+              email: 'anita@test.com',
+              phone: '081234567800',
+              specialization: 'Estetika Kulit',
+              experience: '8 tahun',
+              str: 'STR-2018-12345',
+              bio: 'Dokter spesialis kulit.',
+              status: DoctorStatus.terverifikasi,
+            ),
+            AdminDoctorModel(
+              id: '2',
+              name: 'dr. Andi Pratama, Sp.KK',
+              email: 'andi@test.com',
+              phone: '081234567801',
+              specialization: 'Jerawat',
+              experience: '5 tahun',
+              str: 'STR-2020-12346',
+              bio: 'Spesialis jerawat.',
+              status: DoctorStatus.terverifikasi,
+            ),
+            AdminDoctorModel(
+              id: '3',
+              name: 'dr. Sari Wulandari, Sp.KK',
+              email: 'sari@test.com',
+              phone: '081234567802',
+              specialization: 'Alergi',
+              experience: '3 tahun',
+              str: 'STR-2022-12347',
+              bio: 'Spesialis alergi.',
+              status: DoctorStatus.menunggu,
+            ),
+          ],
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -723,6 +864,29 @@ void main() {
     expect(find.text('Tolak'), findsNothing);
   });
 
+  List<AdminUserModel> sampleUsers() => [
+    AdminUserModel(
+      id: '1',
+      name: 'Leonita Yulyta Agustin',
+      email: 'leonita@test.com',
+      phone: '081234567890',
+      address: 'Jl. Sudirman No. 123, Jakarta',
+      birthDate: '1995-06-15',
+      gender: 'Perempuan',
+      status: UserStatus.aktif,
+    ),
+    AdminUserModel(
+      id: '2',
+      name: 'Annida Tri Aulia',
+      email: 'annida@test.com',
+      phone: '081234567891',
+      address: 'Jl. Melati No. 45, Bandung',
+      birthDate: '1998-03-22',
+      gender: 'Perempuan',
+      status: UserStatus.aktif,
+    ),
+  ];
+
   testWidgets('Test ManajemenPenggunaPage rendering and search', (tester) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1.0;
@@ -730,8 +894,8 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: ManajemenPenggunaPage(showBottomNav: true),
+      MaterialApp(
+        home: ManajemenPenggunaPage(showBottomNav: true, initialUsers: sampleUsers()),
       ),
     );
     await tester.pumpAndSettle();
@@ -834,8 +998,8 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: ManajemenPenggunaPage(),
+      MaterialApp(
+        home: ManajemenPenggunaPage(initialUsers: sampleUsers()),
       ),
     );
     await tester.pumpAndSettle();
@@ -967,7 +1131,22 @@ void main() {
 
     await tester.pumpWidget(
       const MaterialApp(
-        home: RiwayatAktivitasAdminPage(),
+        home: RiwayatAktivitasAdminPage(
+          initialActivities: [
+            AdminActivityItem(
+              title: 'Login admin berhasil',
+              time: '2026-08-27 07:55',
+            ),
+            AdminActivityItem(
+              title: 'Memverifikasi dr. Anita Dewi',
+              time: '2026-08-15 10:00',
+            ),
+            AdminActivityItem(
+              title: 'Mempublikasikan artikel:\nMengenal Tipe Kulit',
+              time: '2026-08-01 12:00',
+            ),
+          ],
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -989,7 +1168,15 @@ void main() {
 
     await tester.pumpWidget(
       const MaterialApp(
-        home: ProfilAdminPage(),
+        home: ProfilAdminPage(
+          initialName: 'Admin Skinora',
+          initialActivities: [
+            AdminActivityItem(
+              title: 'Login admin berhasil',
+              time: '2026-08-27 07:55',
+            ),
+          ],
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -1010,8 +1197,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Apakah Anda yakin ingin keluar?'), findsNothing);
 
-    // 2. Test navigate to Edit Profil
-    await tester.tap(find.text('Edit'));
+    // 2. Test navigate to Edit Profil via panah di sebelah data profile
+    await tester.tap(find.byIcon(LucideIcons.chevronRight).first);
     await tester.pumpAndSettle();
 
     expect(find.text('Edit Profil'), findsOneWidget);
@@ -1055,6 +1242,33 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  List<AdminArticleModel> sampleArticles() => [
+    AdminArticleModel(
+      id: '1',
+      title: 'Mengenal Tipe Kulit Wajah Anda',
+      category: 'Kulit Dasar',
+      date: '2026-08-01',
+      content: 'Pelajari cara mengenali tipe kulit.',
+      status: ArticleStatus.diterbitkan,
+    ),
+    AdminArticleModel(
+      id: '2',
+      title: 'Cara Mengatasi Jerawat Secara',
+      category: 'Kulit Bermasalah',
+      date: '2026-08-10',
+      content: 'Tips mengatasi jerawat.',
+      status: ArticleStatus.diterbitkan,
+    ),
+    AdminArticleModel(
+      id: '3',
+      title: 'Draft: Treatment Laser Terbaru',
+      category: 'Treatment',
+      date: '2026-08-22',
+      content: 'Artikel treatment laser.',
+      status: ArticleStatus.draf,
+    ),
+  ];
+
   testWidgets('Test ManajemenEdukasiPage search and filter chips', (tester) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1.0;
@@ -1062,8 +1276,8 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: ManajemenEdukasiPage(showBottomNav: true),
+      MaterialApp(
+        home: ManajemenEdukasiPage(showBottomNav: true, initialArticles: sampleArticles()),
       ),
     );
     await tester.pumpAndSettle();
@@ -1111,8 +1325,8 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: ManajemenEdukasiPage(),
+      MaterialApp(
+        home: ManajemenEdukasiPage(initialArticles: sampleArticles()),
       ),
     );
     await tester.pumpAndSettle();
@@ -1145,8 +1359,8 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: ManajemenEdukasiPage(),
+      MaterialApp(
+        home: ManajemenEdukasiPage(initialArticles: sampleArticles()),
       ),
     );
     await tester.pumpAndSettle();
@@ -1201,7 +1415,6 @@ void main() {
     expect(find.text('Artikel Baru'), findsOneWidget);
     expect(find.text('JUDUL'), findsOneWidget);
     expect(find.text('KATEGORI'), findsOneWidget);
-    expect(find.text('STATUS'), findsOneWidget);
     expect(find.text('KONTEN'), findsOneWidget);
     expect(find.text('Buat Artikel'), findsOneWidget);
 
@@ -1227,10 +1440,6 @@ void main() {
     // Enter category
     final catField = find.widgetWithText(TextField, 'Kategori artikel...');
     await tester.enterText(catField, 'Perawatan');
-    await tester.pumpAndSettle();
-
-    // Toggle status to Diterbitkan
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Diterbitkan'));
     await tester.pumpAndSettle();
 
     // Enter content
@@ -1274,10 +1483,6 @@ void main() {
     await tester.enterText(titleField, 'Mengenal Tipe Kulit Wajah Kita');
     await tester.pumpAndSettle();
 
-    // Toggle status to Draf
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Draf'));
-    await tester.pumpAndSettle();
-
     // Save
     await tester.tap(find.text('Simpan Perubahan'));
     await tester.pumpAndSettle();
@@ -1290,8 +1495,8 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: ManajemenEdukasiPage(),
+      MaterialApp(
+        home: ManajemenEdukasiPage(initialArticles: sampleArticles()),
       ),
     );
     await tester.pumpAndSettle();
@@ -1348,8 +1553,74 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: DetailPatientInsightPage(),
+      MaterialApp(
+        home: DetailPatientInsightPage(
+          initialPatients: [
+            PatientInsightModel(
+              id: '1',
+              name: 'Annida Tri Aulia',
+              consultationCount: '3 konsultasi',
+              skinType: 'Berminyak & Acne-prone',
+              primaryConcern: 'Jerawat aktif & bekas noda jerawat',
+              lastConsultation: '27 Agu 2026',
+            ),
+            PatientInsightModel(
+              id: '2',
+              name: 'Leonita Yulyta Agustin',
+              consultationCount: '3 konsultasi',
+              skinType: 'Kombinasi',
+              primaryConcern: 'Skin barrier rusak & kemerahan',
+              lastConsultation: '26 Agu 2026',
+            ),
+          ],
+          patient: PatientInsightModel(
+            id: '2',
+            name: 'Leonita Yulyta Agustin',
+            consultationCount: '3 konsultasi',
+            skinType: 'Kombinasi',
+            primaryConcern: 'Skin barrier rusak & kemerahan',
+            lastConsultation: '26 Agu 2026',
+          ),
+          initialTopConditions: [
+            {'name': 'Berminyak', 'count': '2x'},
+            {'name': 'Jerawat', 'count': '2x'},
+            {'name': 'Kemerahan', 'count': '2x'},
+          ],
+          initialAvgWater: '6.6',
+          initialAvgSleep: '0',
+          initialSkincarePct: '57%',
+          initialInsightSkincare: 'Pasien memiliki kepatuhan skincare 57% dalam 7 hari terakhir',
+          initialInsightWater: 'Rata-rata konsumsi air: 6.6 gelas per hari',
+          initialInsightSleep: 'Rata-rata tidur: 0 jam per malam',
+          initialSkinChecks: [
+            {
+              'dateIso': '2026-08-28',
+              'createdDisplay': '2026-08-28',
+              'resultSkinType': 'Kombinasi',
+              'resultSensitivity': 'Sensitif',
+              'resultAcneRisk': 'Rentan',
+            },
+          ],
+          initialSkinDailies: [
+            {
+              'dateIso': '2026-08-28',
+              'kondisiKulit': 'Baik',
+              'gejala': ['Hidung', 'Dahi'],
+              'jamTidur': '23:00',
+              'air': '8 gelas',
+              'makanan': 'Nasi, ayam panggang, salad, buah',
+              'skincarePagi': true,
+              'skincareMalam': false,
+            },
+          ],
+          initialSkincareLogs: [
+            {
+              'dateIso': '2026-08-28',
+              'morningItems': ['Cleanser', 'Toner', 'Serum', 'Moisturizer', 'Sunscreen'],
+              'nightItems': ['Cleanser', 'Toner', 'Serum', 'Moisturizer', 'Night Cream'],
+            },
+          ],
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -1407,8 +1678,19 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: PatientInsightPage(),
+      MaterialApp(
+        home: PatientInsightPage(
+          initialPatients: [
+            PatientInsightModel(
+              id: '2',
+              name: 'Leonita Yulyta Agustin',
+              consultationCount: '3 konsultasi',
+              skinType: 'Kombinasi',
+              primaryConcern: 'Skin barrier rusak & kemerahan',
+              lastConsultation: '26 Agu 2026',
+            ),
+          ],
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -1563,10 +1845,24 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(
+      MaterialApp(
         home: RuangChatDokterPage(
           patientName: 'Leonita Yulyta Agustin',
           showBottomNav: true,
+          initialMessages: [
+            ChatBubbleModel(
+              id: '1',
+              text: 'Selamat pagi, Leonita. Ada yang bisa saya bantu hari ini?',
+              time: '09:00',
+              isFromDoctor: true,
+            ),
+            ChatBubbleModel(
+              id: '2',
+              text: 'Baik Dok, terima kasih banyak atas penjelasannya!',
+              time: '09:05',
+              isFromDoctor: false,
+            ),
+          ],
         ),
       ),
     );
@@ -1574,7 +1870,7 @@ void main() {
 
     expect(find.text('Leonita Yulyta Agustin'), findsOneWidget);
     expect(find.text('Selesai'), findsOneWidget);
-    expect(find.text('Selamat pagi, Leonita. Ada yang bisa saya bantu hari ini?'), findsOneWidget);
+    expect(find.textContaining('Ada yang bisa saya bantu hari ini?'), findsOneWidget);
     expect(find.text('Baik Dok, terima kasih banyak atas penjelasannya!'), findsOneWidget);
 
     // Send a message
@@ -1613,8 +1909,24 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: ChatKonsultasiPage(showBottomNav: true),
+      MaterialApp(
+        home: ChatKonsultasiPage(
+          showBottomNav: true,
+          initialConsultations: [
+            ConsultationItemModel(
+              id: '1',
+              patientName: 'Leonita Yulyta Agustin',
+              dateTime: '2026-08-28 • 09:00 - 09:30',
+              status: 'Terjadwal',
+            ),
+            ConsultationItemModel(
+              id: '2',
+              patientName: 'Annida Tri Aulia',
+              dateTime: '2026-08-28 • 09:30 - 10:00',
+              status: 'Berlangsung',
+            ),
+          ],
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -1676,8 +1988,17 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: DokterMainPage(),
+      MaterialApp(
+        home: DokterMainPage(
+          initialConsultations: [
+            ConsultationItemModel(
+              id: '1',
+              patientName: 'Leonita Yulyta Agustin',
+              dateTime: '2026-08-28 • 09:00 - 09:30',
+              status: 'Berlangsung',
+            ),
+          ],
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -1726,7 +2047,31 @@ void main() {
 
     await tester.pumpWidget(
       const MaterialApp(
-        home: DetailRiwayatKonsultasiPage(showBottomNav: true),
+        home: DetailRiwayatKonsultasiPage(
+          showBottomNav: true,
+          patientName: 'Leonita Yulyta Agustin',
+          dateTime: '2026-08-15 • 09:00 - 09:30',
+          chatHistory: [
+            HistoryChatMessage(
+              sender: 'Pasien',
+              message:
+                  'Dok, saya mau tanya soal perawatan kulit setelah operasi kecil',
+            ),
+            HistoryChatMessage(
+              sender: 'Dokter',
+              message: 'Tentu, operasi apa yang sudah dilakukan?',
+            ),
+            HistoryChatMessage(
+              sender: 'Pasien',
+              message: 'Operasi kecil untuk angkat tahi lalat di pipi kanan',
+            ),
+            HistoryChatMessage(
+              sender: 'Dokter',
+              message:
+                  'Baik, hindari paparan matahari langsung selama 2 minggu. Gunakan krim antibiotik yang sudah saya resepkan.',
+            ),
+          ],
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -1751,8 +2096,25 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: RiwayatKonsultasiPage(showBottomNav: true),
+      MaterialApp(
+        home: RiwayatKonsultasiPage(
+          showBottomNav: true,
+          initialHistory: [
+            ConsultationHistoryModel(
+              id: '4',
+              patientName: 'Leonita Yulyta Agustin',
+              dateTime: '2026-08-15 • 09:00 - 09:30',
+              diagnosis: 'Perawatan Pasca Operasi Kulit',
+              notes: 'Hindari paparan matahari langsung selama 2 minggu.',
+              chatHistory: const [
+                HistoryChatMessage(
+                  sender: 'Pasien',
+                  message: 'Dok, saya mau tanya...',
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -1785,7 +2147,10 @@ void main() {
 
     await tester.pumpWidget(
       const MaterialApp(
-        home: EditProfilDokterPage(showBottomNav: true),
+        home: EditProfilDokterPage(
+          showBottomNav: true,
+          initialName: 'dr. Anita Dewi, Sp.KK',
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -1869,7 +2234,19 @@ void main() {
 
     await tester.pumpWidget(
       const MaterialApp(
-        home: RiwayatAktivitasDokterPage(showBottomNav: true),
+        home: RiwayatAktivitasDokterPage(
+          showBottomNav: true,
+          initialActivities: [
+            DoctorActivityItem(
+              title: 'Konsultasi selesai dengan Annida Tri Aulia',
+              timestamp: '2026-08-29 10:30',
+            ),
+            DoctorActivityItem(
+              title: 'Login berhasil',
+              timestamp: '2026-08-29 08:00',
+            ),
+          ],
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -1889,7 +2266,17 @@ void main() {
 
     await tester.pumpWidget(
       const MaterialApp(
-        home: dokter.ProfilDokterPage(showBottomNav: true),
+        home: dokter.ProfilDokterPage(
+          showBottomNav: true,
+          initialName: 'dr. Anita Dewi, Sp.KK',
+          initialPhone: '081234567800',
+          initialActivities: [
+            DoctorActivityItem(
+              title: 'Konsultasi selesai dengan Annida Tri Aulia',
+              timestamp: '2026-08-29 10:30',
+            ),
+          ],
+        ),
       ),
     );
     await tester.pumpAndSettle();
