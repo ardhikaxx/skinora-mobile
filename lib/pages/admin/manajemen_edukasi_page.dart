@@ -18,7 +18,10 @@ class ManajemenEdukasiPage extends StatefulWidget {
     super.key,
     this.onNavigateTab,
     this.showBottomNav = false,
+    this.initialArticles,
   });
+
+  final List<AdminArticleModel>? initialArticles;
 
   @override
   State<ManajemenEdukasiPage> createState() => _ManajemenEdukasiPageState();
@@ -39,72 +42,7 @@ class _ManajemenEdukasiPageState extends State<ManajemenEdukasiPage> {
     'Draf',
   ];
 
-  /// Seed demo HANYA untuk widget test / mode tanpa Firebase.
-  /// Dengan Firebase, daftar diisi dari Firestore (boleh kosong).
-  final List<AdminArticleModel> _articles = Backend.useFirebase
-      ? <AdminArticleModel>[]
-      : <AdminArticleModel>[
-          AdminArticleModel(
-            id: '1',
-            title: 'Mengenal Tipe Kulit Wajah Anda',
-            category: 'Kulit Dasar',
-            date: '2026-08-01',
-            content:
-                'Pelajari cara mengenali tipe kulit wajah Anda untuk perawatan yang lebih tepat.',
-            status: ArticleStatus.diterbitkan,
-          ),
-          AdminArticleModel(
-            id: '2',
-            title: 'Rutinitas Skincare Pagi yang Ber',
-            category: 'Skincare',
-            date: '2026-08-05',
-            content:
-                'Langkah-langkah rutinitas skincare pagi yang benar untuk kulit sehat.',
-            status: ArticleStatus.diterbitkan,
-          ),
-          AdminArticleModel(
-            id: '3',
-            title: 'Cara Mengatasi Jerawat Secara',
-            category: 'Kulit Bermasalah',
-            date: '2026-08-10',
-            content: 'Tips mengatasi jerawat dengan bahan-bahan alami yang aman.',
-            status: ArticleStatus.diterbitkan,
-          ),
-          AdminArticleModel(
-            id: '4',
-            title: 'Pentingnya Sunscreen untuk Kes',
-            category: 'Skincare',
-            date: '2026-08-15',
-            content:
-                'Kenali pentingnya sunscreen dan cara memilih yang tepat untuk kulit Anda.',
-            status: ArticleStatus.diterbitkan,
-          ),
-          AdminArticleModel(
-            id: '5',
-            title: 'Makanan yang Bagus untuk Kese',
-            category: 'Nutrisi Kulit',
-            date: '2026-08-18',
-            content:
-                'Makanan sehat yang dapat membantu menjaga kesehatan kulit dari dalam.',
-            status: ArticleStatus.diterbitkan,
-          ),
-          AdminArticleModel(
-            id: '6',
-            title: 'Perawatan Kulit untuk Pemula',
-            category: 'Tips & Trik',
-            date: '2026-08-20',
-            content: 'Panduan sederhana memulai rutinitas skincare bagi pemula.',
-            status: ArticleStatus.diterbitkan,
-          ),
-          AdminArticleModel(
-            id: '7',
-            title: 'Draft: Treatment Laser Terbaru',
-            category: 'Treatment',
-            date: '2026-08-22',
-            content: 'Artikel tentang treatment laser terbaru.',
-            status: ArticleStatus.draf,
-          ),
-        ];
+  late final List<AdminArticleModel> _articles;
 
   List<AdminArticleModel> get _filteredArticles {
     return _articles.where((article) {
@@ -135,11 +73,15 @@ class _ManajemenEdukasiPageState extends State<ManajemenEdukasiPage> {
   @override
   void initState() {
     super.initState();
+    _articles = widget.initialArticles != null
+        ? List.from(widget.initialArticles!)
+        : <AdminArticleModel>[];
     _loadFromBackend();
   }
 
   /// Ambil artikel dari Firestore secara realtime.
   void _loadFromBackend() {
+    if (widget.initialArticles != null) return;
     if (!Backend.useFirebase) return;
     _articleSub?.cancel();
     _articleSub = ArticleService.streamAll().listen(
