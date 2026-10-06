@@ -25,10 +25,12 @@ class SpesialisasiModel {
 
 class MasterSpesialisasiPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
+  final List<SpesialisasiModel>? initialSpecializations;
 
   const MasterSpesialisasiPage({
     super.key,
     this.onNavigateTab,
+    this.initialSpecializations,
   });
 
   @override
@@ -47,25 +49,16 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
   static const Color activeBadgeBg = Color(0xFFFFD5C8);
   static const Color inactiveBadgeBg = Color(0xFFFFE5E0);
 
-  /// Seed demo HANYA untuk widget test / mode tanpa Firebase.
-  /// Dengan Firebase, daftar diisi dari Firestore (boleh kosong).
-  final List<SpesialisasiModel> _specializations = Backend.useFirebase
-      ? <SpesialisasiModel>[]
-      : <SpesialisasiModel>[
-          SpesialisasiModel(id: '1', name: 'Jerawat', isActive: true),
-          SpesialisasiModel(id: '2', name: 'Estetika Kulit', isActive: true),
-          SpesialisasiModel(id: '3', name: 'Alergi', isActive: true),
-          SpesialisasiModel(id: '4', name: 'Anti-Aging', isActive: true),
-          SpesialisasiModel(id: '5', name: 'Pigmentasi', isActive: true),
-          SpesialisasiModel(id: '6', name: 'Dermatitis', isActive: true),
-          SpesialisasiModel(id: '7', name: 'Infeksi Kulit', isActive: false),
-        ];
+  late final List<SpesialisasiModel> _specializations;
 
   StreamSubscription<List<SpecializationRecord>>? _specSub;
 
   @override
   void initState() {
     super.initState();
+    _specializations = widget.initialSpecializations != null
+        ? List.from(widget.initialSpecializations!)
+        : <SpesialisasiModel>[];
     _loadFromBackend();
   }
 
@@ -77,6 +70,7 @@ class _MasterSpesialisasiPageState extends State<MasterSpesialisasiPage> {
 
   /// Ambil master spesialisasi dari Firestore secara realtime.
   void _loadFromBackend() {
+    if (widget.initialSpecializations != null) return;
     if (!Backend.useFirebase) return;
     _specSub?.cancel();
     _specSub = SpecializationService.stream().listen(
