@@ -34,13 +34,12 @@ class _ProfilPenggunaPageState extends State<ProfilPenggunaPage> {
   static const Color cardBorder = Color(0xFFEEEEEE);
   static const Color innerBorder = Color(0xFFEBEBEB);
 
-  String _name = Backend.useFirebase ? '' : 'Leonita Yulyta Agustin';
-  String _email = Backend.useFirebase ? '' : 'leonita@demo.com';
-  String _phone = Backend.useFirebase ? '' : '081234567890';
-  String _address =
-      Backend.useFirebase ? '' : 'Jl. Sudirman No. 123, Jakarta';
-  String _birthDate = Backend.useFirebase ? '' : '1995-06-15';
-  String _gender = Backend.useFirebase ? '' : 'Perempuan';
+  String _name = '';
+  String _email = '';
+  String _phone = '';
+  String _address = '';
+  String _birthDate = '';
+  String _gender = '';
 
   StreamSubscription<dynamic>? _profileSub;
 
@@ -76,8 +75,7 @@ class _ProfilPenggunaPageState extends State<ProfilPenggunaPage> {
     super.dispose();
   }
 
-  /// Profile milik pengguna dari Firestore. Tanpa Firebase, seed demo
-  /// tetap dipakai agar UI/tes tidak berubah.
+  /// Profile milik pengguna dari Firestore.
   Future<void> _loadFromBackend() async {
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
@@ -288,7 +286,7 @@ class _ProfilPenggunaPageState extends State<ProfilPenggunaPage> {
             ),
           ),
 
-          // "Edit" text button
+          // Panah di sebelah data profile untuk akses edit profile
           InkWell(
             onTap: () async {
               final result = await Navigator.push(
@@ -327,16 +325,13 @@ class _ProfilPenggunaPageState extends State<ProfilPenggunaPage> {
                 });
               }
             },
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(20),
             child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-              child: Text(
-                'Edit',
-                style: TextStyle(
-                  fontSize: 14.0,
-                  fontWeight: FontWeight.bold,
-                  color: primaryMaroon,
-                ),
+              padding: EdgeInsets.all(8.0),
+              child: Icon(
+                LucideIcons.chevronRight,
+                size: 20,
+                color: primaryMaroon,
               ),
             ),
           ),
