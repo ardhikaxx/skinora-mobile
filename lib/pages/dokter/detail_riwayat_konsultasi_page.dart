@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/empty_state.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
-import '../../services/backend.dart';
 import 'riwayat_konsultasi_page.dart';
 
 class DetailRiwayatKonsultasiPage extends StatelessWidget {
@@ -33,14 +32,12 @@ class DetailRiwayatKonsultasiPage extends StatelessWidget {
 
   String get _name {
     final raw = consultation?.patientName ?? patientName;
-    if (raw.isNotEmpty) return raw;
-    return Backend.useFirebase ? '-' : 'Leonita Yulyta Agustin';
+    return raw.isNotEmpty ? raw : '-';
   }
 
   String get _date {
     final raw = consultation?.dateTime ?? dateTime;
-    if (raw.isNotEmpty) return raw;
-    return Backend.useFirebase ? '-' : '2026-08-15 • 09:00 - 09:30';
+    return raw.isNotEmpty ? raw : '-';
   }
   String get _statusLabel {
     if (status.isNotEmpty) return status;
@@ -50,27 +47,7 @@ class DetailRiwayatKonsultasiPage extends StatelessWidget {
   List<HistoryChatMessage> get _messages {
     if (consultation != null) return consultation!.chatHistory;
     if (chatHistory != null) return chatHistory!;
-    if (Backend.useFirebase) return const <HistoryChatMessage>[];
-    return const [
-      HistoryChatMessage(
-        sender: 'Pasien',
-        message:
-            'Dok, saya mau tanya soal perawatan kulit setelah operasi kecil',
-      ),
-      HistoryChatMessage(
-        sender: 'Dokter',
-        message: 'Tentu, operasi apa yang sudah dilakukan?',
-      ),
-      HistoryChatMessage(
-        sender: 'Pasien',
-        message: 'Operasi kecil untuk angkat tahi lalat di pipi kanan',
-      ),
-      HistoryChatMessage(
-        sender: 'Dokter',
-        message:
-            'Baik, hindari paparan matahari langsung selama 2 minggu. Gunakan krim antibiotik yang sudah saya resepkan.',
-      ),
-    ];
+    return const <HistoryChatMessage>[];
   }
 
   @override
