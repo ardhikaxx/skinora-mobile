@@ -84,8 +84,6 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Firebase Authentication (Email & Password) + Cloud Firestore.
-  // Bila init gagal (platform belum terdaftar / konfigurasi belum ada),
-  // aplikasi tetap berjalan dalam mode demo (lihat services/backend.dart).
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
