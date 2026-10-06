@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:skinora_app/pages/pengguna/riwayat_skin_check_page.dart';
 import 'package:skinora_app/pages/pengguna/skin_check_result_page.dart';
 import 'package:skinora_app/services/skin_service.dart';
@@ -10,8 +11,27 @@ void main() {
   group('Riwayat Skin Check Realtime & WIB Format Tests', () {
     testWidgets('RiwayatSkinCheckPage menampilkan format tanggal dan jam WIB Indonesia', (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(
-          home: RiwayatSkinCheckPage(),
+        MaterialApp(
+          home: RiwayatSkinCheckPage(
+            initialHistory: [
+              SkinCheckHistoryModel(
+                id: 'test-1',
+                date: '28 Agu 2026, 14.30 WIB',
+                skinType: 'Kombinasi',
+                subtitle: 'Sensitif - Rentan',
+                icon: LucideIcons.shield,
+                tags: const ['Kombinasi', 'Sensitif', 'Rentan'],
+              ),
+              SkinCheckHistoryModel(
+                id: 'test-2',
+                date: '15 Agu 2026, 09.15 WIB',
+                skinType: 'Normal',
+                subtitle: 'Non-Sensitif - Tidak Rentan',
+                icon: LucideIcons.sun,
+                tags: const ['Normal', 'Non-Sensitif', 'Tidak Rentan'],
+              ),
+            ],
+          ),
         ),
       );
       await tester.pumpAndSettle();
