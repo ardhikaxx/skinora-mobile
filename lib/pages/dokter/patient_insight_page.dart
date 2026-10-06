@@ -31,10 +31,12 @@ class PatientInsightModel {
 
 class PatientInsightPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
+  final List<PatientInsightModel>? initialPatients;
 
   const PatientInsightPage({
     super.key,
     this.onNavigateTab,
+    this.initialPatients,
   });
 
   @override
@@ -47,52 +49,9 @@ class _PatientInsightPageState extends State<PatientInsightPage> {
   static const Color subText = Color(0xFF757575);
   static const Color coralIconBg = Color(0xFFFFB2A6);
 
-  // Seed demo HANYA untuk widget test / mode tanpa Firebase.
-  // Dengan Firebase, daftar diisi dari Firestore (boleh kosong).
-  final List<PatientInsightModel> _patients = Backend.useFirebase
-      ? <PatientInsightModel>[]
-      : <PatientInsightModel>[
-    PatientInsightModel(
-      id: '1',
-      name: 'Annida Tri Aulia',
-      consultationCount: '3 konsultasi',
-      skinType: 'Berminyak & Acne-prone',
-      primaryConcern: 'Jerawat aktif & bekas noda jerawat',
-      lastConsultation: '27 Agu 2026',
-    ),
-    PatientInsightModel(
-      id: '2',
-      name: 'Leonita Yulyta Agustin',
-      consultationCount: '3 konsultasi',
-      skinType: 'Kombinasi',
-      primaryConcern: 'Skin barrier rusak & kemerahan',
-      lastConsultation: '26 Agu 2026',
-    ),
-    PatientInsightModel(
-      id: '3',
-      name: 'Kafi Khaula Yukisa Zailina',
-      consultationCount: '2 konsultasi',
-      skinType: 'Kering & Sensitif',
-      primaryConcern: 'Kulit bersisik & dehidrasi',
-      lastConsultation: '22 Agu 2026',
-    ),
-    PatientInsightModel(
-      id: '4',
-      name: 'Siti Aisa Nur Apriliana',
-      consultationCount: '2 konsultasi',
-      skinType: 'Normal ke Kering',
-      primaryConcern: 'Hiperpigmentasi & flek hitam',
-      lastConsultation: '19 Agu 2026',
-    ),
-    PatientInsightModel(
-      id: '5',
-      name: 'Nur Alisa Qiroati Sholeha',
-      consultationCount: '3 konsultasi',
-      skinType: 'Berminyak',
-      primaryConcern: 'Pori-pori besar & komedo',
-      lastConsultation: '15 Agu 2026',
-    ),
-  ];
+  late final List<PatientInsightModel> _patients = widget.initialPatients != null
+      ? List.from(widget.initialPatients!)
+      : <PatientInsightModel>[];
 
   StreamSubscription? _consultSub;
 
@@ -116,8 +75,9 @@ class _PatientInsightPageState extends State<PatientInsightPage> {
     super.dispose();
   }
 
-  /// Daftar pasien dari konsultasi dokter secara realtime.
+  /// Daftar pasien dari konsultasi dokter secara realtime dari Firestore.
   Future<void> _loadFromBackend() async {
+    if (widget.initialPatients != null) return;
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
     if (uid == null) return;
@@ -322,6 +282,7 @@ class _PatientInsightPageState extends State<PatientInsightPage> {
               MaterialPageRoute(
                 builder: (context) => DetailPatientInsightPage(
                   patient: patient,
+                  initialPatients: _patients,
                   onNavigateTab: widget.onNavigateTab,
                 ),
               ),
