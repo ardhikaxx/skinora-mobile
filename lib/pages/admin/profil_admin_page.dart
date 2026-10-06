@@ -16,10 +16,26 @@ import 'tentang_admin_page.dart';
 
 class ProfilAdminPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
+  final bool showBottomNav;
+  final String? initialName;
+  final String? initialEmail;
+  final String? initialPhone;
+  final String? initialAddress;
+  final String? initialBirthDate;
+  final Map<String, String>? initialStats;
+  final List<AdminActivityItem>? initialActivities;
 
   const ProfilAdminPage({
     super.key,
     this.onNavigateTab,
+    this.showBottomNav = false,
+    this.initialName,
+    this.initialEmail,
+    this.initialPhone,
+    this.initialAddress,
+    this.initialBirthDate,
+    this.initialStats,
+    this.initialActivities,
   });
 
   @override
@@ -34,18 +50,15 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
   static const Color labelText = Color(0xFF8E8E93);
   static const Color badgeBg = Color(0xFFFFD5C8);
 
-  // Profile data — seed demo HANYA tanpa Firebase. Dengan Firebase, default
-  // placeholder kosong ('' / '-') hingga data asli dimuat dari Firestore.
-  String _nama = Backend.useFirebase ? '' : 'Admin Skinora';
-  String _email = Backend.useFirebase ? '' : 'admin@demo.com';
-  String _telepon = Backend.useFirebase ? '-' : '081234567899';
-  String _alamat = Backend.useFirebase ? '-' : 'Jl. Teknologi No. 1, Jakarta';
-  String _tanggalLahir = Backend.useFirebase ? '-' : '1985-01-01';
+  late String _nama = widget.initialName ?? '';
+  late String _email = widget.initialEmail ?? '';
+  late String _telepon = widget.initialPhone ?? '-';
+  late String _alamat = widget.initialAddress ?? '-';
+  late String _tanggalLahir = widget.initialBirthDate ?? '-';
 
-  // Ringkasan platform — seed demo HANYA tanpa Firebase.
-  String _statPengguna = Backend.useFirebase ? '0' : '5';
-  String _statDokter = Backend.useFirebase ? '0' : '4';
-  String _statKonsultasi = Backend.useFirebase ? '0' : '13';
+  late String _statPengguna = widget.initialStats?['pengguna'] ?? '0';
+  late String _statDokter = widget.initialStats?['dokter'] ?? '0';
+  late String _statKonsultasi = widget.initialStats?['konsultasi'] ?? '0';
 
   StreamSubscription<dynamic>? _profileSub;
   StreamSubscription<dynamic>? _userSub;
@@ -126,10 +139,9 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
     return s.isEmpty ? fallback : s;
   }
 
-  /// Muat profile admin + statistik ringkasan. Tanpa Firebase (test), seed
-  /// demo tetap dipakai. Dengan Firebase, hasil backend selalu menggantikan
-  /// seed — termasuk saat kosong — agar UI sinkron dengan data asli.
+  /// Muat profile admin + statistik ringkasan dari Firestore.
   Future<void> _loadFromBackend() async {
+    if (widget.initialName != null) return;
     if (!Backend.useFirebase) return;
     try {
       final results = await Future.wait<Object?>([
@@ -156,7 +168,7 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
         if (konsultasi != null) _statKonsultasi = '$konsultasi';
       });
     } catch (_) {
-      // Query gagal → reset placeholder, jangan nilai demo di production.
+      // Query gagal -> reset placeholder.
       if (!mounted) return;
       setState(() {
         _nama = '';
@@ -329,21 +341,18 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
             ),
           ),
 
-          // Edit text button
+          // Panah di sebelah data profile untuk akses edit profile
           Material(
             color: Colors.transparent,
             child: InkWell(
               onTap: _navigateToEditProfile,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(20),
               child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                child: Text(
-                  'Edit',
-                  style: TextStyle(
-                    fontSize: 14.0,
-                    fontWeight: FontWeight.w600,
-                    color: primaryMaroon,
-                  ),
+                padding: EdgeInsets.all(8.0),
+                child: Icon(
+                  LucideIcons.chevronRight,
+                  size: 20,
+                  color: primaryMaroon,
                 ),
               ),
             ),
@@ -626,6 +635,7 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
             MaterialPageRoute(
               builder: (context) => RiwayatAktivitasAdminPage(
                 onNavigateTab: widget.onNavigateTab,
+                initialActivities: widget.initialActivities,
               ),
             ),
           );
