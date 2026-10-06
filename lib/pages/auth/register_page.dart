@@ -264,7 +264,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
                           decoration: InputDecoration(
-                            hintText: 'email@demo.com',
+                            hintText: 'contoh@email.com',
                             hintStyle: TextStyle(
                               color: Colors.grey.shade400,
                               fontSize: 14,
