@@ -44,7 +44,10 @@ class RiwayatSkinDailyPage extends StatefulWidget {
     super.key,
     this.onNavigateTab,
     this.showBottomNav = true,
+    this.initialEntries,
   });
+
+  final List<DailyHistoryEntry>? initialEntries;
 
   @override
   State<RiwayatSkinDailyPage> createState() => _RiwayatSkinDailyPageState();
@@ -63,101 +66,9 @@ class _RiwayatSkinDailyPageState extends State<RiwayatSkinDailyPage> {
   // Track expanded cards
   final Set<int> _expandedIndices = {0};
 
-  List<DailyHistoryEntry> _entries = Backend.useFirebase
-      ? <DailyHistoryEntry>[]
-      : const <DailyHistoryEntry>[
-    DailyHistoryEntry(
-      date: 'Jumat, 28 Agustus 2026',
-      status: 'Baik',
-      previewText: 'Berminyak  Komedo',
-      locations: ['Hidung', 'Dahi'],
-      symptoms: ['Berminyak', 'Komedo'],
-      sleepTime: '23:00',
-      waterGlasses: '8 gelas',
-      food: 'Nasi, ayam panggang, salad, buah',
-      activity: 'Kerja di kantor, meeting online',
-      routinePagi: true,
-      routineMalam: false,
-    ),
-    DailyHistoryEntry(
-      date: 'Rabu, 26 Agustus 2026',
-      status: 'Sedang',
-      previewText: 'Jerawat  Kemerahan',
-      locations: ['Pipi Kiri', 'Dagu'],
-      symptoms: ['Jerawat', 'Kemerahan'],
-      sleepTime: '23:30',
-      waterGlasses: '6 gelas',
-      food: 'Mie goreng, telur, jus jeruk',
-      activity: 'Kuliah, tugas di kafe',
-      routinePagi: true,
-      routineMalam: true,
-    ),
-    DailyHistoryEntry(
-      date: 'Selasa, 25 Agustus 2026',
-      status: 'Baik',
-      previewText: 'Normal',
-      locations: ['T-Zone'],
-      symptoms: ['Normal'],
-      sleepTime: '22:30',
-      waterGlasses: '8 gelas',
-      food: 'Oatmeal, pisang, ayam rebus, sayur bayam',
-      activity: 'Jogging pagi, kerja remote',
-      routinePagi: true,
-      routineMalam: true,
-    ),
-    DailyHistoryEntry(
-      date: 'Senin, 24 Agustus 2026',
-      status: 'Baik',
-      previewText: 'Berminyak',
-      locations: ['T-Zone', 'Hidung'],
-      symptoms: ['Berminyak'],
-      sleepTime: '23:00',
-      waterGlasses: '7 gelas',
-      food: 'Nasi merah, tahu tempe, ikan bakar',
-      activity: 'Kerja di kantor seharian',
-      routinePagi: true,
-      routineMalam: true,
-    ),
-    DailyHistoryEntry(
-      date: 'Minggu, 23 Agustus 2026',
-      status: 'Buruk',
-      previewText: 'Jerawat  Kemerahan  +1',
-      locations: ['Pipi Kiri', 'Pipi Kanan', 'Dagu'],
-      symptoms: ['Jerawat', 'Kemerahan', 'Beruntusan'],
-      sleepTime: '01:00',
-      waterGlasses: '5 gelas',
-      food: 'Fast food, gorengan, boba tea',
-      activity: 'Begadang nonton serial, di rumah saja',
-      routinePagi: false,
-      routineMalam: false,
-    ),
-    DailyHistoryEntry(
-      date: 'Sabtu, 22 Agustus 2026',
-      status: 'Sedang',
-      previewText: 'Kusam',
-      locations: ['Pipi Kiri', 'Hidung'],
-      symptoms: ['Kusam'],
-      sleepTime: '23:45',
-      waterGlasses: '6 gelas',
-      food: 'Soto ayam, kerupuk, teh manis',
-      activity: 'Belanja bulanan, jalan-jalan outdoor',
-      routinePagi: true,
-      routineMalam: false,
-    ),
-    DailyHistoryEntry(
-      date: 'Jumat, 21 Agustus 2026',
-      status: 'Baik',
-      previewText: 'Normal  Kombinasi',
-      locations: ['T-Zone', 'Pipi Kanan'],
-      symptoms: ['Normal', 'Kombinasi'],
-      sleepTime: '22:15',
-      waterGlasses: '8 gelas',
-      food: 'Sup sayur, dada ayam, alpukat',
-      activity: 'Gym ringan, istirahat cukup',
-      routinePagi: true,
-      routineMalam: true,
-    ),
-  ];
+  late List<DailyHistoryEntry> _entries = widget.initialEntries != null
+      ? List.from(widget.initialEntries!)
+      : <DailyHistoryEntry>[];
 
   StreamSubscription<List<Map<String, dynamic>>>? _sub;
 
@@ -173,12 +84,11 @@ class _RiwayatSkinDailyPageState extends State<RiwayatSkinDailyPage> {
     super.dispose();
   }
 
-  /// Riwayat skin daily milik pengguna dari Firestore secara realtime. Tanpa Firebase, seed
-  /// demo tetap dipakai agar UI/tes tidak berubah.
+  /// Riwayat skin daily milik pengguna dari Firestore secara realtime.
   void _loadFromBackend() {
-    if (!Backend.useFirebase) return;
-    final uid = AuthService.uid;
-    if (uid == null) return;
+    if (widget.initialEntries != null) return;
+    final uid = AuthService.uid ?? '';
+    if (Backend.useFirebase && uid.isEmpty) return;
     _sub?.cancel();
     _sub = SkinService.streamSkinDailies(uid).listen(
       (items) {
