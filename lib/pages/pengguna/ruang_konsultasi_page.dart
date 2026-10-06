@@ -38,6 +38,7 @@ class RuangKonsultasiPenggunaPage extends StatefulWidget {
   final String? timeStart;
   final String? timeEnd;
   final ValueChanged<int>? onNavigateTab;
+  final List<ChatMessageModel>? initialMessages;
 
   const RuangKonsultasiPenggunaPage({
     super.key,
@@ -52,6 +53,7 @@ class RuangKonsultasiPenggunaPage extends StatefulWidget {
     this.timeStart,
     this.timeEnd,
     this.onNavigateTab,
+    this.initialMessages,
   });
 
   @override
@@ -194,66 +196,8 @@ class _RuangKonsultasiPenggunaPageState
     // native notification (chat realtime sudah memberi feedback visual).
     ActiveChatRegistry.open(widget.consultationId);
 
-    // Seed demo dengan timestamp realtime WIB terkini (hanya bila tanpa Firebase).
-    final now = AppDates.nowWib();
-    final greeting = AppDates.greetingWib();
-    if (!Backend.useFirebase) {
-      _messages.addAll([
-        ChatMessageModel(
-          id: '1',
-          text: '$greeting, Leonita. Ada yang bisa saya bantu hari ini?',
-          time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 7))),
-          isFromUser: false,
-        ),
-        ChatMessageModel(
-          id: '2',
-          text:
-              'Selamat pagi Dok. Saya mau tanya soal flek hitam di pipi kiri saya, sudah sekitar 2 minggu ini muncul.',
-          time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 6))),
-          isFromUser: true,
-        ),
-        ChatMessageModel(
-          id: '3',
-          text:
-              'Flek hitamnya ukurannya kecil atau sudah melebar? Apakah ada rasa gatal atau perih?',
-          time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 5))),
-          isFromUser: false,
-        ),
-        ChatMessageModel(
-          id: '4',
-          text:
-              'Kira-kira sebesar koin, tidak gatal tapi agak kering. Saya juga pakai sunscreen setiap hari.',
-          time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 4))),
-          isFromUser: true,
-        ),
-        ChatMessageModel(
-          id: '5',
-          text:
-              'Baik, kemungkinan ini hiperpigmentasi pasca-inflamasi. Saya sarankan pakai serum Vitamin C di pagi hari dan retinol ringan di malam hari.',
-          time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 3))),
-          isFromUser: false,
-        ),
-        ChatMessageModel(
-          id: '6',
-          text:
-              'Boleh Dok rekomendasinya? Dan berapa lama biasanya sampai terlihat hasilnya?',
-          time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 2))),
-          isFromUser: true,
-        ),
-        ChatMessageModel(
-          id: '7',
-          text:
-              'Untuk hasil optimal biasanya butuh 4-6 minggu. Saya akan kirimkan resepnya setelah konsultasi ini selesai ya.',
-          time: AppDates.formatChatTimeWib(now.subtract(const Duration(minutes: 1))),
-          isFromUser: false,
-        ),
-        ChatMessageModel(
-          id: '8',
-          text: 'Baik Dok, terima kasih banyak atas penjelasannya!',
-          time: AppDates.formatChatTimeWib(now),
-          isFromUser: true,
-        ),
-      ]);
+    if (widget.initialMessages != null) {
+      _messages.addAll(widget.initialMessages!);
     }
 
     final consultationId = widget.consultationId;
