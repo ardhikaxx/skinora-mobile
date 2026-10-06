@@ -46,107 +46,10 @@ class DoctorConsultationStore {
     _ensureHistory();
   }
 
-  // Seed demo HANYA untuk widget test / mode tanpa Firebase.
-  // Dengan Firebase, history diisi dari Firestore (boleh kosong).
   late final List<ConsultationHistoryModel> history;
 
   void _ensureHistory() {
-    if (Backend.useFirebase) {
-      history = <ConsultationHistoryModel>[];
-      return;
-    }
-    history = <ConsultationHistoryModel>[
-      ConsultationHistoryModel(
-        id: '1',
-        patientName: 'Kafi Khaula Yukisa Zailina',
-        dateTime: '2026-08-29 • 10:00 - 10:30',
-        diagnosis: 'Dermatitis Kontak Alergi & Dehidrasi Kulit',
-        notes:
-            'Hentikan penggunaan produk berkandungan alkohol dan fragrance. Gunakan pelembap berbahan dasar ceramide dan soothing gel.',
-        chatHistory: const [
-          HistoryChatMessage(
-            sender: 'Pasien',
-            message: 'Halo Dok, kulit saya terasa perih dan kemerahan sejak kemarin.',
-          ),
-          HistoryChatMessage(
-            sender: 'Dokter',
-            message: 'Apakah ada pemakaian produk baru sebelum gejala muncul?',
-          ),
-          HistoryChatMessage(
-            sender: 'Pasien',
-            message: 'Iya Dok, saya baru coba toner eksfoliasi 3 hari lalu.',
-          ),
-          HistoryChatMessage(
-            sender: 'Dokter',
-            message: 'Hentikan pemakaian toner tersebut dan fokus ke hidrasi dasar ya.',
-          ),
-        ],
-      ),
-      ConsultationHistoryModel(
-        id: '2',
-        patientName: 'Kafi Khaula Yukisa Zailina',
-        dateTime: '2026-08-28 • 10:00 - 10:30',
-        diagnosis: 'Pori-pori tersumbat & Komedo terbuka (Blackheads)',
-        notes:
-            'Eksfoliasi kimiawi menggunakan BHA/Salicylic acid 2% seminggu 2 kali pada malam hari. Double cleansing secara rutin.',
-        chatHistory: const [
-          HistoryChatMessage(
-            sender: 'Pasien',
-            message: 'Dok, di area hidung banyak bintik hitam komedo yang sulit hilang.',
-          ),
-          HistoryChatMessage(
-            sender: 'Dokter',
-            message: 'Bisa gunakan pembersih berbahan salicylic acid 2% secara teratur.',
-          ),
-        ],
-      ),
-      ConsultationHistoryModel(
-        id: '3',
-        patientName: 'Annida Tri Aulia',
-        dateTime: '2026-08-25 • 10:00 - 10:30',
-        diagnosis: 'Acne Vulgaris derajat ringan-sedang',
-        notes:
-            'Resep obat oles benzoyl peroxide 2.5% pagi hari dan retinoid tipis pada malam hari. Tetap gunakan sunscreen non-komedogenik.',
-        chatHistory: const [
-          HistoryChatMessage(
-            sender: 'Pasien',
-            message: 'Dok, jerawat meradang di dahi dan dagu semakin banyak.',
-          ),
-          HistoryChatMessage(
-            sender: 'Dokter',
-            message: 'Gunakan benzoyl peroxide untuk jerawat aktif dan jaga kebersihan wajah.',
-          ),
-        ],
-      ),
-      ConsultationHistoryModel(
-        id: '4',
-        patientName: 'Leonita Yulyta Agustin',
-        dateTime: '2026-08-15 • 09:00 - 09:30',
-        diagnosis: 'Perawatan Pasca Operasi Kulit',
-        notes:
-            'Hindari paparan matahari langsung selama 2 minggu. Gunakan krim antibiotik yang diresepkan.',
-        // Exact chat history shown in image copy 3.png Screen 2
-        chatHistory: const [
-          HistoryChatMessage(
-            sender: 'Pasien',
-            message: 'Dok, saya mau tanya soal perawatan kulit setelah operasi kecil',
-          ),
-          HistoryChatMessage(
-            sender: 'Dokter',
-            message: 'Tentu, operasi apa yang sudah dilakukan?',
-          ),
-          HistoryChatMessage(
-            sender: 'Pasien',
-            message: 'Operasi kecil untuk angkat tahi lalat di pipi kanan',
-          ),
-          HistoryChatMessage(
-            sender: 'Dokter',
-            message:
-                'Baik, hindari paparan matahari langsung selama 2 minggu. Gunakan krim antibiotik yang sudah saya resepkan.',
-          ),
-        ],
-      ),
-    ];
+    history = <ConsultationHistoryModel>[];
   }
 
   void addCompletedConsultation({
@@ -173,11 +76,13 @@ class DoctorConsultationStore {
 class RiwayatKonsultasiPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
   final bool showBottomNav;
+  final List<ConsultationHistoryModel>? initialHistory;
 
   const RiwayatKonsultasiPage({
     super.key,
     this.onNavigateTab,
     this.showBottomNav = false,
+    this.initialHistory,
   });
 
   @override
@@ -192,7 +97,7 @@ class _RiwayatKonsultasiPageState extends State<RiwayatKonsultasiPage> {
   static const Color completedBadgeBg = Color(0xFFFFD5C8);
 
   List<ConsultationHistoryModel> get _historyList =>
-      DoctorConsultationStore().history;
+      widget.initialHistory ?? DoctorConsultationStore().history;
 
   // id Firestore -> data mentah untuk load chat di detail.
   final Map<String, Map<String, dynamic>> _backendMeta = {};
@@ -213,6 +118,7 @@ class _RiwayatKonsultasiPageState extends State<RiwayatKonsultasiPage> {
 
   /// Riwayat konsultasi selesai dari Firestore secara realtime.
   void _loadFromBackend() {
+    if (widget.initialHistory != null) return;
     if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
     if (uid == null) return;
