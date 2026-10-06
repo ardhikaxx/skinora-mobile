@@ -212,7 +212,7 @@ class _TambahPenggunaPageState extends State<TambahPenggunaPage> {
                         const SizedBox(height: 8),
                         _buildTextField(
                           controller: _emailController,
-                          hintText: 'email@demo.com',
+                          hintText: 'pengguna@email.com',
                           keyboardType: TextInputType.emailAddress,
                         ),
                         const SizedBox(height: 16),
