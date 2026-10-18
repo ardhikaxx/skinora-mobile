@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../pages/dokter/ruang_chat_dokter_page.dart';
+import '../pages/pengguna/menunggu_konfirmasi_page.dart';
 import '../pages/pengguna/ruang_konsultasi_page.dart';
 import '../services/consultation_service.dart';
 import '../services/notification_log.dart';
@@ -301,6 +302,26 @@ class NotificationRouter {
             patientName: (consult?['patientName'] as String?) ?? '',
             dateTime: date.isEmpty ? time : '$date • $time',
             status: consult?['status'] as String?,
+            scheduleDate: consult?['scheduleDate'] as String?,
+            scheduleTime: consult?['scheduleTime'] as String?,
+            dateIso: consult?['dateIso'] as String?,
+            timeStart: consult?['timeStart'] as String?,
+            timeEnd: consult?['timeEnd'] as String?,
+          ),
+        ),
+      );
+      return;
+    }
+
+    final status = ((consult?['status'] as String?) ?? '').toLowerCase();
+    if (status == 'menunggu_konfirmasi') {
+      nav.push(
+        MaterialPageRoute<void>(
+          builder: (_) => MenungguKonfirmasiPage(
+            consultationId: id,
+            doctorId: consult?['doctorId'] as String?,
+            doctorName: (consult?['doctorName'] as String?) ?? '',
+            specialization: (consult?['specialization'] as String?) ?? '',
             scheduleDate: consult?['scheduleDate'] as String?,
             scheduleTime: consult?['scheduleTime'] as String?,
             dateIso: consult?['dateIso'] as String?,

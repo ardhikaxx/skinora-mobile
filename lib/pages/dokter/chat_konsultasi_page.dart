@@ -75,10 +75,13 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
 
   String _labelStatus(String raw) {
     switch (raw) {
+      case 'menunggu_konfirmasi':
+        return 'Menunggu Konfirmasi';
       case 'berlangsung':
         return 'Berlangsung';
       case 'selesai':
         return 'Selesai';
+      case 'dikonfirmasi':
       case 'terjadwal':
       default:
         return 'Terjadwal';
@@ -130,6 +133,52 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
         });
       },
     );
+  }
+
+  Future<void> _handleConfirmSchedule(ConsultationItemModel item) async {
+    if (Backend.useFirebase) {
+      try {
+        final uid = AuthService.uid ?? '';
+        final meta = _backendMeta[item.id];
+        final docName = (meta?['doctorName'] as String?) ?? 'Dokter';
+        await ConsultationService.confirm(
+          id: item.id,
+          doctorUid: uid,
+          doctorName: docName,
+          patientName: item.patientName,
+        );
+        if (meta != null) {
+          meta['status'] = 'dikonfirmasi';
+        }
+        if (mounted) {
+          setState(() {
+            item.status = 'Terjadwal';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Jadwal konsultasi berhasil dikonfirmasi. Pasien telah menerima notifikasi.'),
+              backgroundColor: primaryMaroon,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Gagal konfirmasi jadwal: $e')),
+          );
+        }
+      }
+    } else {
+      setState(() {
+        item.status = 'Terjadwal';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Jadwal konsultasi berhasil dikonfirmasi.'),
+          backgroundColor: primaryMaroon,
+        ),
+      );
+    }
   }
 
   Future<void> _handleConsultationAction(ConsultationItemModel item) async {
@@ -418,6 +467,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
 
   /// Single Consultation Card
   Widget _buildConsultationCard(ConsultationItemModel item) {
+    final isWaiting = item.status == 'Menunggu Konfirmasi';
     final isOngoing = item.status == 'Berlangsung';
 
     return Container(
@@ -510,7 +560,9 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
                   vertical: 4.0,
                 ),
                 decoration: BoxDecoration(
-                  color: isOngoing ? ongoingBadgeBg : scheduledBadgeBg,
+                  color: isWaiting
+                      ? const Color(0xFFFEF3C7)
+                      : (isOngoing ? ongoingBadgeBg : scheduledBadgeBg),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -518,7 +570,9 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
                   style: TextStyle(
                     fontSize: 11.0,
                     fontWeight: FontWeight.bold,
-                    color: isOngoing ? ongoingBadgeText : scheduledBadgeText,
+                    color: isWaiting
+                        ? const Color(0xFFB45309)
+                        : (isOngoing ? ongoingBadgeText : scheduledBadgeText),
                   ),
                 ),
               ),
@@ -526,12 +580,14 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
           ),
           const SizedBox(height: 14),
 
-          // Row 2: Action Button ("Mulai Konsultasi" or "Masuk Ruang Chat")
+          // Row 2: Action Button ("Konfirmasi Jadwal", "Mulai Konsultasi", or "Masuk Ruang Chat")
           SizedBox(
             width: double.infinity,
             height: 42,
             child: ElevatedButton(
-              onPressed: () => _handleConsultationAction(item),
+              onPressed: () => isWaiting
+                  ? _handleConfirmSchedule(item)
+                  : _handleConsultationAction(item),
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryMaroon,
                 foregroundColor: Colors.white,
@@ -544,13 +600,19 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    isOngoing ? LucideIcons.messageSquare : LucideIcons.phone,
+                    isWaiting
+                        ? LucideIcons.calendarCheck
+                        : (isOngoing
+                            ? LucideIcons.messageSquare
+                            : LucideIcons.phone),
                     size: 16,
                     color: Colors.white,
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    isOngoing ? 'Masuk Ruang Chat' : 'Mulai Konsultasi',
+                    isWaiting
+                        ? 'Konfirmasi Jadwal'
+                        : (isOngoing ? 'Masuk Ruang Chat' : 'Mulai Konsultasi'),
                     style: const TextStyle(
                       fontSize: 13.5,
                       fontWeight: FontWeight.bold,

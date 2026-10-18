@@ -9,9 +9,11 @@ import '../../services/backend.dart';
 import '../../services/consultation_service.dart';
 import '../../utils/app_dates.dart';
 import 'konsultasi_dokter_page.dart';
+import 'menunggu_konfirmasi_page.dart';
 import 'riwayat_ruang_konsultasi_page.dart';
 
 enum ConsultationStatus {
+  menungguKonfirmasi,
   terjadwal,
   berlangsung,
   selesai,
@@ -97,10 +99,13 @@ class _RiwayatKonsultasiPenggunaPageState
 
   ConsultationStatus _parseStatus(String raw) {
     switch (raw) {
+      case 'menunggu_konfirmasi':
+        return ConsultationStatus.menungguKonfirmasi;
       case 'berlangsung':
         return ConsultationStatus.berlangsung;
       case 'selesai':
         return ConsultationStatus.selesai;
+      case 'dikonfirmasi':
       case 'terjadwal':
       default:
         return ConsultationStatus.terjadwal;
@@ -109,6 +114,8 @@ class _RiwayatKonsultasiPenggunaPageState
 
   String _statusLabel(ConsultationStatus status) {
     switch (status) {
+      case ConsultationStatus.menungguKonfirmasi:
+        return 'Menunggu Konfirmasi';
       case ConsultationStatus.berlangsung:
         return 'Berlangsung';
       case ConsultationStatus.selesai:
@@ -287,6 +294,26 @@ class _RiwayatKonsultasiPenggunaPageState
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
           onTap: () {
+            if (item.status == ConsultationStatus.menungguKonfirmasi) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MenungguKonfirmasiPage(
+                    doctorName: item.doctorName,
+                    specialization: item.specialization,
+                    consultationId: item.id,
+                    onNavigateTab: widget.onNavigateTab,
+                    dateTime: item.dateTime,
+                    scheduleDate: item.scheduleDate,
+                    scheduleTime: item.scheduleTime,
+                    dateIso: item.dateIso,
+                    timeStart: item.timeStart,
+                    timeEnd: item.timeEnd,
+                  ),
+                ),
+              );
+              return;
+            }
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -380,6 +407,26 @@ class _RiwayatKonsultasiPenggunaPageState
   }
 
   Widget _buildStatusBadge(ConsultationStatus status) {
+    if (status == ConsultationStatus.menungguKonfirmasi) {
+      return Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 10.0,
+          vertical: 3.5,
+        ),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF3C7),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Text(
+          'Menunggu Konfirmasi',
+          style: TextStyle(
+            fontSize: 11.0,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFFB45309),
+          ),
+        ),
+      );
+    }
     if (status == ConsultationStatus.terjadwal) {
       return Container(
         padding: const EdgeInsets.symmetric(

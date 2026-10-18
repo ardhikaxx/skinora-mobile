@@ -671,15 +671,9 @@ class _ProfilDokterPageState extends State<ProfilDokterPage> {
     );
   }
 
-  /// 5. Action Menu Card (Edit Profil, Pengaturan, Tentang Aplikasi, Riwayat Aktivitas, Logout)
+  /// 5. Action Menu Card (Pengaturan, Tentang Aplikasi, Riwayat Aktivitas, Logout)
   Widget _buildActionMenuCard() {
     final menuItems = [
-      {
-        'icon': LucideIcons.user,
-        'title': 'Edit Profil',
-        'isDestructive': false,
-        'onTap': _handleEditProfile,
-      },
       {
         'icon': LucideIcons.settings,
         'title': 'Pengaturan',

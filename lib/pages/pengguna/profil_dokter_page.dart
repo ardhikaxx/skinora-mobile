@@ -9,7 +9,7 @@ import '../../services/consultation_service.dart';
 import '../../services/schedule_service.dart';
 import '../../services/user_service.dart';
 import '../../utils/app_dates.dart';
-import 'ruang_konsultasi_page.dart';
+import 'menunggu_konfirmasi_page.dart';
 
 class DoctorScheduleModel {
   final String dayDate;
@@ -619,10 +619,10 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => RuangKonsultasiPenggunaPage(
+        builder: (context) => MenungguKonfirmasiPage(
           doctorId: doctor.id,
           doctorName: doctor.name,
-          status: 'Terjadwal',
+          specialization: doctor.specialization,
           consultationId: consultationId,
           onNavigateTab: widget.onNavigateTab,
           dateTime: '$dayDate • $time',

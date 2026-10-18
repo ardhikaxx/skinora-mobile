@@ -156,7 +156,9 @@ class _RiwayatRuangKonsultasiPageState
     _isExpired = past;
     final label = (raw == 'selesai' || past)
         ? 'Selesai'
-        : (raw == 'berlangsung' ? 'Berlangsung' : 'Terjadwal');
+        : (raw == 'menunggu_konfirmasi'
+            ? 'Menunggu Konfirmasi'
+            : (raw == 'berlangsung' ? 'Berlangsung' : 'Terjadwal'));
     if (label != _statusLive && mounted) {
       setState(() => _statusLive = label);
     }
@@ -265,6 +267,17 @@ class _RiwayatRuangKonsultasiPageState
   }
 
   Future<void> _sendMessage() async {
+    if (_statusLive.toLowerCase().contains('menunggu')) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Menunggu konfirmasi dokter sebelum dapat mengirim pesan.',
+          ),
+        ),
+      );
+      return;
+    }
     if (_isFinished || _isExpired) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -506,6 +519,35 @@ class _RiwayatRuangKonsultasiPageState
   }
 
   Widget _buildInputArea() {
+    if (_statusLive.toLowerCase().contains('menunggu')) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            top: BorderSide(color: Color(0xFFF0F0F0), width: 1.0),
+          ),
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFFBEB),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFFDE68A)),
+          ),
+          child: const Text(
+            'Menunggu konfirmasi dokter sebelum dapat mengirim pesan.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFFB45309),
+            ),
+          ),
+        ),
+      );
+    }
     if (_isFinished || _isExpired) {
       final msg = _scheduleTime.isNotEmpty
           ? 'Sesi konsultasi telah berakhir sesuai jadwal ($_scheduleTime). Anda tidak dapat mengirim pesan lagi.'

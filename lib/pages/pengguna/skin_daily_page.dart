@@ -78,7 +78,7 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
     super.initState();
     _kebiasaanController = TextEditingController();
     _jamTidurController = TextEditingController();
-    _airController = TextEditingController(text: '0');
+    _airController = TextEditingController();
     _makananController = TextEditingController();
     _aktivitasController = TextEditingController();
     _loadProgress();
@@ -203,7 +203,7 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
           ..addAll(syms);
         _kebiasaanController.text = (doc['kebiasaan'] as String?) ?? '';
         _jamTidurController.text = (doc['jamTidur'] as String?) ?? '';
-        _airController.text = (doc['air'] as String?) ?? '0';
+        _airController.text = (doc['air'] as String?) ?? '';
         _makananController.text = (doc['makanan'] as String?) ?? '';
         _aktivitasController.text = (doc['aktivitas'] as String?) ?? '';
         _isSkincarePagi = doc['skincarePagi'] == true;
@@ -238,7 +238,7 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
       _selectedSymptoms.clear();
       _kebiasaanController.clear();
       _jamTidurController.clear();
-      _airController.text = '0';
+      _airController.clear();
       _makananController.clear();
       _aktivitasController.clear();
       _isSkincarePagi = false;
@@ -247,6 +247,30 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
   }
 
   Future<void> _saveDailyJournal() async {
+    final kebiasaan = _kebiasaanController.text.trim();
+    final jamTidur = _jamTidurController.text.trim();
+    final air = _airController.text.trim();
+    final makanan = _makananController.text.trim();
+    final aktivitas = _aktivitasController.text.trim();
+
+    // Validasi: input apapun jika di klik simpan dikosongi tidak bisa
+    if (_selectedLocations.isEmpty ||
+        _selectedSymptoms.isEmpty ||
+        kebiasaan.isEmpty ||
+        jamTidur.isEmpty ||
+        air.isEmpty ||
+        air == '0' ||
+        makanan.isEmpty ||
+        aktivitas.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Semua data input harus diisi terlebih dahulu sebelum disimpan'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     final dateDisplay = _formatIndonesianDate(_selectedDate);
     final dateIso = AppDates.iso(_selectedDate);
     final locations = _selectedLocations.toList();
@@ -552,18 +576,21 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 2.0),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    canSeeInsight
-                        ? 'Lihat Insight Kulit'
-                        : 'Isi $_filledDays/7 hari — lengkapi 7 hari untuk melihat progress',
-                    style: TextStyle(
-                      fontSize: 13.0,
-                      fontWeight: FontWeight.bold,
-                      color: canSeeInsight
-                          ? primaryMaroon
-                          : const Color(0xFF9E9E9E),
+                  Expanded(
+                    child: Text(
+                      canSeeInsight
+                          ? 'Lihat Insight Kulit'
+                          : 'Isi $_filledDays/7 hari — lengkapi 7 hari\nuntuk melihat progress',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13.0,
+                        fontWeight: FontWeight.bold,
+                        color: canSeeInsight
+                            ? primaryMaroon
+                            : const Color(0xFF9E9E9E),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 5),
@@ -714,7 +741,7 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
                   height: 48,
                   padding: const EdgeInsets.symmetric(horizontal: 14.0),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: _isSavedForSelectedDate ? const Color(0xFFF7F7F8) : Colors.white,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: innerBorder, width: 1.0),
                   ),
@@ -722,10 +749,10 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
                     children: [
                       Text(
                         loc,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w500,
-                          color: darkText,
+                          color: _isSavedForSelectedDate ? const Color(0xFF8E8E93) : darkText,
                         ),
                       ),
                       const Spacer(),
@@ -735,10 +762,14 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
                         width: 20,
                         height: 20,
                         decoration: BoxDecoration(
-                          color: isChecked ? primaryMaroon : Colors.white,
+                          color: isChecked
+                              ? (_isSavedForSelectedDate ? const Color(0xFF9E9E9E) : primaryMaroon)
+                              : Colors.white,
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                            color: isChecked ? primaryMaroon : const Color(0xFFCCCCCC),
+                            color: isChecked
+                                ? (_isSavedForSelectedDate ? const Color(0xFF9E9E9E) : primaryMaroon)
+                                : const Color(0xFFCCCCCC),
                             width: 1.4,
                           ),
                         ),
@@ -819,10 +850,14 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
                     vertical: 8.0,
                   ),
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFFFCF4F4) : Colors.white,
+                    color: isSelected
+                        ? (_isSavedForSelectedDate ? const Color(0xFFEFEFEF) : const Color(0xFFFCF4F4))
+                        : (_isSavedForSelectedDate ? const Color(0xFFF7F7F8) : Colors.white),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: isSelected ? primaryMaroon : const Color(0xFFE0E0E0),
+                      color: isSelected
+                          ? (_isSavedForSelectedDate ? const Color(0xFFCCCCCC) : primaryMaroon)
+                          : const Color(0xFFE0E0E0),
                       width: 1.0,
                     ),
                   ),
@@ -831,7 +866,9 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
                     style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                      color: isSelected ? primaryMaroon : const Color(0xFF4A4A4A),
+                      color: isSelected
+                          ? (_isSavedForSelectedDate ? const Color(0xFF8E8E93) : primaryMaroon)
+                          : (_isSavedForSelectedDate ? const Color(0xFFAAAAAA) : const Color(0xFF4A4A4A)),
                     ),
                   ),
                 ),
@@ -879,8 +916,13 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
             readOnly: _isSavedForSelectedDate,
             maxLines: 4,
             minLines: 3,
-            style: const TextStyle(fontSize: 13.5, color: darkText),
+            style: TextStyle(
+              fontSize: 13.5,
+              color: _isSavedForSelectedDate ? const Color(0xFF8E8E93) : darkText,
+            ),
             decoration: InputDecoration(
+              filled: _isSavedForSelectedDate,
+              fillColor: const Color(0xFFF7F7F8),
               hintText: 'Ceritakan kebiasaan harian Anda hari ini...',
               hintStyle: const TextStyle(
                 fontSize: 13.0,
@@ -948,14 +990,23 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
                       child: TextField(
                         controller: _jamTidurController,
                         readOnly: true,
-                        style:
-                            const TextStyle(fontSize: 14.0, color: darkText),
+                        style: TextStyle(
+                          fontSize: 14.0,
+                          color: _isSavedForSelectedDate
+                              ? const Color(0xFF8E8E93)
+                              : darkText,
+                        ),
                         decoration: InputDecoration(
+                          filled: _isSavedForSelectedDate,
+                          fillColor: const Color(0xFFF7F7F8),
                           hintText: 'Pilih jam (mis. 21.30)',
                           hintStyle: const TextStyle(
                               fontSize: 13, color: Color(0xFF9E9E9E)),
-                          suffixIcon: const Icon(LucideIcons.clock,
-                              size: 16, color: subText),
+                          suffixIcon: Icon(LucideIcons.clock,
+                              size: 16,
+                              color: _isSavedForSelectedDate
+                                  ? const Color(0xFFCCCCCC)
+                                  : subText),
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 14.0,
                             vertical: 10.0,
@@ -1022,8 +1073,18 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
                     controller: _airController,
                     readOnly: _isSavedForSelectedDate,
                     keyboardType: TextInputType.number,
-                    style: const TextStyle(fontSize: 14.0, color: darkText),
+                    style: TextStyle(
+                      fontSize: 14.0,
+                      color: _isSavedForSelectedDate
+                          ? const Color(0xFF8E8E93)
+                          : darkText,
+                    ),
                     decoration: InputDecoration(
+                      filled: _isSavedForSelectedDate,
+                      fillColor: const Color(0xFFF7F7F8),
+                      hintText: '0',
+                      hintStyle: const TextStyle(
+                          fontSize: 13, color: Color(0xFF9E9E9E)),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14.0,
                         vertical: 10.0,
@@ -1086,8 +1147,13 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
             readOnly: _isSavedForSelectedDate,
             maxLines: 3,
             minLines: 2,
-            style: const TextStyle(fontSize: 13.5, color: darkText),
+            style: TextStyle(
+              fontSize: 13.5,
+              color: _isSavedForSelectedDate ? const Color(0xFF8E8E93) : darkText,
+            ),
             decoration: InputDecoration(
+              filled: _isSavedForSelectedDate,
+              fillColor: const Color(0xFFF7F7F8),
               hintText: 'Apa saja yang Anda makan hari ini?',
               hintStyle: const TextStyle(
                 fontSize: 13.0,
@@ -1148,8 +1214,13 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
             readOnly: _isSavedForSelectedDate,
             maxLines: 3,
             minLines: 2,
-            style: const TextStyle(fontSize: 13.5, color: darkText),
+            style: TextStyle(
+              fontSize: 13.5,
+              color: _isSavedForSelectedDate ? const Color(0xFF8E8E93) : darkText,
+            ),
             decoration: InputDecoration(
+              filled: _isSavedForSelectedDate,
+              fillColor: const Color(0xFFF7F7F8),
               hintText: 'Aktivitas apa yang Anda lakukan hari ini?',
               hintStyle: const TextStyle(
                 fontSize: 13.0,
@@ -1210,24 +1281,24 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
             height: 52,
             padding: const EdgeInsets.symmetric(horizontal: 14.0),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: _isSavedForSelectedDate ? const Color(0xFFF7F7F8) : Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: innerBorder, width: 1.0),
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   LucideIcons.sun,
                   size: 18,
-                  color: Color(0xFFE65100),
+                  color: _isSavedForSelectedDate ? const Color(0xFF9E9E9E) : const Color(0xFFE65100),
                 ),
                 const SizedBox(width: 10),
-                const Text(
+                Text(
                   'Skincare Pagi',
                   style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
-                    color: darkText,
+                    color: _isSavedForSelectedDate ? const Color(0xFF8E8E93) : darkText,
                   ),
                 ),
                 const Spacer(),
@@ -1242,8 +1313,8 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
                               _isSkincarePagi = val;
                             });
                           },
-                    activeThumbColor: primaryMaroon,
-                    activeTrackColor: primaryMaroon.withValues(alpha: 0.3),
+                    activeThumbColor: _isSavedForSelectedDate ? const Color(0xFF9E9E9E) : primaryMaroon,
+                    activeTrackColor: _isSavedForSelectedDate ? const Color(0xFFE0E0E0) : primaryMaroon.withValues(alpha: 0.3),
                     inactiveThumbColor: Colors.white,
                     inactiveTrackColor: const Color(0xFFE5E5EA),
                   ),
@@ -1258,24 +1329,24 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
             height: 52,
             padding: const EdgeInsets.symmetric(horizontal: 14.0),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: _isSavedForSelectedDate ? const Color(0xFFF7F7F8) : Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: innerBorder, width: 1.0),
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   LucideIcons.moon,
                   size: 18,
-                  color: Color(0xFF5E35B1),
+                  color: _isSavedForSelectedDate ? const Color(0xFF9E9E9E) : const Color(0xFF5E35B1),
                 ),
                 const SizedBox(width: 10),
-                const Text(
+                Text(
                   'Skincare Malam',
                   style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
-                    color: darkText,
+                    color: _isSavedForSelectedDate ? const Color(0xFF8E8E93) : darkText,
                   ),
                 ),
                 const Spacer(),
@@ -1290,8 +1361,8 @@ class _SkinDailyPageState extends State<SkinDailyPage> {
                               _isSkincareMalam = val;
                             });
                           },
-                    activeThumbColor: primaryMaroon,
-                    activeTrackColor: primaryMaroon.withValues(alpha: 0.3),
+                    activeThumbColor: _isSavedForSelectedDate ? const Color(0xFF9E9E9E) : primaryMaroon,
+                    activeTrackColor: _isSavedForSelectedDate ? const Color(0xFFE0E0E0) : primaryMaroon.withValues(alpha: 0.3),
                     inactiveThumbColor: Colors.white,
                     inactiveTrackColor: const Color(0xFFE5E5EA),
                   ),

@@ -87,9 +87,12 @@ class _ManajemenEdukasiPageState extends State<ManajemenEdukasiPage> {
     _articleSub = ArticleService.streamAll().listen(
       (articles) {
         if (!mounted) return;
-        setState(() => _articles
-          ..clear()
-          ..addAll(articles));
+        setState(() {
+          final seen = <String>{};
+          _articles
+            ..clear()
+            ..addAll(articles.where((a) => seen.add(a.id)));
+        });
       },
       onError: (_) {
         if (!mounted) return;
@@ -117,7 +120,12 @@ class _ManajemenEdukasiPageState extends State<ManajemenEdukasiPage> {
 
     if (result != null && mounted) {
       setState(() {
-        _articles.insert(0, result);
+        final existingIndex = _articles.indexWhere((a) => a.id == result.id);
+        if (existingIndex == -1) {
+          _articles.insert(0, result);
+        } else {
+          _articles[existingIndex] = result;
+        }
       });
       AdminSuccessDialog.show(
         context,

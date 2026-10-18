@@ -156,7 +156,9 @@ class _RuangKonsultasiPenggunaPageState
     _isExpired = past;
     final label = (raw.toLowerCase() == 'selesai' || past)
         ? 'Selesai'
-        : (raw.toLowerCase() == 'berlangsung' ? 'Berlangsung' : 'Terjadwal');
+        : (raw.toLowerCase() == 'menunggu_konfirmasi'
+            ? 'Menunggu Konfirmasi'
+            : (raw.toLowerCase() == 'berlangsung' ? 'Berlangsung' : 'Terjadwal'));
     if (label != _statusLabel && mounted) {
       setState(() => _statusLabel = label);
     }
@@ -266,6 +268,18 @@ class _RuangKonsultasiPenggunaPageState
   }
 
   Future<void> _sendMessage() async {
+    // Menunggu konfirmasi dokter -> tolak pengiriman.
+    if (_statusLabel.toLowerCase().contains('menunggu')) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Menunggu konfirmasi dokter sebelum dapat mengirim pesan.',
+          ),
+        ),
+      );
+      return;
+    }
     // Sesi selesai atau jadwal telah berakhir -> tolak pengiriman.
     if (_statusLabel.toLowerCase() == 'selesai' || _isExpired) {
       if (!mounted) return;
@@ -534,6 +548,36 @@ class _RuangKonsultasiPenggunaPageState
 
   /// Bottom Text Input Field and Send Button
   Widget _buildInputArea() {
+    final isWaiting = _statusLabel.toLowerCase().contains('menunggu');
+    if (isWaiting) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            top: BorderSide(color: Color(0xFFF0F0F0), width: 1.0),
+          ),
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFFBEB),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFFDE68A)),
+          ),
+          child: const Text(
+            'Menunggu konfirmasi dokter sebelum dapat mengirim pesan.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFFB45309),
+            ),
+          ),
+        ),
+      );
+    }
     final finished = _statusLabel.toLowerCase() == 'selesai' || _isExpired;
     if (finished) {
       final msg = _scheduleTime.isNotEmpty

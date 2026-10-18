@@ -89,7 +89,7 @@ class ConsultationService {
         'scheduleTime': scheduleTime,
         'timeStart': timeStart,
         'timeEnd': timeEnd,
-        'status': 'terjadwal',
+        'status': 'menunggu_konfirmasi',
         'diagnosis': null,
         'notes': null,
         'slotId': slotId,
@@ -131,9 +131,9 @@ class ConsultationService {
     );
     await NotificationService.notifyUser(
       uid: doctorUid,
-      title: 'Booking Baru',
+      title: 'Penjadwalan Konsultasi Baru',
       description:
-          '${patient.name} memesan konsultasi untuk jadwal $scheduleDate $scheduleTime',
+          '${patient.name} memilih jadwal konsultasi pada $scheduleDate $scheduleTime. Silakan konfirmasi jadwal ini.',
       iconKey: 'calendar',
       type: NotificationType.bookingCreated,
       entityId: consultationRef.id,
@@ -143,9 +143,9 @@ class ConsultationService {
     );
     await NotificationService.notifyUser(
       uid: patient.uid,
-      title: 'Booking Berhasil',
+      title: 'Menunggu Konfirmasi Dokter',
       description:
-          'Konsultasi dengan $doctorName pada $scheduleDate $scheduleTime telah dijadwalkan.',
+          'Jadwal konsultasi Anda bersama $doctorName pada $scheduleDate $scheduleTime sedang menunggu konfirmasi dokter.',
       iconKey: 'calendar',
       type: NotificationType.bookingCreated,
       entityId: consultationRef.id,
@@ -317,6 +317,54 @@ class ConsultationService {
   // ---------------------------------------------------------------------------
   // Status lifecycle (hanya dokter — diverifikasi Security Rules)
   // ---------------------------------------------------------------------------
+  /// Konfirmasi jadwal konsultasi oleh dokter.
+  static Future<void> confirm({
+    required String id,
+    required String doctorUid,
+    required String doctorName,
+    required String patientName,
+  }) async {
+    if (!Backend.useFirebase) return;
+    final ref = _col.doc(id);
+    String patientId = '';
+    final bool confirmed = await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) throw StateError('Konsultasi tidak ditemukan.');
+      final status = ((snap.data()?['status'] as String?) ?? '').toLowerCase();
+      patientId = (snap.data()?['patientId'] as String?) ?? '';
+      if (status == 'selesai') return false;
+      tx.update(ref, {
+        'status': 'dikonfirmasi',
+        'confirmedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      return true;
+    });
+    if (!confirmed) return;
+    await ActivityService.log(
+      title: 'Mengonfirmasi jadwal konsultasi dengan $patientName',
+      tag: 'Konsultasi',
+      actor: doctorName,
+      actorUid: doctorUid,
+    );
+    if (patientId.isNotEmpty) {
+      await NotificationService.notifyUser(
+        uid: patientId,
+        title: 'Jadwal Konsultasi Dikonfirmasi',
+        description:
+            'Dokter $doctorName telah mengonfirmasi jadwal konsultasi Anda. Anda sekarang dapat berkonsultasi langsung.',
+        iconKey: 'calendar',
+        type: NotificationType.consultationStarted,
+        entityId: id,
+        consultationId: id,
+        route: NotificationPageRoute.penggunaRiwayatKonsultasi,
+        audienceRole: NotificationRole.pengguna,
+        createdBy: doctorUid,
+      );
+    }
+    unawaited(NotificationService.refreshChatFeed());
+  }
+
   static Future<void> markBerlangsung(String id) async {
     if (!Backend.useFirebase) return;
     final ref = _col.doc(id);
@@ -329,7 +377,7 @@ class ConsultationService {
       if (!snap.exists) throw StateError('Konsultasi tidak ditemukan.');
       final status = (snap.data()?['status'] as String?) ?? 'terjadwal';
       if (status == 'selesai' || status == 'berlangsung') return false;
-      if (status != 'terjadwal') {
+      if (status != 'terjadwal' && status != 'dikonfirmasi') {
         throw StateError('Status konsultasi tidak valid untuk dimulai.');
       }
       patientId = (snap.data()?['patientId'] as String?) ?? '';
@@ -398,7 +446,7 @@ class ConsultationService {
       final status = (snap.data()?['status'] as String?) ?? 'terjadwal';
       patientId = (snap.data()?['patientId'] as String?) ?? '';
       if (status == 'selesai') return false;
-      if (status != 'berlangsung' && status != 'terjadwal') {
+      if (status != 'berlangsung' && status != 'terjadwal' && status != 'dikonfirmasi') {
         throw StateError('Status konsultasi tidak dapat diselesaikan.');
       }
       tx.update(ref, {
@@ -488,6 +536,11 @@ class ConsultationService {
     final consultData = consultSnap.data();
     if (consultData != null) {
       final status = ((consultData['status'] as String?) ?? '').toLowerCase();
+      if (status == 'menunggu_konfirmasi') {
+        throw StateError(
+          'Konsultasi belum dikonfirmasi oleh dokter. Mohon tunggu konfirmasi dokter sebelum dapat mengirim pesan.',
+        );
+      }
       final dateIso = (consultData['dateIso'] as String?) ?? '';
       final scheduleDate = (consultData['scheduleDate'] as String?) ?? '';
       final timeEnd = (consultData['timeEnd'] as String?) ?? (consultData['scheduleTime'] as String?) ?? '';

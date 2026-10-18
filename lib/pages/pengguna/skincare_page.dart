@@ -562,7 +562,7 @@ class _SkincarePageState extends State<SkincarePage> {
                   height: 48,
                   padding: const EdgeInsets.symmetric(horizontal: 14.0),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: _isMorningSaved ? const Color(0xFFF7F7F8) : Colors.white,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: innerBorder, width: 1.0),
                   ),
@@ -570,10 +570,10 @@ class _SkincarePageState extends State<SkincarePage> {
                     children: [
                       Text(
                         item,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w500,
-                          color: darkText,
+                          color: _isMorningSaved ? const Color(0xFF8E8E93) : darkText,
                         ),
                       ),
                       const Spacer(),
@@ -583,10 +583,14 @@ class _SkincarePageState extends State<SkincarePage> {
                         width: 20,
                         height: 20,
                         decoration: BoxDecoration(
-                          color: isChecked ? primaryMaroon : Colors.white,
+                          color: isChecked
+                              ? (_isMorningSaved ? const Color(0xFF9E9E9E) : primaryMaroon)
+                              : Colors.white,
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                            color: isChecked ? primaryMaroon : const Color(0xFFCCCCCC),
+                            color: isChecked
+                                ? (_isMorningSaved ? const Color(0xFF9E9E9E) : primaryMaroon)
+                                : const Color(0xFFCCCCCC),
                             width: 1.4,
                           ),
                         ),
@@ -715,7 +719,7 @@ class _SkincarePageState extends State<SkincarePage> {
                   height: 48,
                   padding: const EdgeInsets.symmetric(horizontal: 14.0),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: _isNightSaved ? const Color(0xFFF7F7F8) : Colors.white,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: innerBorder, width: 1.0),
                   ),
@@ -723,10 +727,10 @@ class _SkincarePageState extends State<SkincarePage> {
                     children: [
                       Text(
                         item,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w500,
-                          color: darkText,
+                          color: _isNightSaved ? const Color(0xFF8E8E93) : darkText,
                         ),
                       ),
                       const Spacer(),
@@ -736,10 +740,14 @@ class _SkincarePageState extends State<SkincarePage> {
                         width: 20,
                         height: 20,
                         decoration: BoxDecoration(
-                          color: isChecked ? primaryMaroon : Colors.white,
+                          color: isChecked
+                              ? (_isNightSaved ? const Color(0xFF9E9E9E) : primaryMaroon)
+                              : Colors.white,
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                            color: isChecked ? primaryMaroon : const Color(0xFFCCCCCC),
+                            color: isChecked
+                                ? (_isNightSaved ? const Color(0xFF9E9E9E) : primaryMaroon)
+                                : const Color(0xFFCCCCCC),
                             width: 1.4,
                           ),
                         ),
