@@ -152,6 +152,16 @@ service cloud.firestore {
             && request.resource.data.isBooked == true
             && request.resource.data.patientId == request.auth.uid
             && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['isBooked', 'patientId', 'patientName', 'updatedAt']))
+          // Kompensasi booking dua fase: pasien boleh melepas slot miliknya
+          // bila dokumen konsultasi gagal dibuat (dokumen konsultasi belum ada).
+          || (signedIn()
+            && resource.data.isBooked == true
+            && resource.data.patientId == request.auth.uid
+            && request.resource.data.isBooked == false
+            && !request.resource.data.keys().hasAny(['patientId', 'patientName'])
+            && !exists(/databases/$(database)/documents/consultations/$(doc))
+            && request.resource.data.diff(resource.data).affectedKeys()
                 .hasOnly(['isBooked', 'patientId', 'patientName', 'updatedAt']));
       }
 
@@ -247,7 +257,7 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.patientId == request.auth.uid
         && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.status == 'terjadwal'
+        && request.resource.data.status in ['terjadwal', 'menunggu_konfirmasi']
         && request.resource.data.diagnosis == null
         && request.resource.data.notes == null
         && request.resource.data.slotId is string
@@ -276,9 +286,12 @@ service cloud.firestore {
           && request.resource.data.createdBy == resource.data.createdBy
           && request.resource.data.slotId == resource.data.slotId
           && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['status', 'diagnosis', 'notes', 'updatedAt', 'completedAt'])
+              .hasOnly(['status', 'diagnosis', 'notes', 'updatedAt',
+                        'completedAt', 'confirmedAt'])
           && resource.data.status != 'selesai'
-          && request.resource.data.status in ['terjadwal', 'berlangsung', 'selesai', 'dibatalkan']);
+          && request.resource.data.status in ['terjadwal', 'menunggu_konfirmasi',
+                                              'dikonfirmasi', 'berlangsung',
+                                              'selesai', 'dibatalkan']);
 
       allow delete: if isAdmin();
 

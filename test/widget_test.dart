@@ -137,6 +137,24 @@ void main() {
     expect(find.text('Edit Profil'), findsOneWidget);
   });
 
+  testWidgets('Avatar edit profil memakai inisial dari nama akun',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: EditProfilPenggunaPage(initialName: 'Siti Aminah'),
+      ),
+    );
+    // Inisial mengikuti data nama akun (bukan hardcode).
+    expect(find.text('SA'), findsOneWidget);
+    expect(find.text('LY'), findsNothing);
+
+    // Inisial ikut menyesuaikan saat nama diganti.
+    await tester.enterText(find.byType(TextField).first, 'Lina Yuliana');
+    await tester.pump();
+    expect(find.text('LY'), findsOneWidget);
+    expect(find.text('SA'), findsNothing);
+  });
+
   testWidgets('Test PengaturanPenggunaPage', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
@@ -232,7 +250,28 @@ void main() {
     await tester.tap(find.text('Jerawat'));
     await tester.pumpAndSettle();
 
+    // Validasi: Simpan gagal jika input masih kosong
+    await tester.tap(find.text('Simpan'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Semua data input harus diisi terlebih dahulu sebelum disimpan'),
+      findsOneWidget,
+    );
+
+    // Lengkapi semua input form
+    final textFields = find.byType(TextField);
+    await tester.enterText(textFields.at(0), 'Kebiasaan rutin');
+    await tester.tap(find.byIcon(LucideIcons.clock), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(2), '8');
+    await tester.enterText(find.byType(TextField).at(3), 'Sayuran dan buah');
+    await tester.enterText(find.byType(TextField).at(4), 'Olahraga ringan');
+    await tester.pumpAndSettle();
+
     // Tap Simpan
+    await tester.ensureVisible(find.text('Simpan'));
     await tester.tap(find.text('Simpan'));
     await tester.pumpAndSettle();
     expect(find.text('Jurnal harian berhasil disimpan'), findsOneWidget);
@@ -2301,8 +2340,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Apakah Anda yakin ingin keluar?'), findsNothing);
 
-    // 2. Test navigate to Edit Profil
-    await tester.tap(find.text('Edit Profil'));
+    // 2. Test navigate to Edit Profil via profile card chevron button
+    await tester.tap(find.byIcon(LucideIcons.chevronRight).first);
     await tester.pumpAndSettle();
     expect(find.text('Edit Profil'), findsOneWidget);
     // Back

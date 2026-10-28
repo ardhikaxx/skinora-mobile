@@ -44,6 +44,9 @@ class _EditProfilPenggunaPageState extends State<EditProfilPenggunaPage> {
   late final TextEditingController _birthDateController;
   String _selectedGender = '';
 
+  /// Inisial avatar, selalu diturunkan dari nama akun (bukan hardcode).
+  String _currentInitials = '-';
+
   @override
   void initState() {
     super.initState();
@@ -55,15 +58,36 @@ class _EditProfilPenggunaPageState extends State<EditProfilPenggunaPage> {
     _selectedGender = widget.initialGender.isNotEmpty
         ? widget.initialGender
         : 'Perempuan';
+    _currentInitials = _initialsOf(_nameController.text);
+    _nameController.addListener(_updateInitials);
   }
 
   @override
   void dispose() {
+    _nameController.removeListener(_updateInitials);
     _nameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
     _birthDateController.dispose();
     super.dispose();
+  }
+
+  /// Dua huruf pertama dari dua kata pertama nama (sama dengan halaman profil).
+  String _initialsOf(String name) {
+    final parts =
+        name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '-';
+    if (parts.length == 1) {
+      return parts.first.substring(0, 1).toUpperCase();
+    }
+    return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
+  }
+
+  void _updateInitials() {
+    final next = _initialsOf(_nameController.text);
+    if (next != _currentInitials) {
+      setState(() => _currentInitials = next);
+    }
   }
 
   Future<void> _pickBirthDate() async {
@@ -233,10 +257,10 @@ class _EditProfilPenggunaPageState extends State<EditProfilPenggunaPage> {
                                   color: avatarBg,
                                   borderRadius: BorderRadius.circular(22),
                                 ),
-                                child: const Center(
+                                child: Center(
                                   child: Text(
-                                    'LY',
-                                    style: TextStyle(
+                                    _currentInitials,
+                                    style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 26,
                                       fontWeight: FontWeight.bold,

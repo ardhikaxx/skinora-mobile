@@ -56,7 +56,9 @@ class ConsultationService {
     final linkRef = _links.doc(linkId(patient.uid, doctorUid));
     final now = FieldValue.serverTimestamp();
 
-    // Fase 1 — book slot secara atomik (tolak bila sudah diambil lain).
+    // Satu transaksi atomik: slot + konsultasi + care_link. Bila salah satu
+    // tulisan ditolak (mis. Security Rules belum diperbarui), seluruh transaksi
+    // dibatalkan sehingga slot TIDAK pernah hilang karena booking setengah jadi.
     await _db.runTransaction((tx) async {
       final slotSnap = await tx.get(slotRef);
       if (!slotSnap.exists ||
@@ -73,12 +75,7 @@ class ConsultationService {
         'patientName': patient.name,
         'updatedAt': now,
       });
-    });
-
-    // Fase 2 — consultation + care_link.
-    try {
-      final batch = _db.batch();
-      batch.set(consultationRef, {
+      tx.set(consultationRef, {
         'patientId': patient.uid,
         'patientName': patient.name,
         'doctorId': doctorUid,
@@ -97,31 +94,14 @@ class ConsultationService {
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      batch.set(linkRef, {
+      tx.set(linkRef, {
         'patientId': patient.uid,
         'doctorId': doctorUid,
         'slotId': slotId,
         'createdBy': patient.uid,
         'createdAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-      await batch.commit();
-    } catch (_) {
-      // Kompensasi: lepas booking bila consultation gagal dibuat.
-      try {
-        final consultSnap = await consultationRef.get();
-        if (!consultSnap.exists) {
-          await slotRef.update({
-            'isBooked': false,
-            'patientId': FieldValue.delete(),
-            'patientName': FieldValue.delete(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-        }
-      } catch (_) {
-        // best-effort
-      }
-      rethrow;
-    }
+    });
 
     await ActivityService.log(
       title: 'Booking konsultasi dengan $doctorName',

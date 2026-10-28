@@ -36,6 +36,21 @@ class SlotRecord {
   }
 }
 
+/// Status kelayakan sebuah slot untuk memulai konsultasi saat ini.
+enum SlotAvailability {
+  /// Slot boleh dipakai (sudah masuk jam konsultasi, belum berakhir).
+  available,
+
+  /// Belum masuk jam mulai konsultasi.
+  upcoming,
+
+  /// Sudah melewati jam selesai konsultasi.
+  expired,
+
+  /// Sudah dibooking pasien lain.
+  booked,
+}
+
 /// Subcollection `users/{doctorUid}/slots`.
 class ScheduleService {
   ScheduleService._();
@@ -110,6 +125,34 @@ class ScheduleService {
                 ),
           )
           .toList();
+
+  /// Kelayakan slot untuk **memulai konsultasi** sekarang (WIB).
+  ///
+  /// Dipakai UI agar jadwal yang belum waktunya tetap tampil, tetapi memberi
+  /// peringatan (bukan langsung menghilang karena dianggap dibooking).
+  static SlotAvailability availabilityOf(SlotRecord slot) {
+    if (slot.isBooked) return SlotAvailability.booked;
+    final start = slot.timeStart.isNotEmpty
+        ? slot.timeStart
+        : slot.time.split('-').first.trim();
+    if (AppDates.isSlotUpcoming(
+      dateIso: slot.dateIso,
+      scheduleDate: slot.date,
+      timeStart: start,
+    )) {
+      return SlotAvailability.upcoming;
+    }
+    if (slot.timeEnd.isNotEmpty &&
+        AppDates.isPastSlot(
+          dateIso: slot.dateIso,
+          scheduleDate: slot.date,
+          timeStart: start,
+          timeEnd: slot.timeEnd,
+        )) {
+      return SlotAvailability.expired;
+    }
+    return SlotAvailability.available;
+  }
 
   /// Tambah slot — mengembalikan document id Firestore.
   static Future<String> addSlot({

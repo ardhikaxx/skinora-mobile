@@ -478,25 +478,164 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
     );
   }
 
-  /// Menampilkan dialog menunggu dokter selama 3 detik lalu ke ruang konsultasi
-  Future<void> _onTimeSlotTapped(
-    String time,
-    String dayDate,
-    DoctorProfileDetailModel doctor,
-  ) async {
-    SlotRecord? slot;
+  /// Cari slot pada daftar realtime yang cocok dengan chip yang diketuk.
+  SlotRecord? _findSlot(String time, String dayDate) {
     for (final s in _availableSlots) {
       if (s.isBooked) continue;
       final sDate = s.date.toUpperCase();
       final sTime = AppDates.formatHm(
         s.timeStart.isNotEmpty ? s.timeStart : s.time,
       );
-      if (sDate == dayDate && sTime == time) {
-        slot = s;
-        break;
-      }
+      if (sDate == dayDate && sTime == time) return s;
+    }
+    return null;
+  }
+
+  /// Peringatan ramah saat pasien menekan jadwal sebelum jam konsultasi.
+  Future<void> _showNotYetAvailableDialog(
+    String doctorName,
+    String dayDate,
+    String startTime,
+  ) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 24, 22, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFFF3E0),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      LucideIcons.clock,
+                      size: 28,
+                      color: Color(0xFFB45309),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Belum Waktunya Konsultasi',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'serif',
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: darkText,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Jadwal konsultasi bersama $doctorName tersedia pada '
+                  '$dayDate pukul $startTime WIB.\n\n'
+                  'Anda belum dapat memulai konsultasi sebelum jam tersebut. '
+                  'Jadwal tetap tersimpan — silakan kembali pada waktu yang '
+                  'ditentukan.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6B5E5E),
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryMaroon,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Mengerti',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Menampilkan dialog menunggu dokter selama 3 detik lalu ke ruang konsultasi
+  Future<void> _onTimeSlotTapped(
+    String time,
+    String dayDate,
+    DoctorProfileDetailModel doctor,
+  ) async {
+    final slot = _findSlot(time, dayDate);
+    if (slot == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Jadwal ini sudah tidak tersedia. Silakan pilih jadwal lain.',
+          ),
+        ),
+      );
+      return;
     }
 
+    final slotDate = slot.date.isNotEmpty ? slot.date : dayDate;
+    final startTime = AppDates.formatHm(
+      slot.timeStart.isNotEmpty
+          ? slot.timeStart
+          : slot.time.split('-').first.trim(),
+    );
+
+    // Jaga-jaga: jangan pernah membooking jadwal yang belum waktunya / sudah
+    // lewat. Jadwal tetap tampil dan pasien hanya diberi peringatan.
+    switch (ScheduleService.availabilityOf(slot)) {
+      case SlotAvailability.booked:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Slot sudah dibooking oleh pasien lain. Silakan pilih jadwal lain.',
+            ),
+          ),
+        );
+        return;
+      case SlotAvailability.upcoming:
+        await _showNotYetAvailableDialog(doctor.name, slotDate, startTime);
+        return;
+      case SlotAvailability.expired:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Jadwal $slotDate pukul $startTime WIB sudah berakhir.',
+            ),
+          ),
+        );
+        return;
+      case SlotAvailability.available:
+        break;
+    }
+
+    if (!mounted) return;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -542,7 +681,7 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Sedang menghubungkan ke ${doctor.name} untuk jadwal $dayDate pukul $time WIB.',
+                  'Sedang menghubungkan ke ${doctor.name} untuk jadwal $slotDate pukul $startTime WIB.',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 13,
@@ -560,37 +699,36 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
     String? consultationId;
     String bookingError = '';
     if (Backend.useFirebase) {
-      final nowBooked = slot == null || slot.isBooked;
-      if (nowBooked) {
-        bookingError =
-            'Slot sudah dibooking oleh pasien lain. Silahkan pilih jadwal lain.';
-      } else {
-        try {
-          final patient = await AuthService.loadProfile();
-          if (patient == null || patient.uid.isEmpty) {
-            throw StateError(
-              'Sesi pengguna tidak ditemukan. Silahkan login ulang.',
-            );
-          }
-          consultationId = await ConsultationService.book(
-            doctorUid: doctor.id,
-            doctorName: doctor.name,
-            specialization: doctor.specialization,
-            slotId: slot.id,
-            scheduleDate: slot.date,
-            scheduleTime: slot.time,
-            patient: patient,
-            dateIso: slot.dateIso,
-            timeStart: slot.timeStart,
-            timeEnd: slot.timeEnd,
+      try {
+        final patient = await AuthService.loadProfile();
+        if (patient == null || patient.uid.isEmpty) {
+          throw StateError(
+            'Sesi pengguna tidak ditemukan. Silahkan login ulang.',
           );
-        } catch (e) {
-          final msg = e.toString();
-          bookingError = msg.contains('permission-denied') ||
-                  msg.toLowerCase().contains('already') ||
-                  msg.contains('dibooking')
-              ? 'Slot sudah dibooking oleh pasien lain. Silahkan pilih jadwal lain.'
-              : 'Gagal booking: $msg';
+        }
+        consultationId = await ConsultationService.book(
+          doctorUid: doctor.id,
+          doctorName: doctor.name,
+          specialization: doctor.specialization,
+          slotId: slot.id,
+          scheduleDate: slotDate,
+          scheduleTime: slot.time,
+          patient: patient,
+          dateIso: slot.dateIso,
+          timeStart: slot.timeStart.isNotEmpty ? slot.timeStart : startTime,
+          timeEnd: slot.timeEnd,
+        );
+      } catch (e) {
+        final msg = e.toString();
+        final lowered = msg.toLowerCase();
+        if (msg.contains('dibooking') || lowered.contains('already booked')) {
+          bookingError =
+              'Slot sudah dibooking oleh pasien lain. Silakan pilih jadwal lain.';
+        } else if (lowered.contains('permission-denied')) {
+          bookingError =
+              'Gagal memesan jadwal karena akses ditolak. Silakan coba lagi.';
+        } else {
+          bookingError = 'Gagal memesan jadwal: $msg';
         }
       }
     }
@@ -610,7 +748,7 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
         (consultationId == null || consultationId.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Gagal booking: slot tidak ditemukan.'),
+          content: Text('Gagal memesan jadwal. Silakan coba lagi.'),
         ),
       );
       return;
@@ -625,12 +763,12 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
           specialization: doctor.specialization,
           consultationId: consultationId,
           onNavigateTab: widget.onNavigateTab,
-          dateTime: '$dayDate • $time',
-          scheduleDate: (slot != null && slot.date.isNotEmpty) ? slot.date : dayDate,
-          scheduleTime: (slot != null && slot.time.isNotEmpty) ? slot.time : time,
-          dateIso: slot?.dateIso,
-          timeStart: (slot != null && slot.timeStart.isNotEmpty) ? slot.timeStart : time,
-          timeEnd: slot?.timeEnd,
+          dateTime: '$slotDate • $startTime',
+          scheduleDate: slotDate,
+          scheduleTime: slot.time.isNotEmpty ? slot.time : time,
+          dateIso: slot.dateIso,
+          timeStart: slot.timeStart.isNotEmpty ? slot.timeStart : startTime,
+          timeEnd: slot.timeEnd,
         ),
       ),
     );

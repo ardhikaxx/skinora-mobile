@@ -226,7 +226,7 @@ class _ProfilPenggunaPageState extends State<ProfilPenggunaPage> {
       ),
       child: Row(
         children: [
-          // Maroon Squircle Avatar with "LY" initials
+          // Maroon Squircle Avatar with initials from the account name
           Container(
             width: 64,
             height: 64,

@@ -5,6 +5,7 @@ import '../../models/user_profile.dart';
 import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
+import '../../services/login_preference_service.dart';
 import '../admin/admin_main_page.dart';
 import '../dokter/dokter_main_page.dart';
 import '../pengguna/pengguna_main_page.dart';
@@ -27,14 +28,48 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
-  bool _rememberMe = false;
+  bool _rememberMe = true;
   String? _errorMessage;
   bool _busy = false;
 
   @override
   void initState() {
     super.initState();
+    _restoreRememberedEmail();
     _restoreSessionIfNeeded();
+  }
+
+  /// Isi kolom email dari preferensi "Ingat saya" (fitur ini hanya menyimpan
+  /// email — password tidak pernah disimpan).
+  Future<void> _restoreRememberedEmail() async {
+    try {
+      final enabled = await LoginPreferenceService.isRememberEnabled();
+      final remembered = await LoginPreferenceService.rememberedEmail();
+      if (!mounted) return;
+      setState(() {
+        _rememberMe = enabled;
+        if (remembered.isNotEmpty && _emailController.text.trim().isEmpty) {
+          _emailController.text = remembered;
+          _emailController.selection =
+              TextSelection.collapsed(offset: remembered.length);
+        }
+      });
+    } catch (e) {
+      debugPrint('[LOGIN] gagal memuat "Ingat saya": $e');
+    }
+  }
+
+  /// Simpan / lupakan email akun sesuai pilihan "Ingat saya".
+  Future<void> _persistRememberChoice(String email) async {
+    try {
+      if (_rememberMe) {
+        await LoginPreferenceService.remember(email);
+      } else {
+        await LoginPreferenceService.forget();
+      }
+    } catch (e) {
+      debugPrint('[LOGIN] gagal menyimpan "Ingat saya": $e');
+    }
   }
 
   /// Session persistence: bila pengguna sudah login, langsung diarahkan
@@ -163,7 +198,11 @@ class _LoginPageState extends State<LoginPage> {
       debugPrint('[LOGIN] ActivityService.log gagal (diabaikan): $e');
     }
 
-    // ── Tahap 4: Navigasi ke halaman sesuai role ──
+    // ── Tahap 4: Simpan preferensi "Ingat saya" ──
+    // Non-blocking: kegagalan menyimpan preferensi tidak menghalangi login.
+    await _persistRememberChoice(email);
+
+    // ── Tahap 5: Navigasi ke halaman sesuai role ──
     if (!mounted) return;
     _routeToHome(profile.role);
   }
@@ -427,9 +466,24 @@ class _LoginPageState extends State<LoginPage> {
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     onChanged: (val) {
+                                      final enabled = val ?? false;
                                       setState(() {
-                                        _rememberMe = val ?? false;
+                                        _rememberMe = enabled;
                                       });
+                                      if (enabled) {
+                                        // Langsung ingat email yang sedang
+                                        // diketik (bila ada).
+                                        final typed =
+                                            _emailController.text.trim();
+                                        if (typed.isNotEmpty) {
+                                          LoginPreferenceService.remember(typed);
+                                        } else {
+                                          LoginPreferenceService
+                                              .setRememberEnabled(true);
+                                        }
+                                      } else {
+                                        LoginPreferenceService.forget();
+                                      }
                                     },
                                   ),
                                 ),
