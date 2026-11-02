@@ -34,9 +34,8 @@ class AuthService {
   }
 
   /// Membuat akun Auth + dokumen profile.
-  /// - Register hanya untuk pengguna (dan dokter yang di-provision admin).
-  /// - Provision role `admin` → ditolak (admin sudah terdaftar pertama).
-  /// - Provision role `dokter` → diwariskan saat email cocok.
+  /// - Register untuk pengguna, serta dokter dan admin yang di-provision admin.
+  /// - Provision role `dokter` / `admin` → diwariskan saat email cocok.
   /// - Selain itu role = 'pengguna'.
   ///
   /// Catatan: cek provision dilakukan SETELAH Auth account dibuat

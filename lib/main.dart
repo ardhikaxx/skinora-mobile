@@ -34,6 +34,10 @@ import 'pages/admin/laporan_riwayat_page.dart';
 import 'models/admin_article_model.dart';
 import 'models/admin_doctor_model.dart';
 import 'models/admin_user_model.dart';
+import 'models/admin_account_model.dart';
+import 'pages/admin/manajemen_admin_page.dart';
+import 'pages/admin/tambah_admin_page.dart';
+import 'pages/admin/detail_admin_page.dart';
 import 'pages/dokter/dokter_main_page.dart';
 import 'pages/dokter/patient_insight_page.dart';
 import 'pages/dokter/detail_patient_insight_page.dart';
@@ -242,6 +246,23 @@ class _SkinoraAppState extends State<SkinoraApp> {
                   status: UserStatus.aktif,
                 );
           return DetailPenggunaPage(user: user);
+        },
+        '/admin/admin': (context) => const ManajemenAdminPage(),
+        '/admin/admin/tambah': (context) => const TambahAdminPage(),
+        '/admin/admin/detail': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          final admin = (args is AdminAccountModel)
+              ? args
+              : AdminAccountModel(
+                  id: '',
+                  name: '',
+                  email: '',
+                  phone: '',
+                  address: '',
+                  birthDate: '',
+                  gender: '',
+                );
+          return DetailAdminPage(admin: admin);
         },
         '/admin/profil': (context) => const ProfilAdminPage(),
         '/admin/edit-profil': (context) => const EditProfilAdminPage(),

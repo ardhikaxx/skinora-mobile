@@ -54,22 +54,28 @@ service cloud.firestore {
       allow read: if isAdmin() || isOwner(uid)
         || (signedIn() && resource.data.role == 'dokter');
 
-      // Register: role admin mustahil dari client; role dokter hanya bila ada
-      // provision aktif untuk email token yang belum dikonsumsi.
+      // Register: role dokter atau admin hanya bila ada provision aktif
+      // yang dibuat admin untuk email token yang belum dikonsumsi.
       allow create: if isOwner(uid)
         && request.resource.data.uid == uid
-        && request.resource.data.role in ['pengguna', 'dokter']
+        && request.resource.data.role in ['pengguna', 'dokter', 'admin']
         && (
           request.resource.data.role == 'pengguna'
           || (
-            request.resource.data.status in ['menunggu', 'terverifikasi', 'ditolak', 'ditangguhkan']
+            request.resource.data.role in ['dokter', 'admin']
             && userExists(uid) == false
             && exists(/databases/$(database)/documents/provisioned_accounts/$(request.auth.token.email))
-            && get(/databases/$(database)/documents/provisioned_accounts/$(request.auth.token.email)).data.role == 'dokter'
+            && get(/databases/$(database)/documents/provisioned_accounts/$(request.auth.token.email)).data.role == request.resource.data.role
             && get(/databases/$(database)/documents/provisioned_accounts/$(request.auth.token.email)).data.consumedByUid == null
             && get(/databases/$(database)/documents/provisioned_accounts/$(request.auth.token.email)).data.email == request.auth.token.email
             && request.resource.data.status
                  == get(/databases/$(database)/documents/provisioned_accounts/$(request.auth.token.email)).data.status
+            && (
+              (request.resource.data.role == 'dokter'
+                && request.resource.data.status in ['menunggu', 'terverifikasi', 'ditolak', 'ditangguhkan'])
+              || (request.resource.data.role == 'admin'
+                && request.resource.data.status in ['aktif', 'ditangguhkan'])
+            )
           )
         )
         // Client register pengguna selalu berstatus aktif.

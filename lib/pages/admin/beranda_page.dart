@@ -15,6 +15,7 @@ import '../../utils/app_dates.dart';
 import 'notifikasi_admin_page.dart';
 import 'master_spesialisasi_page.dart';
 import 'laporan_riwayat_page.dart';
+import 'manajemen_admin_page.dart';
 
 class BerandaAdminPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
@@ -550,8 +551,22 @@ class _BerandaAdminPageState extends State<BerandaAdminPage> {
                   },
                 ),
               ),
-              const Expanded(
-                child: SizedBox(),
+              Expanded(
+                child: _buildQuickMenuItem(
+                  icon: LucideIcons.shieldCheck,
+                  title: 'Admin',
+                  subtitle: 'Kelola admin',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ManajemenAdminPage(
+                          onNavigateTab: widget.onNavigateTab,
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
             ],
           ),

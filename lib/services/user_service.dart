@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import '../models/admin_account_model.dart';
 import '../models/admin_doctor_model.dart';
 import '../models/admin_user_model.dart';
 import '../models/user_profile.dart';
@@ -142,9 +143,11 @@ class UserService {
     final now = FieldValue.serverTimestamp();
 
     if (p != null) {
-      // Admin tidak boleh dibuat lewat register (admin sudah terdaftar pertama).
+      // Role dokter atau admin diwariskan dari provision; selain itu pengguna.
       final inheritedRole = (p['role'] as String?) ?? 'pengguna';
-      final role = inheritedRole == 'admin' ? 'pengguna' : inheritedRole;
+      final role = (inheritedRole == 'dokter' || inheritedRole == 'admin')
+          ? inheritedRole
+          : 'pengguna';
       batch.set(_users.doc(uid), {
         'uid': uid,
         'name': (p['name'] as String?) ?? name,
@@ -209,10 +212,8 @@ class UserService {
       final snap = await _provisions.doc(normalized).get();
       if (!snap.exists) return null;
       final data = snap.data() ?? const {};
-      if (data['consumedByUid'] != null) return null;
-      final role = (data['role'] as String?) ?? 'pengguna';
-      if (role == 'admin') {
-        return 'Akun admin tidak dapat mendaftar. Silahkan gunakan menu Masuk.';
+      if (data['consumedByUid'] != null) {
+        return 'Undangan untuk email ini sudah digunakan.';
       }
       return null;
     } on FirebaseException {
@@ -260,6 +261,26 @@ class UserService {
       str: (d['str'] as String?) ?? '',
       bio: (d['bio'] as String?) ?? '',
       status: doctorStatusFrom((d['status'] as String?) ?? 'menunggu'),
+    );
+  }
+
+  static AdminAccountModel _adminAccountFrom(
+    String docId,
+    Map<String, dynamic> d, {
+    required bool registered,
+  }) {
+    return AdminAccountModel(
+      id: docId,
+      fsDocId: docId,
+      registered: registered,
+      name: (d['name'] as String?) ?? '',
+      email: (d['email'] as String?) ?? '',
+      phone: (d['phone'] as String?) ?? '',
+      address: (d['address'] as String?) ?? '',
+      birthDate: (d['birthDate'] as String?) ?? '',
+      gender: (d['gender'] as String?) ?? '',
+      status: userStatusFrom((d['status'] as String?) ?? 'aktif'),
+      createdAt: d['createdAt'],
     );
   }
 
@@ -413,6 +434,70 @@ class UserService {
             .toList());
   }
 
+  /// Daftar seluruh akun admin (terdaftar + undangan provision).
+  static Future<List<AdminAccountModel>> listAdmin() async {
+    if (!Backend.useFirebase) return const [];
+    final users = await _users.where('role', isEqualTo: 'admin').get();
+    final provisions = await _provisions
+        .where('role', isEqualTo: 'admin')
+        .where('consumedByUid', isEqualTo: null)
+        .get();
+    return [
+      ...users.docs
+          .map((d) => _adminAccountFrom(d.id, d.data(), registered: true)),
+      ...provisions.docs
+          .map((d) => _adminAccountFrom(d.id, d.data(), registered: false)),
+    ];
+  }
+
+  /// Stream realtime seluruh akun admin (terdaftar + undangan provision).
+  static Stream<List<AdminAccountModel>> streamAdmin() {
+    if (!Backend.useFirebase) return const Stream.empty();
+    late StreamController<List<AdminAccountModel>> controller;
+    StreamSubscription? s1;
+    StreamSubscription? s2;
+    List<AdminAccountModel> aList = [];
+    List<AdminAccountModel> pList = [];
+
+    void emit() {
+      if (!controller.isClosed) {
+        controller.add([...aList, ...pList]);
+      }
+    }
+
+    controller = StreamController<List<AdminAccountModel>>(
+      onListen: () {
+        s1 = _users.where('role', isEqualTo: 'admin').snapshots().listen(
+          (snap) {
+            aList = snap.docs
+                .map((d) => _adminAccountFrom(d.id, d.data(), registered: true))
+                .toList();
+            emit();
+          },
+          onError: controller.addError,
+        );
+        s2 = _provisions
+            .where('role', isEqualTo: 'admin')
+            .where('consumedByUid', isEqualTo: null)
+            .snapshots()
+            .listen(
+          (snap) {
+            pList = snap.docs
+                .map((d) => _adminAccountFrom(d.id, d.data(), registered: false))
+                .toList();
+            emit();
+          },
+          onError: controller.addError,
+        );
+      },
+      onCancel: () {
+        s1?.cancel();
+        s2?.cancel();
+      },
+    );
+    return controller.stream;
+  }
+
   // ---------------------------------------------------------------------------
   // Admin: tulis (tambah / status)
   // ---------------------------------------------------------------------------
@@ -522,6 +607,66 @@ class UserService {
     });
   }
 
+  /// "Tambah Admin": bila email sudah terdaftar → upgrade role ke admin,
+  /// bila belum terdaftar → buat dokumen pre-provision di provisioned_accounts.
+  static Future<AdminAccountModel> createAdmin(AdminAccountModel a) async {
+    if (!Backend.useFirebase) return a;
+    final email = a.email.trim().toLowerCase();
+    final existing =
+        await _users.where('email', isEqualTo: email).limit(1).get();
+    if (existing.docs.isNotEmpty) {
+      final doc = existing.docs.first;
+      await _users.doc(doc.id).update({
+        'name': a.name,
+        'phone': a.phone,
+        'address': a.address,
+        'gender': a.gender,
+        'birthDate': a.birthDate,
+        'role': 'admin',
+        'status': userStatusLabel(a.status),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      return a.copyWith(fsDocId: doc.id, registered: true, email: email);
+    }
+    // Doc ID = email (cocok rules register).
+    final ref = _provisions.doc(email);
+    await ref.set({
+      'email': email,
+      'name': a.name,
+      'phone': a.phone,
+      'address': a.address,
+      'birthDate': a.birthDate,
+      'gender': a.gender,
+      'role': 'admin',
+      'status': userStatusLabel(a.status),
+      'settings': {
+        'notificationsEnabled': true,
+        'morningReminder': '',
+        'eveningReminder': '',
+      },
+      'consumedByUid': null,
+      'createdBy': FirebaseAuth.instance.currentUser?.uid ?? 'admin',
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    return a.copyWith(fsDocId: ref.id, registered: false, email: email);
+  }
+
+  /// Update status akun admin (aktifkan / tangguhkan).
+  /// Menolak penangguhan terhadap akun admin yang sedang login.
+  static Future<void> updateAdminStatus(AdminAccountModel a) async {
+    if (!Backend.useFirebase) return;
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    if (a.registered && currentUid != null && a.backendId == currentUid) {
+      throw StateError('Anda tidak dapat menangguhkan akun admin Anda sendiri.');
+    }
+    final col = a.registered ? _users : _provisions;
+    await col.doc(a.backendId).update({
+      'status': userStatusLabel(a.status),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   // ---------------------------------------------------------------------------
   // Update profile milik sendiri & pengaturan
   // ---------------------------------------------------------------------------
@@ -592,6 +737,9 @@ class UserService {
   static Future<int> countDokterAktif() async => _count(_users
       .where('role', isEqualTo: 'dokter')
       .where('status', isEqualTo: 'terverifikasi'));
+
+  static Future<int> countAdmin() async =>
+      _count(_users.where('role', isEqualTo: 'admin'));
 
   static Future<int> _count(Query<Map<String, dynamic>> q) async {
     if (!Backend.useFirebase) return 0;

@@ -10,6 +10,7 @@ import '../../services/user_service.dart';
 import '../../models/admin_doctor_model.dart';
 import 'edit_profil_admin_page.dart';
 import 'laporan_riwayat_page.dart';
+import 'manajemen_admin_page.dart';
 import 'pengaturan_admin_page.dart';
 import 'riwayat_aktivitas_admin_page.dart';
 import 'tentang_admin_page.dart';
@@ -592,9 +593,24 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
     );
   }
 
-  /// 4. Action Menu Card (Pengaturan, Tentang Aplikasi, Riwayat Aktivitas, Logout)
+  /// 4. Action Menu Card (Manajemen Admin, Pengaturan, Tentang Aplikasi, Riwayat Aktivitas, Logout)
   Widget _buildActionMenuCard() {
     final menuItems = [
+      {
+        'icon': LucideIcons.shieldCheck,
+        'title': 'Manajemen Admin',
+        'isDestructive': false,
+        'onTap': () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ManajemenAdminPage(
+                onNavigateTab: widget.onNavigateTab,
+              ),
+            ),
+          );
+        },
+      },
       {
         'icon': LucideIcons.settings,
         'title': 'Pengaturan',
