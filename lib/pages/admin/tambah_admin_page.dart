@@ -26,53 +26,29 @@ class _TambahAdminPageState extends State<TambahAdminPage> {
 
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
-  final _birthDateController = TextEditingController();
 
-  String _selectedGender = 'Perempuan';
-  final List<String> _genders = ['Perempuan', 'Laki-laki'];
-
+  bool _obscurePassword = true;
   bool _isSaving = false;
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _passwordController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
-    _birthDateController.dispose();
     super.dispose();
-  }
-
-  Future<void> _pickBirthDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime(1995),
-      firstDate: DateTime(1950),
-      lastDate: DateTime.now(),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: primaryMaroon,
-            onPrimary: Colors.white,
-            onSurface: darkText,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (picked != null && mounted) {
-      setState(() {
-        _birthDateController.text =
-            '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
-      });
-    }
   }
 
   Future<void> _handleSubmit() async {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim().toLowerCase();
+    final password = _passwordController.text.trim();
+    final phone = _phoneController.text.trim();
+    final address = _addressController.text.trim();
 
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -96,16 +72,26 @@ class _TambahAdminPageState extends State<TambahAdminPage> {
       return;
     }
 
+    if (password.isNotEmpty && password.length < 6) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password minimal 6 karakter'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     var newAdmin = AdminAccountModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name,
       email: email,
-      phone: _phoneController.text.trim(),
-      address: _addressController.text.trim(),
-      birthDate: _birthDateController.text.trim(),
-      gender: _selectedGender,
+      password: password.isNotEmpty ? password : null,
+      phone: phone,
+      address: address,
       status: UserStatus.aktif,
     );
 
@@ -205,7 +191,7 @@ class _TambahAdminPageState extends State<TambahAdminPage> {
                           SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'Admin baru akan memiliki hak akses penuh ke seluruh menu manajemen platform. Pastikan email yang dimasukkan adalah email resmi yang valid.',
+                              'Admin baru akan memiliki hak akses penuh ke seluruh menu manajemen platform. Masukkan nama lengkap, nomor telepon, alamat, email dan password admin.',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Color(0xFF9A3412),
@@ -219,17 +205,17 @@ class _TambahAdminPageState extends State<TambahAdminPage> {
 
                     const SizedBox(height: 18),
 
-                    // Nama Lengkap
+                    // 1. Nama Lengkap
                     _buildLabel('Nama Lengkap *'),
                     _buildTextField(
                       controller: _nameController,
-                      hintText: 'Contoh: dr. Sarah Wijaya / Ahmad Admin',
+                      hintText: 'Contoh: Ahmad Admin / Sarah Wijaya',
                       icon: LucideIcons.user,
                     ),
 
                     const SizedBox(height: 16),
 
-                    // Email
+                    // 2. Email Admin
                     _buildLabel('Email Admin *'),
                     _buildTextField(
                       controller: _emailController,
@@ -240,7 +226,61 @@ class _TambahAdminPageState extends State<TambahAdminPage> {
 
                     const SizedBox(height: 16),
 
-                    // Nomor Telepon
+                    // 3. Password
+                    _buildLabel('Password Admin'),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFFE5E7EB),
+                          width: 1.1,
+                        ),
+                      ),
+                      child: TextField(
+                        controller: _passwordController,
+                        obscureText: _obscurePassword,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: darkText,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Minimal 6 karakter',
+                          hintStyle: const TextStyle(
+                            fontSize: 13.5,
+                            color: Color(0xFF9CA3AF),
+                          ),
+                          prefixIcon: const Icon(
+                            LucideIcons.lock,
+                            size: 18,
+                            color: Color(0xFF9CA3AF),
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? LucideIcons.eyeOff
+                                  : LucideIcons.eye,
+                              size: 18,
+                              color: subText,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // 4. Nomor Telepon
                     _buildLabel('Nomor Telepon'),
                     _buildTextField(
                       controller: _phoneController,
@@ -251,65 +291,7 @@ class _TambahAdminPageState extends State<TambahAdminPage> {
 
                     const SizedBox(height: 16),
 
-                    // Jenis Kelamin
-                    _buildLabel('Jenis Kelamin'),
-                    Container(
-                      height: 48,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: const Color(0xFFE5E7EB),
-                          width: 1.1,
-                        ),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedGender,
-                          isExpanded: true,
-                          icon: const Icon(
-                            LucideIcons.chevronDown,
-                            size: 18,
-                            color: subText,
-                          ),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: darkText,
-                          ),
-                          items: _genders.map((g) {
-                            return DropdownMenuItem<String>(
-                              value: g,
-                              child: Text(g),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() => _selectedGender = val);
-                            }
-                          },
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Tanggal Lahir
-                    _buildLabel('Tanggal Lahir'),
-                    InkWell(
-                      onTap: _pickBirthDate,
-                      child: IgnorePointer(
-                        child: _buildTextField(
-                          controller: _birthDateController,
-                          hintText: 'Pilih tanggal lahir (YYYY-MM-DD)',
-                          icon: LucideIcons.calendar,
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Alamat
+                    // 5. Alamat
                     _buildLabel('Alamat'),
                     _buildTextField(
                       controller: _addressController,

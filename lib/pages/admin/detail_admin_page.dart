@@ -400,20 +400,6 @@ class _DetailAdminPageState extends State<DetailAdminPage> {
                           ),
                           const Divider(height: 24, color: Color(0xFFF3F4F6)),
                           _buildInfoRow(
-                            icon: LucideIcons.user,
-                            label: 'Jenis Kelamin',
-                            value: _admin.gender.isNotEmpty ? _admin.gender : '-',
-                          ),
-                          const Divider(height: 24, color: Color(0xFFF3F4F6)),
-                          _buildInfoRow(
-                            icon: LucideIcons.calendar,
-                            label: 'Tanggal Lahir',
-                            value: _admin.birthDate.isNotEmpty
-                                ? _admin.birthDate
-                                : '-',
-                          ),
-                          const Divider(height: 24, color: Color(0xFFF3F4F6)),
-                          _buildInfoRow(
                             icon: LucideIcons.mapPin,
                             label: 'Alamat',
                             value:

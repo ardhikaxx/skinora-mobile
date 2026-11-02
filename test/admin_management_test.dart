@@ -172,7 +172,8 @@ void main() {
       await tester.enterText(find.byType(TextField).at(0), 'Budi Santoso');
       await tester.enterText(
           find.byType(TextField).at(1), 'budi.admin@skinora.id');
-      await tester.enterText(find.byType(TextField).at(2), '0812345678');
+      await tester.enterText(find.byType(TextField).at(2), 'adminSecret123');
+      await tester.enterText(find.byType(TextField).at(3), '0812345678');
       await tester.enterText(
           find.byType(TextField).at(4), 'Jl. Merdeka No. 45');
 
@@ -183,6 +184,9 @@ void main() {
       expect(createdAdmin, isNotNull);
       expect(createdAdmin!.name, 'Budi Santoso');
       expect(createdAdmin!.email, 'budi.admin@skinora.id');
+      expect(createdAdmin!.password, 'adminSecret123');
+      expect(createdAdmin!.phone, '0812345678');
+      expect(createdAdmin!.address, 'Jl. Merdeka No. 45');
       expect(createdAdmin!.status, UserStatus.aktif);
     });
   });

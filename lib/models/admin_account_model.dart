@@ -1,12 +1,14 @@
 import 'admin_user_model.dart';
 
 /// Model akun admin untuk fitur Manajemen Admin.
+/// Data admin diselaraskan: Nama Lengkap, Email, Nomor Telepon, Alamat, dan Password.
 class AdminAccountModel {
   final String id;
   String name;
   String email;
   String phone;
   String address;
+  String? password;
   String birthDate;
   String gender;
   UserStatus status;
@@ -23,10 +25,11 @@ class AdminAccountModel {
     required this.id,
     required this.name,
     required this.email,
-    required this.phone,
-    required this.address,
-    required this.birthDate,
-    required this.gender,
+    this.phone = '',
+    this.address = '',
+    this.password,
+    this.birthDate = '',
+    this.gender = '',
     this.status = UserStatus.aktif,
     this.fsDocId,
     this.registered = true,
@@ -53,6 +56,7 @@ class AdminAccountModel {
     String? email,
     String? phone,
     String? address,
+    String? password,
     String? birthDate,
     String? gender,
     UserStatus? status,
@@ -66,6 +70,7 @@ class AdminAccountModel {
       email: email ?? this.email,
       phone: phone ?? this.phone,
       address: address ?? this.address,
+      password: password ?? this.password,
       birthDate: birthDate ?? this.birthDate,
       gender: gender ?? this.gender,
       status: status ?? this.status,

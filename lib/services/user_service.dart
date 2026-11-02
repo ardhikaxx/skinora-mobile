@@ -609,6 +609,7 @@ class UserService {
 
   /// "Tambah Admin": bila email sudah terdaftar → upgrade role ke admin,
   /// bila belum terdaftar → buat dokumen pre-provision di provisioned_accounts.
+  /// Data admin selaras: nama lengkap, nomor telepon, alamat, email, dan password.
   static Future<AdminAccountModel> createAdmin(AdminAccountModel a) async {
     if (!Backend.useFirebase) return a;
     final email = a.email.trim().toLowerCase();
@@ -620,8 +621,6 @@ class UserService {
         'name': a.name,
         'phone': a.phone,
         'address': a.address,
-        'gender': a.gender,
-        'birthDate': a.birthDate,
         'role': 'admin',
         'status': userStatusLabel(a.status),
         'updatedAt': FieldValue.serverTimestamp(),
@@ -635,8 +634,7 @@ class UserService {
       'name': a.name,
       'phone': a.phone,
       'address': a.address,
-      'birthDate': a.birthDate,
-      'gender': a.gender,
+      'initialPassword': a.password,
       'role': 'admin',
       'status': userStatusLabel(a.status),
       'settings': {
