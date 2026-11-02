@@ -33,6 +33,14 @@
       ]
     },
     {
+      "collectionGroup": "consultations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "patientId", "order": "ASCENDING" },
+        { "fieldPath": "dateIso", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "slots",
       "queryScope": "COLLECTION_GROUP",
       "fields": [

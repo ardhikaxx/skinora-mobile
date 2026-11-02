@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../models/doctor_practice_settings.dart';
 import '../services/activity_service.dart';
 import '../services/backend.dart';
 import '../services/notification_payload.dart';
@@ -10,10 +11,14 @@ class SlotRecord {
   final String id;
   final String doctorId;
   final String date; // tampil: "Jumat, 28 Agustus 2026"
-  final String time; // "09:00 - 09:30"
+  final String time; // "09.00 - 09.15" atau "09:00 - 09:30"
   final String timeStart;
   final String timeEnd;
   final bool isBooked;
+  final int quota; // Batas kuota pasien untuk sesi ini (default 1)
+  final int bookedCount; // Berapa pasien yang sudah booking
+  final List<String> patientIds;
+  final List<String> patientNames;
   final String? patientId;
   final String? patientName;
 
@@ -25,9 +30,24 @@ class SlotRecord {
     this.timeStart = '',
     this.timeEnd = '',
     this.isBooked = false,
+    this.quota = 1,
+    this.bookedCount = 0,
+    this.patientIds = const [],
+    this.patientNames = const [],
     this.patientId,
     this.patientName,
   });
+
+  /// Sisa kuota pasien yang masih tersedia untuk sesi ini.
+  int get remainingQuota {
+    final effectiveCount =
+        bookedCount > 0 ? bookedCount : (isBooked ? quota : 0);
+    final remaining = quota - effectiveCount;
+    return remaining < 0 ? 0 : remaining;
+  }
+
+  /// Apakah sesi sudah penuh mencapai batas maksimal kuota pasien.
+  bool get isFull => isBooked || (bookedCount >= quota && quota > 0);
 
   /// yyyy-MM-dd bila tanggal tampil bisa diparse, else "".
   String get dateIso {
@@ -47,7 +67,7 @@ enum SlotAvailability {
   /// Sudah melewati jam selesai konsultasi.
   expired,
 
-  /// Sudah dibooking pasien lain.
+  /// Sudah penuh / dibooking pasien.
   booked,
 }
 
@@ -65,6 +85,23 @@ class ScheduleService {
     DocumentSnapshot<Map<String, dynamic>> d,
   ) {
     final m = d.data() ?? const {};
+    final quota = (m['quota'] as num?)?.toInt() ?? 1;
+    final isBooked = (m['isBooked'] as bool?) ?? false;
+    final patientIdsRaw = m['patientIds'];
+    final patientIds = patientIdsRaw is List
+        ? patientIdsRaw.map((e) => e.toString()).toList()
+        : <String>[];
+    final patientNamesRaw = m['patientNames'];
+    final patientNames = patientNamesRaw is List
+        ? patientNamesRaw.map((e) => e.toString()).toList()
+        : <String>[];
+    int bookedCount = (m['bookedCount'] as num?)?.toInt() ?? 0;
+    if (bookedCount == 0 && patientIds.isNotEmpty) {
+      bookedCount = patientIds.length;
+    } else if (bookedCount == 0 && isBooked) {
+      bookedCount = quota;
+    }
+
     return SlotRecord(
       id: d.id,
       doctorId: doctorUid,
@@ -72,7 +109,11 @@ class ScheduleService {
       time: (m['time'] as String?) ?? '',
       timeStart: (m['timeStart'] as String?) ?? '',
       timeEnd: (m['timeEnd'] as String?) ?? '',
-      isBooked: (m['isBooked'] as bool?) ?? false,
+      isBooked: isBooked || (bookedCount >= quota && quota > 0),
+      quota: quota > 0 ? quota : 1,
+      bookedCount: bookedCount,
+      patientIds: patientIds,
+      patientNames: patientNames,
       patientId: m['patientId'] as String?,
       patientName: m['patientName'] as String?,
     );
@@ -80,13 +121,11 @@ class ScheduleService {
 
   static Future<List<SlotRecord>> listSlots(String doctorUid) async {
     if (!Backend.useFirebase || doctorUid.isEmpty) return const [];
-    final snap = await _slots(doctorUid)
-        .orderBy('createdAt')
-        .get();
+    final snap = await _slots(doctorUid).orderBy('createdAt').get();
     return snap.docs.map((d) => _from(doctorUid, d)).toList();
   }
 
-  /// Stream realtime slot dokter — daftar selalu sinkron antar klien.
+  /// Stream realtime semua slot dokter (sinkron antar dokter & pasien).
   static Stream<List<SlotRecord>> slotStream(String doctorUid) {
     if (!Backend.useFirebase || doctorUid.isEmpty) {
       return const Stream.empty();
@@ -96,8 +135,7 @@ class ScheduleService {
         );
   }
 
-  /// Slot kosong saja (kompatibel rules read: `isBooked != true` untuk
-  /// non-owner — query harus memfilter agar rules dapat memverifikasi).
+  /// Slot kosong / belum penuh saja (kompatibel rules read).
   static Stream<List<SlotRecord>> bookableSlotStream(String doctorUid) {
     if (!Backend.useFirebase || doctorUid.isEmpty) {
       return const Stream.empty();
@@ -111,12 +149,12 @@ class ScheduleService {
         );
   }
 
-  /// Slot layak booking: belum diambil, punya tanggal, belum lewat (WIB).
+  /// Slot layak booking: belum penuh, punya tanggal, belum lewat (WIB).
   static List<SlotRecord> bookableSlots(Iterable<SlotRecord> slots) =>
       slots
           .where(
             (s) =>
-                !s.isBooked &&
+                !s.isFull &&
                 s.date.isNotEmpty &&
                 !AppDates.isPastSlot(
                   dateIso: s.dateIso,
@@ -127,11 +165,8 @@ class ScheduleService {
           .toList();
 
   /// Kelayakan slot untuk **memulai konsultasi** sekarang (WIB).
-  ///
-  /// Dipakai UI agar jadwal yang belum waktunya tetap tampil, tetapi memberi
-  /// peringatan (bukan langsung menghilang karena dianggap dibooking).
   static SlotAvailability availabilityOf(SlotRecord slot) {
-    if (slot.isBooked) return SlotAvailability.booked;
+    if (slot.isFull) return SlotAvailability.booked;
     final start = slot.timeStart.isNotEmpty
         ? slot.timeStart
         : slot.time.split('-').first.trim();
@@ -154,13 +189,14 @@ class ScheduleService {
     return SlotAvailability.available;
   }
 
-  /// Tambah slot — mengembalikan document id Firestore.
+  /// Tambah slot manual dengan batas [quota] pasien (default 1).
   static Future<String> addSlot({
     required String doctorUid,
     required String date,
     required String time,
     required String timeStart,
     required String timeEnd,
+    int quota = 1,
   }) async {
     if (!Backend.useFirebase) return '';
     final normalizedStart = AppDates.formatHm(timeStart);
@@ -170,7 +206,6 @@ class ScheduleService {
       timeEnd: normalizedEnd,
       timeStart: normalizedStart,
     )) {
-      // Tanggal belum tentu parse; hanya tolak bila parse dan lampau.
       final parsed = AppDates.tryParseDisplay(date);
       if (parsed != null &&
           AppDates.isPastSlot(
@@ -200,11 +235,16 @@ class ScheduleService {
       }
     }
 
+    final safeQuota = quota > 0 ? quota : 1;
     final ref = await _slots(doctorUid).add({
       'date': date,
       'time': time,
       'timeStart': normalizedStart,
       'timeEnd': normalizedEnd,
+      'quota': safeQuota,
+      'bookedCount': 0,
+      'patientIds': <String>[],
+      'patientNames': <String>[],
       'isBooked': false,
       'createdBy': doctorUid,
       'createdAt': FieldValue.serverTimestamp(),
@@ -223,8 +263,119 @@ class ScheduleService {
     return ref.id;
   }
 
+  /// Otomatis membuat sesi-sesi konsultasi berdasarkan [DoctorPracticeSettings].
+  ///
+  /// Contoh: Jam buka 09.00 - 12.00, durasi 15 menit, kuota 2 pasien/sesi:
+  /// Menghasilkan sesi 09.00-09.15 (kuota 2), 09.15-09.30 (kuota 2), dst.
+  static Future<int> generatePracticeSlots({
+    required String doctorUid,
+    required String date,
+    required DoctorPracticeSettings settings,
+  }) async {
+    if (!Backend.useFirebase || doctorUid.isEmpty) return 0;
+    final sessions = settings.generateSessions();
+    if (sessions.isEmpty) return 0;
+
+    // Ambil slot yang sudah ada pada tanggal tersebut agar tidak bentrok
+    final existingSnap =
+        await _slots(doctorUid).where('date', isEqualTo: date).get();
+    final existingRanges = <String>{};
+    for (final d in existingSnap.docs) {
+      final s = (d.data()['timeStart'] as String?) ?? '';
+      final e = (d.data()['timeEnd'] as String?) ?? '';
+      if (s.isNotEmpty && e.isNotEmpty) {
+        existingRanges.add('$s-$e');
+      }
+    }
+
+    int createdCount = 0;
+    final batch = _db.batch();
+    for (final sess in sessions) {
+      final key = '${sess.timeStart}-${sess.timeEnd}';
+      if (existingRanges.contains(key)) continue;
+
+      final docRef = _slots(doctorUid).doc();
+      batch.set(docRef, {
+        'date': date,
+        'time': sess.displayRange,
+        'timeStart': sess.timeStart,
+        'timeEnd': sess.timeEnd,
+        'quota': sess.quota,
+        'bookedCount': 0,
+        'patientIds': <String>[],
+        'patientNames': <String>[],
+        'isBooked': false,
+        'createdBy': doctorUid,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      createdCount++;
+    }
+
+    if (createdCount > 0) {
+      await batch.commit();
+      await ActivityService.log(
+        title: 'Menerapkan $createdCount sesi praktik otomatis ($date)',
+        tag: 'Jadwal',
+        actor: 'Dokter',
+        actorUid: doctorUid,
+      );
+    }
+    return createdCount;
+  }
+
+  /// Simpan pengaturan jam buka, jam tutup, durasi sesi, dan limit kuota
+  /// pasien yang diatur sendiri oleh dokter (bukan admin).
+  static Future<void> savePracticeSettings(
+    String doctorUid,
+    DoctorPracticeSettings settings,
+  ) async {
+    if (!Backend.useFirebase || doctorUid.isEmpty) return;
+    await _db.collection('users').doc(doctorUid).update({
+      'practiceSettings': settings.toMap(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    await ActivityService.log(
+      title: 'Memperbarui pengaturan jadwal & kuota praktik',
+      tag: 'Pengaturan',
+      actor: 'Dokter',
+      actorUid: doctorUid,
+    );
+  }
+
+  /// Ambil pengaturan praktik dokter sekali dari Firestore.
+  static Future<DoctorPracticeSettings> getPracticeSettings(
+    String doctorUid,
+  ) async {
+    if (!Backend.useFirebase || doctorUid.isEmpty) {
+      return const DoctorPracticeSettings();
+    }
+    try {
+      final doc = await _db.collection('users').doc(doctorUid).get();
+      if (!doc.exists) return const DoctorPracticeSettings();
+      final data = doc.data()?['practiceSettings'] as Map<String, dynamic>?;
+      return DoctorPracticeSettings.fromMap(data);
+    } catch (_) {
+      return const DoctorPracticeSettings();
+    }
+  }
+
+  /// Stream realtime pengaturan praktik dokter.
+  static Stream<DoctorPracticeSettings> streamPracticeSettings(
+    String doctorUid,
+  ) {
+    if (!Backend.useFirebase || doctorUid.isEmpty) {
+      return Stream.value(const DoctorPracticeSettings());
+    }
+    return _db.collection('users').doc(doctorUid).snapshots().map((snap) {
+      if (!snap.exists) return const DoctorPracticeSettings();
+      final data = snap.data()?['practiceSettings'] as Map<String, dynamic>?;
+      return DoctorPracticeSettings.fromMap(data);
+    });
+  }
+
   static int _minutes(String hm) {
-    final parts = hm.split('.');
+    final parts = hm.replaceAll(':', '.').split('.');
     if (parts.length < 2) return 0;
     final h = int.tryParse(parts[0]) ?? 0;
     final m = int.tryParse(parts[1]) ?? 0;
@@ -236,7 +387,10 @@ class ScheduleService {
     final ref = _slots(doctorUid).doc(slotId);
     final snap = await ref.get();
     if (!snap.exists) return;
-    if ((snap.data()?['isBooked'] as bool?) ?? false) {
+    final data = snap.data() ?? const <String, dynamic>{};
+    final isBooked = (data['isBooked'] as bool?) ?? false;
+    final bookedCount = (data['bookedCount'] as num?)?.toInt() ?? 0;
+    if (isBooked || bookedCount > 0) {
       throw StateError('Slot sudah dibooking dan tidak dapat dihapus.');
     }
     final m = snap.data() ?? const <String, dynamic>{};

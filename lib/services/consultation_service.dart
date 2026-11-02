@@ -29,6 +29,50 @@ class ConsultationService {
       '${patientId}_$doctorId';
 
   // ---------------------------------------------------------------------------
+  // Aturan 1 Pasien 1 Konsultasi per Hari
+  // ---------------------------------------------------------------------------
+  /// Memeriksa apakah pasien sudah memiliki jadwal konsultasi pada tanggal
+  /// tertentu ([dateIso] atau [scheduleDate]) dengan status aktif (bukan dibatalkan).
+  static Future<bool> hasConsultationOnDate({
+    required String patientUid,
+    required String dateIso,
+    String? scheduleDate,
+  }) async {
+    if (!Backend.useFirebase || patientUid.isEmpty) return false;
+    try {
+      if (dateIso.isNotEmpty) {
+        final snap = await _col
+            .where('patientId', isEqualTo: patientUid)
+            .where('dateIso', isEqualTo: dateIso)
+            .get();
+        for (final doc in snap.docs) {
+          final status =
+              ((doc.data()['status'] as String?) ?? '').toLowerCase();
+          if (status != 'dibatalkan') {
+            return true;
+          }
+        }
+      }
+      if (scheduleDate != null && scheduleDate.isNotEmpty) {
+        final dateSnap = await _col
+            .where('patientId', isEqualTo: patientUid)
+            .where('scheduleDate', isEqualTo: scheduleDate)
+            .get();
+        for (final doc in dateSnap.docs) {
+          final status =
+              ((doc.data()['status'] as String?) ?? '').toLowerCase();
+          if (status != 'dibatalkan') {
+            return true;
+          }
+        }
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Booking
   // ---------------------------------------------------------------------------
   static Future<String> book({
@@ -46,8 +90,23 @@ class ConsultationService {
     if (!Backend.useFirebase) {
       throw StateError('Firebase belum terhubung.');
     }
-    // ID deterministik: satu konsultasi per slot (mencegah double dokumen).
-    final consultationRef = _col.doc(slotId);
+
+    // 1 Pasien 1 Konsultasi per Hari agar adil untuk semua pasien.
+    final alreadyBooked = await hasConsultationOnDate(
+      patientUid: patient.uid,
+      dateIso: dateIso,
+      scheduleDate: scheduleDate,
+    );
+    if (alreadyBooked) {
+      throw StateError(
+        'Anda sudah memiliki jadwal konsultasi pada hari ini. Setiap pasien dibatasi maksimal 1 kali konsultasi per hari agar pasien lainnya kebagian jadwal.',
+      );
+    }
+
+    // ID deterministik per kombinasi slot + pasien: mendukung kuota > 1
+    // pasien per slot tanpa saling menimpa.
+    final consultationDocId = '${slotId}_${patient.uid}';
+    final consultationRef = _col.doc(consultationDocId);
     final slotRef = _db
         .collection('users')
         .doc(doctorUid)
@@ -56,21 +115,51 @@ class ConsultationService {
     final linkRef = _links.doc(linkId(patient.uid, doctorUid));
     final now = FieldValue.serverTimestamp();
 
-    // Satu transaksi atomik: slot + konsultasi + care_link. Bila salah satu
-    // tulisan ditolak (mis. Security Rules belum diperbarui), seluruh transaksi
-    // dibatalkan sehingga slot TIDAK pernah hilang karena booking setengah jadi.
+    // Satu transaksi atomik: slot + konsultasi + care_link.
     await _db.runTransaction((tx) async {
       final slotSnap = await tx.get(slotRef);
-      if (!slotSnap.exists ||
-          ((slotSnap.data()?['isBooked'] as bool?) ?? false)) {
-        throw StateError('Slot sudah dibooking oleh pasien lain.');
+      if (!slotSnap.exists) {
+        throw StateError('Slot jadwal tidak ditemukan.');
       }
-      if (slotSnap.data()?['patientId'] != null &&
-          slotSnap.data()?['patientId'] != patient.uid) {
-        throw StateError('Slot sudah dibooking oleh pasien lain.');
+      final slotData = slotSnap.data() ?? const <String, dynamic>{};
+      final quota = (slotData['quota'] as num?)?.toInt() ?? 1;
+      final isBooked = (slotData['isBooked'] as bool?) ?? false;
+
+      final patientIdsRaw = slotData['patientIds'];
+      final patientIds = patientIdsRaw is List
+          ? patientIdsRaw.map((e) => e.toString()).toList()
+          : <String>[];
+      final patientNamesRaw = slotData['patientNames'];
+      final patientNames = patientNamesRaw is List
+          ? patientNamesRaw.map((e) => e.toString()).toList()
+          : <String>[];
+
+      int bookedCount = (slotData['bookedCount'] as num?)?.toInt() ?? 0;
+      if (bookedCount == 0 && patientIds.isNotEmpty) {
+        bookedCount = patientIds.length;
+      } else if (bookedCount == 0 && isBooked) {
+        bookedCount = quota;
       }
+
+      if (patientIds.contains(patient.uid) ||
+          slotData['patientId'] == patient.uid) {
+        throw StateError('Anda sudah terdaftar pada sesi jadwal ini.');
+      }
+
+      if (isBooked || (bookedCount >= quota && quota > 0)) {
+        throw StateError('Slot jadwal sudah penuh untuk sesi ini.');
+      }
+
+      final newBookedCount = bookedCount + 1;
+      final newIsBooked = newBookedCount >= quota;
+      final newPatientIds = List<String>.from(patientIds)..add(patient.uid);
+      final newPatientNames = List<String>.from(patientNames)..add(patient.name);
+
       tx.update(slotRef, {
-        'isBooked': true,
+        'bookedCount': newBookedCount,
+        'isBooked': newIsBooked,
+        'patientIds': newPatientIds,
+        'patientNames': newPatientNames,
         'patientId': patient.uid,
         'patientName': patient.name,
         'updatedAt': now,
