@@ -11,6 +11,7 @@ import 'services/notification_service.dart';
 import 'pages/splash_screen.dart';
 import 'pages/auth/login_page.dart';
 import 'pages/auth/register_page.dart';
+import 'pages/auth/register_dokter_page.dart';
 import 'pages/admin/admin_main_page.dart';
 import 'pages/admin/notifikasi_admin_page.dart';
 import 'pages/admin/master_spesialisasi_page.dart';
@@ -201,6 +202,7 @@ class _SkinoraAppState extends State<SkinoraApp> {
         '/splash': (context) => const SplashScreen(),
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
+        '/register/dokter': (context) => const RegisterDokterPage(),
         '/admin': (context) => const AdminMainPage(),
         '/admin/notifikasi': (context) => const NotifikasiAdminPage(),
         '/admin/spesialisasi': (context) => const MasterSpesialisasiPage(),

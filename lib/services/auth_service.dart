@@ -82,6 +82,61 @@ class AuthService {
     return credential;
   }
 
+  /// Pendaftaran mandiri dokter Skinora.
+  /// Membuat akun Firebase Auth, lalu menyimpan dokumen `users/{uid}` dengan
+  /// role = 'dokter' dan status = 'menunggu'.
+  static Future<UserCredential> registerDoctor({
+    required String name,
+    required String email,
+    required String phone,
+    required String password,
+    required String specialization,
+    required String str,
+    required String experience,
+    required String address,
+    String bio = '',
+  }) async {
+    if (!Backend.useAuth) {
+      throw const FormatException('Firebase Auth belum aktif');
+    }
+    final credential = await _auth.createUserWithEmailAndPassword(
+      email: email.trim().toLowerCase(),
+      password: password,
+    );
+    final uid = credential.user!.uid;
+    try {
+      final blockReason = await UserService.registerBlockReason(
+        email.trim().toLowerCase(),
+      );
+      if (blockReason != null) {
+        await credential.user?.delete();
+        throw FirebaseAuthException(
+          code: 'register-not-allowed',
+          message: blockReason,
+        );
+      }
+      await UserService.createDoctorProfileOnRegister(
+        uid: uid,
+        email: email.trim().toLowerCase(),
+        name: name,
+        phone: phone,
+        specialization: specialization,
+        str: str,
+        experience: experience,
+        address: address,
+        bio: bio,
+      );
+    } catch (_) {
+      try {
+        await credential.user?.delete();
+      } catch (_) {
+        // ignore: best-effort cleanup
+      }
+      rethrow;
+    }
+    return credential;
+  }
+
   static Future<void> signOut() async {
     if (!Backend.useAuth) return;
     await _auth.signOut();

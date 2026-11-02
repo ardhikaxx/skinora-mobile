@@ -198,6 +198,74 @@ class UserService {
     await batch.commit();
   }
 
+  /// Pendaftaran mandiri akun dokter baru.
+  /// Status awal selalu 'menunggu' (memerlukan verifikasi admin sebelum praktik),
+  /// isAvailable: false.
+  static Future<void> createDoctorProfileOnRegister({
+    required String uid,
+    required String email,
+    required String name,
+    required String phone,
+    required String specialization,
+    required String str,
+    required String experience,
+    required String address,
+    String bio = '',
+  }) async {
+    if (!Backend.useFirebase) return;
+    final normalized = email.trim().toLowerCase();
+    final tokenEmail = FirebaseAuth.instance.currentUser?.email?.toLowerCase();
+
+    Map<String, dynamic>? p;
+    if (tokenEmail != null) {
+      try {
+        final provSnap = await _provisions.doc(tokenEmail).get();
+        if (provSnap.exists &&
+            (provSnap.data()?['consumedByUid'] == null) &&
+            provSnap.data()?['email'] == tokenEmail) {
+          p = provSnap.data();
+        }
+      } on FirebaseException {
+        p = null;
+      }
+    }
+
+    final batch = _db.batch();
+    final now = FieldValue.serverTimestamp();
+
+    batch.set(_users.doc(uid), {
+      'uid': uid,
+      'name': name,
+      'email': normalized,
+      'phone': phone,
+      'address': address,
+      'role': 'dokter',
+      'status': 'menunggu',
+      'specialization': specialization,
+      'experience': experience,
+      'str': str,
+      'bio': bio,
+      'isAvailable': false,
+      'settings': {
+        'notificationsEnabled': true,
+        'morningReminder': '',
+        'eveningReminder': '',
+      },
+      'createdBy': uid,
+      'createdAt': now,
+      'updatedAt': now,
+    });
+
+    if (p != null && tokenEmail != null) {
+      batch.update(_provisions.doc(tokenEmail), {
+        'consumedByUid': uid,
+        'updatedAt': now,
+      });
+    }
+
+    await batch.commit();
+  }
+
   /// Alasan register ditolak untuk email ini, atau null bila boleh.
   /// Harus dipanggil SETELAH signed in (rules provision butuh sesi Auth).
   static Future<String?> registerBlockReason(String email) async {

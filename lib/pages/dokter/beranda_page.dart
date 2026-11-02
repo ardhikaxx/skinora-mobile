@@ -50,6 +50,7 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
   late String _greetingName =
       widget.initialGreetingName ?? (AuthService.currentUser?.displayName ?? '');
   late String _specialization = widget.initialSpecialization ?? '';
+  String _accountStatus = '';
   int _unreadNotif = 0;
 
   /// Badge lonceng realtime (shared listener — lihat NotificationController).
@@ -97,11 +98,14 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
       if (!mounted || profile == null) return;
       final name = (profile.name as String?) ?? '';
       final spec = (profile.specialization as String?) ?? '';
+      final status = (profile.status as String?) ?? '';
       if ((name.isNotEmpty && name != _greetingName) ||
-          (spec.isNotEmpty && spec != _specialization)) {
+          (spec.isNotEmpty && spec != _specialization) ||
+          (status != _accountStatus)) {
         setState(() {
           if (name.isNotEmpty) _greetingName = name;
           if (spec.isNotEmpty) _specialization = spec;
+          _accountStatus = status;
         });
       }
     }, onError: (_) {});
@@ -155,6 +159,7 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
         if (profile != null) {
           _greetingName = (profile.name as String?) ?? '';
           _specialization = (profile.specialization as String?) ?? '';
+          _accountStatus = (profile.status as String?) ?? '';
         }
         if (consults != null) {
           final todayIso = AppDates.todayIso();
@@ -217,6 +222,51 @@ class _BerandaDokterPageState extends State<BerandaDokterPage> {
             children: [
               // 1. Header with greeting and notification bell
               _buildHeader(context),
+              if (_accountStatus == 'menunggu') ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFFFDE68A),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Icon(LucideIcons.clock, color: Color(0xFFD97706), size: 20),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Akun Menunggu Verifikasi',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF92400E),
+                              ),
+                            ),
+                            SizedBox(height: 3),
+                            Text(
+                              'Admin Skinora sedang memverifikasi dokumen STR Anda. Jadwal praktik dan konsultasi dapat diaktifkan setelah akun terverifikasi.',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: Color(0xFFB45309),
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
 
               // 2. Section STATISTIK HARI INI

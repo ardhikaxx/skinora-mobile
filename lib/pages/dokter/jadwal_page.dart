@@ -74,6 +74,7 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
 
   bool _isReady = false; // false = "Sibuk", true = "Siap"
   bool _isFormOpen = false;
+  String _accountStatus = '';
 
   late final TextEditingController _dateController;
   final TextEditingController _startTimeController = TextEditingController();
@@ -134,6 +135,7 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
       if (!mounted || profile == null) return;
       setState(() {
         _isReady = profile.isAvailable;
+        _accountStatus = profile.status;
       });
     }).catchError((_) {});
   }
@@ -175,6 +177,18 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
   }
 
   void _handleToggleAvailability() {
+    if (_accountStatus == 'menunggu') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Akun dokter Anda sedang menunggu verifikasi admin. Jadwal praktik belum dapat diaktifkan.',
+          ),
+          backgroundColor: Color(0xFFA83244),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
     setState(() {
       _isReady = !_isReady;
     });
@@ -187,6 +201,18 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
   }
 
   Future<void> _handleSaveNewSlot() async {
+    if (_accountStatus == 'menunggu') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Akun dokter Anda sedang menunggu verifikasi admin. Pembuatan slot jadwal belum dapat dilakukan.',
+          ),
+          backgroundColor: Color(0xFFA83244),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
     final date = _dateController.text.trim();
     final start = _startTimeController.text.trim();
     final end = _endTimeController.text.trim();
@@ -1057,6 +1083,52 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 20.0),
                 children: [
+                  if (_accountStatus == 'menunggu') ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(0xFFFDE68A),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Icon(LucideIcons.clock, color: Color(0xFFD97706), size: 20),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Verifikasi Diperlukan',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF92400E),
+                                  ),
+                                ),
+                                SizedBox(height: 3),
+                                Text(
+                                  'Akun Anda berstatus Menunggu Verifikasi. Pengaturan jadwal dan praktik akan aktif otomatis setelah akun disetujui Admin.',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: Color(0xFFB45309),
+                                    height: 1.35,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   // 1. Status Ketersediaan Card (Siap vs Sibuk)
                   _buildStatusKetersediaanCard(),
                   const SizedBox(height: 14),

@@ -10,6 +10,7 @@ import '../admin/admin_main_page.dart';
 import '../dokter/dokter_main_page.dart';
 import '../pengguna/pengguna_main_page.dart';
 import 'register_page.dart';
+import 'register_dokter_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -180,10 +181,50 @@ class _LoginPageState extends State<LoginPage> {
     if (!profile.canLogin) {
       await AuthService.signOut();
       setState(() {
-        _errorMessage = 'Akun Anda ditangguhkan. Hubungi administrator.';
+        _errorMessage = profile!.role == 'dokter' && profile.status == 'ditolak'
+            ? 'Pendaftaran dokter Anda ditolak oleh admin. Silahkan hubungi administrator.'
+            : 'Akun Anda ditangguhkan. Hubungi administrator.';
         _busy = false;
       });
       return;
+    }
+
+    if (profile.role == 'dokter' && profile.status == 'menunggu') {
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Row(
+            children: [
+              Icon(LucideIcons.clock, color: Colors.orange, size: 24),
+              SizedBox(width: 10),
+              Text(
+                'Menunggu Verifikasi',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Akun dokter Anda saat ini masih dalam proses verifikasi oleh Admin Skinora.\n\nAnda dapat masuk untuk melihat profil Anda, namun belum dapat membuka jadwal atau melayani konsultasi hingga akun terverifikasi.',
+            style: TextStyle(fontSize: 13.5, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text(
+                'Mengerti',
+                style: TextStyle(
+                  color: primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     // ── Tahap 3: Log aktivitas (non-blocking — gagal tidak menghalangi login) ──
@@ -575,6 +616,85 @@ class _LoginPageState extends State<LoginPage> {
                         ],
                       ),
                       textAlign: TextAlign.center,
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Opsi 2: Card / Banner "Bergabung Sebagai Dokter Skinora"
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const RegisterDokterPage(),
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFDF2F4),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: primaryColor.withValues(alpha: 0.25),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: primaryColor.withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                LucideIcons.stethoscope,
+                                color: primaryColor,
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Bergabung Sebagai Dokter Skinora',
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: darkTextColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'Buka konsultasi online & bantu pasien kulit',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(
+                              LucideIcons.chevronRight,
+                              color: primaryColor,
+                              size: 18,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ],
