@@ -8,6 +8,7 @@ import 'services/auth_service.dart';
 import 'services/location_service.dart';
 import 'services/notification_router.dart';
 import 'services/notification_service.dart';
+import 'pages/splash_screen.dart';
 import 'pages/auth/login_page.dart';
 import 'pages/auth/register_page.dart';
 import 'pages/admin/admin_main_page.dart';
@@ -183,7 +184,7 @@ class _SkinoraAppState extends State<SkinoraApp> {
           ),
         ),
       ),
-      initialRoute: '/login',
+      initialRoute: '/splash',
       // Dialog izin notifikasi dipasang di level aplikasi: begitu user punya
       // sesi (login baru / sesi berlanjut di perangkat), prompt izin OS muncul
       // satu kali — jalur inilah yang benar-benar menampilkan dialog Android
@@ -193,6 +194,7 @@ class _SkinoraAppState extends State<SkinoraApp> {
         child: child ?? const SizedBox.shrink(),
       ),
       routes: {
+        '/splash': (context) => const SplashScreen(),
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
         '/admin': (context) => const AdminMainPage(),
