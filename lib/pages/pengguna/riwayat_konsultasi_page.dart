@@ -115,7 +115,7 @@ class _RiwayatKonsultasiPenggunaPageState
   String _statusLabel(ConsultationStatus status) {
     switch (status) {
       case ConsultationStatus.menungguKonfirmasi:
-        return 'Menunggu Konfirmasi';
+        return 'Menunggu Verifikasi';
       case ConsultationStatus.berlangsung:
         return 'Berlangsung';
       case ConsultationStatus.selesai:
@@ -418,7 +418,7 @@ class _RiwayatKonsultasiPenggunaPageState
           borderRadius: BorderRadius.circular(12),
         ),
         child: const Text(
-          'Menunggu Konfirmasi',
+          'Menunggu Verifikasi',
           style: TextStyle(
             fontSize: 11.0,
             fontWeight: FontWeight.w600,

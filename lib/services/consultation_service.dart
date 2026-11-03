@@ -202,7 +202,7 @@ class ConsultationService {
       uid: doctorUid,
       title: 'Penjadwalan Konsultasi Baru',
       description:
-          '${patient.name} memilih jadwal konsultasi pada $scheduleDate $scheduleTime. Silakan konfirmasi jadwal ini.',
+          '${patient.name} memilih jadwal konsultasi pada $scheduleDate $scheduleTime. Silakan verifikasi jadwal ini.',
       iconKey: 'calendar',
       type: NotificationType.bookingCreated,
       entityId: consultationRef.id,
@@ -212,9 +212,9 @@ class ConsultationService {
     );
     await NotificationService.notifyUser(
       uid: patient.uid,
-      title: 'Menunggu Konfirmasi Dokter',
+      title: 'Menunggu Verifikasi Dokter',
       description:
-          'Jadwal konsultasi Anda bersama $doctorName pada $scheduleDate $scheduleTime sedang menunggu konfirmasi dokter.',
+          'Jadwal konsultasi Anda bersama $doctorName pada $scheduleDate $scheduleTime sedang menunggu verifikasi dokter.',
       iconKey: 'calendar',
       type: NotificationType.bookingCreated,
       entityId: consultationRef.id,
@@ -411,7 +411,7 @@ class ConsultationService {
     });
     if (!confirmed) return;
     await ActivityService.log(
-      title: 'Mengonfirmasi jadwal konsultasi dengan $patientName',
+      title: 'Memverifikasi jadwal konsultasi dengan $patientName',
       tag: 'Konsultasi',
       actor: doctorName,
       actorUid: doctorUid,
@@ -419,9 +419,9 @@ class ConsultationService {
     if (patientId.isNotEmpty) {
       await NotificationService.notifyUser(
         uid: patientId,
-        title: 'Jadwal Konsultasi Dikonfirmasi',
+        title: 'Jadwal Konsultasi Diverifikasi',
         description:
-            'Dokter $doctorName telah mengonfirmasi jadwal konsultasi Anda. Anda sekarang dapat berkonsultasi langsung.',
+            'Dokter $doctorName telah memverifikasi jadwal konsultasi Anda. Anda sekarang dapat memasuki ruangan chat konsultasi.',
         iconKey: 'calendar',
         type: NotificationType.consultationStarted,
         entityId: id,

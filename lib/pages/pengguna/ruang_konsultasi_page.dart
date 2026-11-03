@@ -274,7 +274,7 @@ class _RuangKonsultasiPenggunaPageState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Menunggu konfirmasi dokter sebelum dapat mengirim pesan.',
+            'Menunggu verifikasi dokter sebelum dapat mengirim pesan.',
           ),
         ),
       );
@@ -567,7 +567,7 @@ class _RuangKonsultasiPenggunaPageState
             border: Border.all(color: const Color(0xFFFDE68A)),
           ),
           child: const Text(
-            'Menunggu konfirmasi dokter sebelum dapat mengirim pesan.',
+            'Menunggu verifikasi dokter sebelum dapat mengirim pesan.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 12.5,

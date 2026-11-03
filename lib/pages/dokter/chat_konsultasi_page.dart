@@ -75,8 +75,9 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
 
   String _labelStatus(String raw) {
     switch (raw) {
+      case 'menunggu_verifikasi':
       case 'menunggu_konfirmasi':
-        return 'Menunggu Konfirmasi';
+        return 'Menunggu Verifikasi';
       case 'berlangsung':
         return 'Berlangsung';
       case 'selesai':
@@ -156,7 +157,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
           });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Jadwal konsultasi berhasil dikonfirmasi. Pasien telah menerima notifikasi.'),
+              content: Text('Jadwal konsultasi berhasil diverifikasi. Pasien telah menerima notifikasi.'),
               backgroundColor: primaryMaroon,
             ),
           );
@@ -164,7 +165,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Gagal konfirmasi jadwal: $e')),
+            SnackBar(content: Text('Gagal verifikasi jadwal: $e')),
           );
         }
       }
@@ -174,7 +175,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Jadwal konsultasi berhasil dikonfirmasi.'),
+          content: Text('Jadwal konsultasi berhasil diverifikasi.'),
           backgroundColor: primaryMaroon,
         ),
       );
@@ -182,6 +183,9 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
   }
 
   Future<void> _handleConsultationAction(ConsultationItemModel item) async {
+    setState(() {
+      item.status = 'Berlangsung';
+    });
     // Persist status "berlangsung" saat dokter membuka ruang chat.
     if (Backend.useFirebase && _backendMeta.containsKey(item.id)) {
       try {
@@ -189,11 +193,6 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
         final m = _backendMeta[item.id];
         if (m != null) {
           m['status'] = 'berlangsung';
-        }
-        if (mounted) {
-          setState(() {
-            item.status = 'Berlangsung';
-          });
         }
       } catch (_) {
         // lanjut ke ruang chat walau update status gagal
@@ -467,7 +466,8 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
 
   /// Single Consultation Card
   Widget _buildConsultationCard(ConsultationItemModel item) {
-    final isWaiting = item.status == 'Menunggu Konfirmasi';
+    final isWaiting = item.status == 'Menunggu Verifikasi' ||
+        item.status == 'Menunggu Konfirmasi';
     final isOngoing = item.status == 'Berlangsung';
 
     return Container(
@@ -601,7 +601,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
                 children: [
                   Icon(
                     isWaiting
-                        ? LucideIcons.calendarCheck
+                        ? LucideIcons.userCheck
                         : (isOngoing
                             ? LucideIcons.messageSquare
                             : LucideIcons.phone),
@@ -611,7 +611,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
                   const SizedBox(width: 8),
                   Text(
                     isWaiting
-                        ? 'Konfirmasi Jadwal'
+                        ? 'Verifikasi Sekarang'
                         : (isOngoing ? 'Masuk Ruang Chat' : 'Mulai Konsultasi'),
                     style: const TextStyle(
                       fontSize: 13.5,

@@ -45,6 +45,8 @@ class ProfilDokterPenggunaPage extends StatefulWidget {
   final String? doctorName;
   final String? specialization;
   final ValueChanged<int>? onNavigateTab;
+  final DoctorProfileDetailModel? initialDoctor;
+  final List<SlotRecord>? initialSlots;
 
   const ProfilDokterPenggunaPage({
     super.key,
@@ -52,6 +54,8 @@ class ProfilDokterPenggunaPage extends StatefulWidget {
     this.doctorName,
     this.specialization,
     this.onNavigateTab,
+    this.initialDoctor,
+    this.initialSlots,
   });
 
   @override
@@ -87,6 +91,13 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialDoctor != null) {
+      _liveDoctor = widget.initialDoctor;
+    }
+    if (widget.initialSlots != null) {
+      _availableSlots = widget.initialSlots!;
+      _applySlotsToDoctor(widget.initialSlots!);
+    }
     _loadFromBackend();
   }
 
@@ -98,6 +109,7 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
 
   /// Profil dokter sekali + stream slot realtime dari Firestore.
   Future<void> _loadFromBackend() async {
+    if (widget.initialSlots != null) return;
     if (!Backend.useFirebase) return;
     final doctorId = widget.doctorId;
     if (doctorId == null || doctorId.isEmpty) {
@@ -668,97 +680,6 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
     return null;
   }
 
-  /// Peringatan ramah jika jadwal konsultasi belum masuk jamnya.
-  Future<void> _showNotYetAvailableDialog(
-    String doctorName,
-    String dayDate,
-    String startTime,
-  ) {
-    return showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return Dialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(22, 24, 22, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFFF3E0),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      LucideIcons.clock,
-                      size: 28,
-                      color: Color(0xFFB45309),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Belum Waktunya Konsultasi',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: 'serif',
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: darkText,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Jadwal konsultasi bersama $doctorName tersedia pada '
-                  '$dayDate pukul $startTime WIB.\n\n'
-                  'Anda belum dapat memulai konsultasi sebelum jam tersebut. '
-                  'Jadwal tetap tersimpan — silakan kembali pada waktu yang '
-                  'ditentukan.',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF6B5E5E),
-                    height: 1.45,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(dialogContext),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryMaroon,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: const Text(
-                      'Mengerti',
-                      style: TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   /// Dialog edukatif: Dibatasi 1 pasien hanya bisa konsultasi sekali dalam satu hari
   /// agar pasien lainnya kebagian antrean/jadwal.
   Future<void> _showDailyLimitDialog(String slotDate) {
@@ -902,13 +823,7 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
       return;
     }
 
-    // 3. Validasi belum masuk jam konsultasi (upcoming)
-    if (ScheduleService.availabilityOf(slot) == SlotAvailability.upcoming) {
-      await _showNotYetAvailableDialog(doctor.name, slotDate, startTime);
-      return;
-    }
-
-    // 4. Validasi aturan: Dibatasi 1 pasien hanya bisa konsultasi sekali dalam satu hari
+    // 3. Validasi aturan: Dibatasi 1 pasien hanya bisa konsultasi sekali dalam satu hari
     if (Backend.useFirebase) {
       final patient = await AuthService.loadProfile();
       if (patient != null && patient.uid.isNotEmpty) {
@@ -962,7 +877,7 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
                 ),
                 const SizedBox(height: 20),
                 const Text(
-                  'Menunggu Dokter...',
+                  'Menunggu Konfirmasi Dokter...',
                   style: TextStyle(
                     fontFamily: 'serif',
                     fontSize: 18,
@@ -972,7 +887,7 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Sedang menghubungkan ke ${doctor.name} untuk jadwal $slotDate pukul $startTime WIB.',
+                  'Mengajukan jadwal ke ${doctor.name} untuk jadwal $slotDate pukul $startTime WIB. Mohon menunggu konfirmasi dokter.',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 13,

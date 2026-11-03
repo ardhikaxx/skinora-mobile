@@ -151,11 +151,13 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Text(
-                    'Status Penjadwalan',
-                    style: TextStyle(
+                  Text(
+                    _isConfirmed
+                        ? 'Jadwal Terverifikasi'
+                        : 'Menunggu Verifikasi Dokter',
+                    style: const TextStyle(
                       fontFamily: 'serif',
-                      fontSize: 20.0,
+                      fontSize: 19.0,
                       fontWeight: FontWeight.bold,
                       color: darkText,
                       letterSpacing: -0.2,
@@ -310,8 +312,8 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
                               ),
                               child: Text(
                                 _isConfirmed
-                                    ? 'Dikonfirmasi'
-                                    : 'Menunggu Konfirmasi',
+                                    ? 'Terverifikasi'
+                                    : 'Menunggu Verifikasi',
                                 style: TextStyle(
                                   fontSize: 11.0,
                                   fontWeight: FontWeight.bold,
@@ -382,8 +384,8 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
 
                         Text(
                           _isConfirmed
-                              ? 'Jadwal Telah Dikonfirmasi'
-                              : 'Menunggu Konfirmasi Dokter',
+                              ? 'Jadwal Telah Diverifikasi'
+                              : 'Menunggu Verifikasi Dokter',
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             fontSize: 17.5,
@@ -396,8 +398,8 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
 
                         Text(
                           _isConfirmed
-                              ? 'Dokter telah mengonfirmasi jadwal konsultasi Anda. Anda sekarang dapat masuk ke ruang chat dan berkonsultasi langsung.'
-                              : 'Jadwal konsultasi Anda telah berhasil dikirim ke dokter. Mohon menunggu konfirmasi dokter sebelum dapat mengirimkan pesan konsultasi.\n\nNotifikasi akan dikirimkan otomatis setelah dokter mengonfirmasi jadwal Anda.',
+                              ? 'Dokter telah memverifikasi jadwal konsultasi Anda. Anda sekarang dapat memasuki ruangan chat konsultasi.'
+                              : 'Jadwal konsultasi Anda telah berhasil diajukan ke dokter. Mohon menunggu verifikasi dokter sebelum memasuki ruangan chat konsultasi.\n\nNotifikasi akan dikirimkan otomatis setelah dokter memverifikasi jadwal Anda.',
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             fontSize: 13.0,
@@ -421,7 +423,7 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
                                 color: Colors.white,
                               ),
                               label: const Text(
-                                'Mulai Konsultasi Langsung',
+                                'Masuk Ruang Chat',
                                 style: TextStyle(
                                   fontSize: 14.5,
                                   fontWeight: FontWeight.bold,
@@ -461,7 +463,7 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
                                 SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'Pesan chat belum dapat dikirim sampai dokter mengonfirmasi.',
+                                    'Pesan chat dapat diakses setelah dokter memverifikasi jadwal Anda.',
                                     style: TextStyle(
                                       fontSize: 12.0,
                                       color: subText,
