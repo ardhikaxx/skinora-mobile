@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../../services/backend.dart';
 import '../../services/consultation_service.dart';
 import '../../utils/app_dates.dart';
 import 'riwayat_konsultasi_page.dart';
@@ -20,6 +19,7 @@ class MenungguKonfirmasiPage extends StatefulWidget {
   final String? timeStart;
   final String? timeEnd;
   final ValueChanged<int>? onNavigateTab;
+  final bool initialIsConfirmed;
 
   const MenungguKonfirmasiPage({
     super.key,
@@ -34,6 +34,7 @@ class MenungguKonfirmasiPage extends StatefulWidget {
     this.timeStart,
     this.timeEnd,
     this.onNavigateTab,
+    this.initialIsConfirmed = false,
   });
 
   @override
@@ -53,12 +54,23 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
   @override
   void initState() {
     super.initState();
+    _isConfirmed = widget.initialIsConfirmed;
     _subscribeStatus();
+  }
+
+  @override
+  void didUpdateWidget(covariant MenungguKonfirmasiPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialIsConfirmed != oldWidget.initialIsConfirmed) {
+      setState(() {
+        _isConfirmed = widget.initialIsConfirmed;
+      });
+    }
   }
 
   void _subscribeStatus() {
     final cid = widget.consultationId;
-    if (cid == null || cid.isEmpty || !Backend.useFirebase) return;
+    if (cid == null || cid.isEmpty) return;
 
     _statusSub = ConsultationService.streamById(cid).listen((doc) {
       if (!mounted || doc == null) return;
@@ -423,7 +435,7 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
                                 color: Colors.white,
                               ),
                               label: const Text(
-                                'Masuk Ruang Chat',
+                                'Mulai Konsultasi',
                                 style: TextStyle(
                                   fontSize: 14.5,
                                   fontWeight: FontWeight.bold,

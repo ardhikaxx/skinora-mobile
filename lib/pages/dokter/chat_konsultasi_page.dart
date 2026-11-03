@@ -74,7 +74,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
   }
 
   String _labelStatus(String raw) {
-    switch (raw) {
+    switch (raw.toLowerCase()) {
       case 'menunggu_verifikasi':
       case 'menunggu_konfirmasi':
         return 'Menunggu Verifikasi';
@@ -83,16 +83,16 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
       case 'selesai':
         return 'Selesai';
       case 'dikonfirmasi':
+        return 'Terverifikasi';
       case 'terjadwal':
       default:
         return 'Terjadwal';
     }
   }
 
-  /// Streaming konsultasi aktif dokter dari Firestore.
+  /// Streaming konsultasi aktif dokter dari Firestore / backend.
   void _loadFromBackend() {
     if (widget.initialConsultations != null) return;
-    if (!Backend.useFirebase) return;
     final uid = AuthService.uid;
     if (uid == null) return;
     _sub = ConsultationService.streamForDoctor(uid).listen(
@@ -107,7 +107,9 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
                 .map((m) {
               final id = (m['id'] as String?) ?? '';
               _backendMeta[id] = m;
-              final date = (m['dateIso'] as String?) ?? '';
+              final dateIso = (m['dateIso'] as String?) ?? '';
+              final scheduleDate = (m['scheduleDate'] as String?) ?? '';
+              final date = scheduleDate.isNotEmpty ? scheduleDate : dateIso;
               final ts = (m['timeStart'] as String?) ?? '';
               final te = (m['timeEnd'] as String?) ?? '';
               final time = ts.isNotEmpty
@@ -118,9 +120,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
               return ConsultationItemModel(
                 id: id,
                 patientName: (m['patientName'] as String?) ?? 'Pasien',
-                dateTime: date.isEmpty
-                    ? ((m['scheduleDate'] as String?) ?? '')
-                    : '$date • $time',
+                dateTime: time.isNotEmpty ? '$date • $time' : date,
                 status: _labelStatus((m['status'] as String?) ?? 'terjadwal'),
               );
             }));
@@ -137,48 +137,37 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
   }
 
   Future<void> _handleConfirmSchedule(ConsultationItemModel item) async {
-    if (Backend.useFirebase) {
-      try {
-        final uid = AuthService.uid ?? '';
-        final meta = _backendMeta[item.id];
-        final docName = (meta?['doctorName'] as String?) ?? 'Dokter';
-        await ConsultationService.confirm(
-          id: item.id,
-          doctorUid: uid,
-          doctorName: docName,
-          patientName: item.patientName,
-        );
-        if (meta != null) {
-          meta['status'] = 'dikonfirmasi';
-        }
-        if (mounted) {
-          setState(() {
-            item.status = 'Terjadwal';
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Jadwal konsultasi berhasil diverifikasi. Pasien telah menerima notifikasi.'),
-              backgroundColor: primaryMaroon,
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Gagal verifikasi jadwal: $e')),
-          );
-        }
-      }
-    } else {
-      setState(() {
-        item.status = 'Terjadwal';
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Jadwal konsultasi berhasil diverifikasi.'),
-          backgroundColor: primaryMaroon,
-        ),
+    try {
+      final uid = AuthService.uid ?? '';
+      final meta = _backendMeta[item.id];
+      final docName = (meta?['doctorName'] as String?) ?? 'Dokter';
+      await ConsultationService.confirm(
+        id: item.id,
+        doctorUid: uid,
+        doctorName: docName,
+        patientName: item.patientName,
       );
+      if (meta != null) {
+        meta['status'] = 'dikonfirmasi';
+      }
+      if (mounted) {
+        setState(() {
+          item.status = 'Terverifikasi';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Jadwal konsultasi berhasil diverifikasi. Pasien telah menerima notifikasi.'),
+            backgroundColor: primaryMaroon,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal verifikasi jadwal: $e')),
+        );
+      }
     }
   }
 

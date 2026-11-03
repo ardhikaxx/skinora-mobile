@@ -5,6 +5,7 @@ import 'package:skinora_app/pages/dokter/chat_konsultasi_page.dart';
 import 'package:skinora_app/pages/pengguna/menunggu_konfirmasi_page.dart';
 import 'package:skinora_app/pages/pengguna/profil_dokter_page.dart';
 import 'package:skinora_app/services/schedule_service.dart';
+import 'package:skinora_app/utils/app_dates.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +17,10 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
+      // Siapkan tanggal yang belum lewat (misal besok atau format tanggal masa depan)
+      final futureDate = AppDates.nowWib().add(const Duration(days: 1));
+      final dateDisplay = AppDates.display(futureDate).toUpperCase();
+
       // Siapkan dokter dengan slot jam 15.30
       final doctor = DoctorProfileDetailModel(
         id: 'doc_1',
@@ -23,10 +28,10 @@ void main() {
         specialization: 'Spesialis Kulit & Kelamin',
         experience: '5 Tahun',
         bio: 'Dokter spesialis kulit dan kelamin.',
-        schedules: const [
+        schedules: [
           DoctorScheduleModel(
-            dayDate: 'SENIN, 3 NOVEMBER 2026',
-            timeSlots: ['15.30 - 16.00'],
+            dayDate: dateDisplay,
+            timeSlots: const ['15.30 - 16.00'],
           ),
         ],
       );
@@ -38,11 +43,11 @@ void main() {
             doctorName: doctor.name,
             specialization: doctor.specialization,
             initialDoctor: doctor,
-            initialSlots: const [
+            initialSlots: [
               SlotRecord(
                 id: 'slot_1530',
                 doctorId: 'doc_1',
-                date: 'SENIN, 3 NOVEMBER 2026',
+                date: dateDisplay,
                 time: '15.30 - 16.00',
                 timeStart: '15.30',
                 timeEnd: '16.00',
@@ -63,21 +68,38 @@ void main() {
       await tester.tap(find.text('15.30 - 16.00'));
       await tester.pump(); // trigger dialog
 
-      // Muncul dialog menunggu konfirmasi dokter (tidak diblokir oleh "Belum Waktunya Konsultasi")
+      // Muncul dialog menunggu konfirmasi dokter
       expect(find.text('Menunggu Konfirmasi Dokter...'), findsOneWidget);
       expect(find.text('Belum Waktunya Konsultasi'), findsNothing);
 
       // Tunggu delay navigasi dialog
-      await tester.pump(const Duration(seconds: 4));
+      await tester.pump(const Duration(seconds: 2));
       await tester.pumpAndSettle();
 
-      // Pasien diarahkan ke halaman awal Menunggu Verifikasi Dokter
+      // Pasien diarahkan ke halaman awal Menunggu Verifikasi Dokter dengan tombol kembali
       expect(find.text('Menunggu Verifikasi Dokter'), findsWidgets);
+      expect(find.byIcon(LucideIcons.chevronLeft), findsOneWidget);
+
+      // Pasien klik tombol kembali ke halaman profil dokter
+      await tester.tap(find.byIcon(LucideIcons.chevronLeft));
+      await tester.pumpAndSettle();
+
+      // Kembali di profil dokter, slot yang dipilih sekarang berstatus "Menunggu Verifikasi"
+      expect(find.text('Menunggu Verifikasi'), findsOneWidget);
+
+      // Jika pasien mengeklik lagi slot yang sudah dipilih, TIDAK muncul dialog "Menunggu Konfirmasi Dokter..."
+      // melainkan LANGSUNG diarahkan ke halaman menunggu verifikasi dokter
+      await tester.tap(find.text('15.30 - 16.00'));
+      await tester.pumpAndSettle();
+
+      // Memastikan langsung di halaman Menunggu Verifikasi Dokter
+      expect(find.text('Menunggu Verifikasi Dokter'), findsWidgets);
+      expect(find.text('Menunggu Konfirmasi Dokter...'), findsNothing);
     });
   });
 
   group('Halaman Menunggu Verifikasi Pasien & Masuk Ruang Chat Setelah Diverifikasi', () {
-    testWidgets('Tampil status menunggu verifikasi dan berubah jadi Masuk Ruang Chat saat terverifikasi', (tester) async {
+    testWidgets('Tampil status menunggu verifikasi dan berubah jadi Mulai Konsultasi saat terverifikasi', (tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -92,6 +114,7 @@ void main() {
             dateTime: 'Senin, 3 November 2026 • 15.30 WIB',
             scheduleDate: 'Senin, 3 November 2026',
             scheduleTime: '15.30 - 16.00',
+            initialIsConfirmed: false,
           ),
         ),
       );
@@ -100,7 +123,28 @@ void main() {
       // Verifikasi tampilan awal status Menunggu Verifikasi
       expect(find.text('Menunggu Verifikasi Dokter'), findsWidgets);
       expect(find.text('Menunggu Verifikasi'), findsOneWidget);
-      expect(find.text('Masuk Ruang Chat'), findsNothing);
+      expect(find.text('Mulai Konsultasi'), findsNothing);
+
+      // Tampilkan dengan status sudah diverifikasi (initialIsConfirmed: true)
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: MenungguKonfirmasiPage(
+            doctorId: 'doc_1',
+            doctorName: 'dr. Sarah Sp.KK',
+            specialization: 'Spesialis Kulit',
+            dateTime: 'Senin, 3 November 2026 • 15.30 WIB',
+            scheduleDate: 'Senin, 3 November 2026',
+            scheduleTime: '15.30 - 16.00',
+            initialIsConfirmed: true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Tampil status Terverifikasi dan tombol Mulai Konsultasi
+      expect(find.text('Jadwal Terverifikasi'), findsOneWidget);
+      expect(find.text('Terverifikasi'), findsOneWidget);
+      expect(find.text('Mulai Konsultasi'), findsOneWidget);
     });
   });
 
@@ -136,8 +180,8 @@ void main() {
       await tester.tap(find.text('Verifikasi Sekarang'));
       await tester.pumpAndSettle();
 
-      // Status berubah menjadi "Terjadwal" dan tombol berubah menjadi "Mulai Konsultasi"
-      expect(find.text('Terjadwal'), findsOneWidget);
+      // Status berubah menjadi "Terverifikasi" dan tombol berubah menjadi "Mulai Konsultasi"
+      expect(find.text('Terverifikasi'), findsOneWidget);
       expect(find.text('Mulai Konsultasi'), findsOneWidget);
       expect(find.text('Verifikasi Sekarang'), findsNothing);
 

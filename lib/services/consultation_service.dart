@@ -28,6 +28,21 @@ class ConsultationService {
   static String linkId(String patientId, String doctorId) =>
       '${patientId}_$doctorId';
 
+  // In-memory fallback untuk testing / offline environment
+  static final Map<String, Map<String, dynamic>> _inMemoryStore = {};
+  static final StreamController<List<Map<String, dynamic>>> _inMemoryCtrl =
+      StreamController<List<Map<String, dynamic>>>.broadcast();
+
+  static void resetInMemoryStore() {
+    _inMemoryStore.clear();
+    _inMemoryCtrl.add([]);
+  }
+
+  static void setInMemoryConsultation(String id, Map<String, dynamic> data) {
+    _inMemoryStore[id] = Map<String, dynamic>.from(data);
+    _inMemoryCtrl.add(_inMemoryStore.values.toList());
+  }
+
   // ---------------------------------------------------------------------------
   // Aturan 1 Pasien 1 Konsultasi per Hari
   // ---------------------------------------------------------------------------
@@ -38,7 +53,23 @@ class ConsultationService {
     required String dateIso,
     String? scheduleDate,
   }) async {
-    if (!Backend.useFirebase || patientUid.isEmpty) return false;
+    if (patientUid.isEmpty) return false;
+    if (!Backend.useFirebase) {
+      for (final doc in _inMemoryStore.values) {
+        if (doc['patientId'] == patientUid) {
+          final status = ((doc['status'] as String?) ?? '').toLowerCase();
+          if (status != 'dibatalkan') {
+            if (dateIso.isNotEmpty && doc['dateIso'] == dateIso) return true;
+            if (scheduleDate != null &&
+                scheduleDate.isNotEmpty &&
+                doc['scheduleDate'] == scheduleDate) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    }
     try {
       if (dateIso.isNotEmpty) {
         final snap = await _col
@@ -88,7 +119,30 @@ class ConsultationService {
     required String timeEnd,
   }) async {
     if (!Backend.useFirebase) {
-      throw StateError('Firebase belum terhubung.');
+      final consultationDocId = '${slotId}_${patient.uid}';
+      final doc = <String, dynamic>{
+        'id': consultationDocId,
+        'patientId': patient.uid,
+        'patientName': patient.name,
+        'doctorId': doctorUid,
+        'doctorName': doctorName,
+        'specialization': specialization,
+        'scheduleDate': scheduleDate,
+        'dateIso': dateIso,
+        'scheduleTime': scheduleTime,
+        'timeStart': timeStart,
+        'timeEnd': timeEnd,
+        'status': 'menunggu_konfirmasi',
+        'diagnosis': null,
+        'notes': null,
+        'slotId': slotId,
+        'createdBy': patient.uid,
+        'createdAt': DateTime.now(),
+        'updatedAt': DateTime.now(),
+      };
+      _inMemoryStore[consultationDocId] = doc;
+      _inMemoryCtrl.add(_inMemoryStore.values.toList());
+      return consultationDocId;
     }
 
     // 1 Pasien 1 Konsultasi per Hari agar adil untuk semua pasien.
@@ -274,19 +328,41 @@ class ConsultationService {
     String doctorUid, {
     bool includeFinished = false,
   }) {
-    if (!Backend.useFirebase || doctorUid.isEmpty) {
-      return const Stream.empty();
+    if (doctorUid.isEmpty) return const Stream.empty();
+    if (!Backend.useFirebase) {
+      final initial = _inMemoryStore.values
+          .where((m) =>
+              m['doctorId'] == doctorUid &&
+              (includeFinished || (m['status'] as String?) != 'selesai'))
+          .toList();
+      return _inMemoryCtrl.stream
+          .map((list) => list
+              .where((m) =>
+                  m['doctorId'] == doctorUid &&
+                  (includeFinished || (m['status'] as String?) != 'selesai'))
+              .toList())
+          .startWith(initial);
     }
     return _col
         .where('doctorId', isEqualTo: doctorUid)
-        .orderBy('createdAt', descending: true)
         .snapshots()
         .map(
-          (snap) => snap.docs
-              .map((d) => {'id': d.id, ...d.data()})
-              .where((m) =>
-                  includeFinished || (m['status'] as String?) != 'selesai')
-              .toList(),
+          (snap) {
+            final docs =
+                snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+            docs.sort((a, b) {
+              final aCreated = a['createdAt'];
+              final bCreated = b['createdAt'];
+              if (aCreated is Timestamp && bCreated is Timestamp) {
+                return bCreated.compareTo(aCreated);
+              }
+              return 0;
+            });
+            return docs
+                .where((m) =>
+                    includeFinished || (m['status'] as String?) != 'selesai')
+                .toList();
+          },
         );
   }
 
@@ -294,19 +370,42 @@ class ConsultationService {
   static Stream<List<Map<String, dynamic>>> streamForPatient(
     String patientUid,
   ) {
-    if (!Backend.useFirebase || patientUid.isEmpty) {
-      return const Stream.empty();
+    if (patientUid.isEmpty) return const Stream.empty();
+    if (!Backend.useFirebase) {
+      final initial = _inMemoryStore.values
+          .where((m) => m['patientId'] == patientUid)
+          .toList();
+      return _inMemoryCtrl.stream
+          .map((list) =>
+              list.where((m) => m['patientId'] == patientUid).toList())
+          .startWith(initial);
     }
     return _col
         .where('patientId', isEqualTo: patientUid)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList());
+        .map((snap) {
+      final docs = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+      docs.sort((a, b) {
+        final aCreated = a['createdAt'];
+        final bCreated = b['createdAt'];
+        if (aCreated is Timestamp && bCreated is Timestamp) {
+          return bCreated.compareTo(aCreated);
+        }
+        return 0;
+      });
+      return docs;
+    });
   }
 
   /// Stream 1 dokumen konsultasi (badge status live di ruang chat).
   static Stream<Map<String, dynamic>?> streamById(String id) {
-    if (!Backend.useFirebase || id.isEmpty) return const Stream.empty();
+    if (id.isEmpty) return const Stream.empty();
+    if (!Backend.useFirebase) {
+      final initial = _inMemoryStore[id];
+      return _inMemoryCtrl.stream
+          .map((_) => _inMemoryStore[id])
+          .startWith(initial);
+    }
     return _col.doc(id).snapshots().map(
           (s) => s.exists ? {'id': s.id, ...s.data()!} : null,
         );
@@ -393,7 +492,15 @@ class ConsultationService {
     required String doctorName,
     required String patientName,
   }) async {
-    if (!Backend.useFirebase) return;
+    if (!Backend.useFirebase) {
+      if (_inMemoryStore.containsKey(id)) {
+        _inMemoryStore[id]!['status'] = 'dikonfirmasi';
+        _inMemoryStore[id]!['confirmedAt'] = DateTime.now();
+        _inMemoryStore[id]!['updatedAt'] = DateTime.now();
+        _inMemoryCtrl.add(_inMemoryStore.values.toList());
+      }
+      return;
+    }
     final ref = _col.doc(id);
     String patientId = '';
     final bool confirmed = await _db.runTransaction((tx) async {
@@ -435,7 +542,14 @@ class ConsultationService {
   }
 
   static Future<void> markBerlangsung(String id) async {
-    if (!Backend.useFirebase) return;
+    if (!Backend.useFirebase) {
+      if (_inMemoryStore.containsKey(id)) {
+        _inMemoryStore[id]!['status'] = 'berlangsung';
+        _inMemoryStore[id]!['updatedAt'] = DateTime.now();
+        _inMemoryCtrl.add(_inMemoryStore.values.toList());
+      }
+      return;
+    }
     final ref = _col.doc(id);
     String patientId = '';
     String patientName = '';
@@ -506,7 +620,17 @@ class ConsultationService {
     String? diagnosis,
     String? notes,
   }) async {
-    if (!Backend.useFirebase) return;
+    if (!Backend.useFirebase) {
+      if (_inMemoryStore.containsKey(id)) {
+        _inMemoryStore[id]!['status'] = 'selesai';
+        _inMemoryStore[id]!['diagnosis'] = diagnosis ?? '';
+        _inMemoryStore[id]!['notes'] = notes ?? '';
+        _inMemoryStore[id]!['completedAt'] = DateTime.now();
+        _inMemoryStore[id]!['updatedAt'] = DateTime.now();
+        _inMemoryCtrl.add(_inMemoryStore.values.toList());
+      }
+      return;
+    }
     final ref = _col.doc(id);
     String patientId = '';
     final bool finished = await _db.runTransaction((tx) async {
@@ -680,5 +804,12 @@ class ConsultationService {
     } catch (_) {
       // Notifikasi chat bersifat best-effort — pesan tetap tersimpan.
     }
+  }
+}
+
+extension _StreamStartWith<T> on Stream<T> {
+  Stream<T> startWith(T initial) async* {
+    yield initial;
+    yield* this;
   }
 }

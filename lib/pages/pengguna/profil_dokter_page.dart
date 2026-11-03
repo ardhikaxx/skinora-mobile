@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
-import '../../models/doctor_practice_settings.dart';
+import '../../models/user_profile.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/consultation_service.dart';
@@ -86,7 +86,8 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
   DoctorProfileDetailModel? _liveDoctor;
   List<SlotRecord> _availableSlots = const [];
   StreamSubscription<List<SlotRecord>>? _slotSub;
-  DoctorPracticeSettings _practiceSettings = const DoctorPracticeSettings();
+  Map<String, Map<String, dynamic>> _myConsultationsBySlotId = {};
+  StreamSubscription<List<Map<String, dynamic>>>? _patientConsultationsSub;
 
   @override
   void initState() {
@@ -99,12 +100,78 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
       _applySlotsToDoctor(widget.initialSlots!);
     }
     _loadFromBackend();
+    _listenPatientConsultations();
   }
 
   @override
   void dispose() {
     _slotSub?.cancel();
+    _patientConsultationsSub?.cancel();
     super.dispose();
+  }
+
+  void _listenPatientConsultations() {
+    final patientUid = AuthService.uid;
+    if (patientUid == null || patientUid.isEmpty) return;
+    _patientConsultationsSub?.cancel();
+    _patientConsultationsSub =
+        ConsultationService.streamForPatient(patientUid).listen(
+      (items) {
+        if (!mounted) return;
+        final map = <String, Map<String, dynamic>>{};
+        final currentDocId = widget.doctorId ?? _liveDoctor?.id ?? '';
+        for (final item in items) {
+          final docId = item['doctorId'] as String? ?? '';
+          if (currentDocId.isEmpty || docId == currentDocId) {
+            final slotId = item['slotId'] as String? ?? '';
+            final status = (item['status'] as String? ?? '').toLowerCase();
+            if (status != 'selesai' && status != 'dibatalkan') {
+              if (slotId.isNotEmpty) {
+                map[slotId] = item;
+              }
+              final date = item['scheduleDate'] as String? ?? '';
+              final time = item['scheduleTime'] as String? ?? '';
+              if (date.isNotEmpty && time.isNotEmpty) {
+                map['${date}_$time'] = item;
+              }
+            }
+          }
+        }
+        setState(() {
+          _myConsultationsBySlotId = map;
+        });
+      },
+      onError: (_) {},
+    );
+  }
+
+  Map<String, dynamic>? _findMyConsultation(
+    SlotRecord? slot,
+    String time,
+    String dayDate,
+  ) {
+    if (slot != null && _myConsultationsBySlotId.containsKey(slot.id)) {
+      return _myConsultationsBySlotId[slot.id];
+    }
+    final key = '${dayDate}_$time';
+    if (_myConsultationsBySlotId.containsKey(key)) {
+      return _myConsultationsBySlotId[key];
+    }
+    final currentUid = AuthService.uid;
+    if (currentUid != null && currentUid.isNotEmpty && slot != null) {
+      if (slot.patientId == currentUid || slot.patientIds.contains(currentUid)) {
+        return _myConsultationsBySlotId[slot.id] ??
+            {
+              'id': '${slot.id}_$currentUid',
+              'slotId': slot.id,
+              'doctorId': slot.doctorId,
+              'status': 'menunggu_konfirmasi',
+              'scheduleDate': slot.date,
+              'scheduleTime': slot.time,
+            };
+      }
+    }
+    return null;
   }
 
   /// Profil dokter sekali + stream slot realtime dari Firestore.
@@ -140,11 +207,6 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
         });
       },
     );
-
-    ScheduleService.getPracticeSettings(doctorId).then((settings) {
-      if (!mounted) return;
-      setState(() => _practiceSettings = settings);
-    }).catchError((_) {});
 
     try {
       final profile = await UserService.loadByUid(doctorId);
@@ -278,12 +340,7 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
 
                   const SizedBox(height: 20.0),
 
-                  // 2. Banner Informasi Praktik & Pembagian Sesi Dokter
-                  _buildPracticeInfoBanner(),
-
-                  const SizedBox(height: 20.0),
-
-                  // 3. Section Title: "JADWAL TERSEDIA"
+                  // 2. Section Title: "JADWAL TERSEDIA"
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -359,81 +416,6 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
             widget.onNavigateTab?.call(index);
           }
         },
-      ),
-    );
-  }
-
-  /// Banner Ringkasan Praktik & Kuota Dokter
-  Widget _buildPracticeInfoBanner() {
-    final isEnded = _practiceSettings.isPracticeEndedNow();
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF7ED),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFFEDD5)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFEDD5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  LucideIcons.clock,
-                  size: 16,
-                  color: Color(0xFFC2410C),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Jam Praktik: ${_practiceSettings.practiceStartTime} - ${_practiceSettings.practiceEndTime} WIB',
-                  style: const TextStyle(
-                    fontSize: 13.0,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF9A3412),
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isEnded
-                      ? const Color(0xFFFEE2E2)
-                      : const Color(0xFFDCFCE7),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  isEnded ? 'Tutup Otomatis' : 'Praktik Buka',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.bold,
-                    color: isEnded
-                        ? const Color(0xFFB91C1C)
-                        : const Color(0xFF15803D),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '• Pembagian sesi: ${_practiceSettings.sessionDurationMinutes} Menit / sesi\n'
-            '• Limit pasien: ${_practiceSettings.quotaPerSession} Pasien / sesi (Maks. ${_practiceSettings.dailyPatientLimit} pasien/hari)',
-            style: const TextStyle(
-              fontSize: 12.0,
-              color: Color(0xFF7C2D12),
-              height: 1.4,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -587,6 +569,13 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
     DoctorProfileDetailModel doctor,
   ) {
     final slot = _findSlot(time, dayDate);
+    final myConsultation = _findMyConsultation(slot, time, dayDate);
+    final isMyBooking = myConsultation != null;
+    final myStatus =
+        (myConsultation?['status'] as String? ?? '').toLowerCase();
+    final isConfirmed =
+        myStatus == 'dikonfirmasi' || myStatus == 'berlangsung';
+
     final isFull = slot?.isFull ?? false;
     final isExpired = slot != null &&
         slot.timeEnd.isNotEmpty &&
@@ -603,7 +592,19 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
     String statusBadge = 'Sisa $remaining kuota';
     Color statusColor = const Color(0xFFC2410C);
 
-    if (isExpired) {
+    if (isMyBooking) {
+      if (isConfirmed) {
+        bgColor = const Color(0xFFDCFCE7);
+        textColor = const Color(0xFF15803D);
+        statusBadge = 'Terverifikasi';
+        statusColor = const Color(0xFF16A34A);
+      } else {
+        bgColor = const Color(0xFFFFF7ED);
+        textColor = const Color(0xFFC2410C);
+        statusBadge = 'Menunggu Verifikasi';
+        statusColor = const Color(0xFFD97706);
+      }
+    } else if (isExpired) {
       bgColor = const Color(0xFFF3F4F6);
       textColor = const Color(0xFF9CA3AF);
       statusBadge = 'Selesai';
@@ -628,14 +629,21 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
           decoration: BoxDecoration(
             color: bgColor,
             borderRadius: BorderRadius.circular(14),
-            border: isFull || isExpired
+            border: isMyBooking
                 ? Border.all(
-                    color: isFull
-                        ? const Color(0xFFFECACA)
-                        : const Color(0xFFE5E7EB),
-                    width: 1,
+                    color: isConfirmed
+                        ? const Color(0xFF86EFAC)
+                        : const Color(0xFFFDBA74),
+                    width: 1.2,
                   )
-                : null,
+                : (isFull || isExpired
+                    ? Border.all(
+                        color: isFull
+                            ? const Color(0xFFFECACA)
+                            : const Color(0xFFE5E7EB),
+                        width: 1,
+                      )
+                    : null),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -767,13 +775,55 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
     );
   }
 
-  /// Menampilkan dialog menunggu dokter selama 3 detik lalu ke ruang konfirmasi
+  /// Menampilkan dialog menunggu konfirmasi dokter saat booking baru,
+  /// atau langsung ke halaman konfirmasi jika slot sudah dibooking.
   Future<void> _onTimeSlotTapped(
     String time,
     String dayDate,
     DoctorProfileDetailModel doctor,
   ) async {
     final slot = _findSlot(time, dayDate);
+    final slotDate = slot?.date.isNotEmpty == true ? slot!.date : dayDate;
+    final startTime = AppDates.formatHm(
+      slot?.timeStart.isNotEmpty == true
+          ? slot!.timeStart
+          : (slot?.time.split('-').first.trim() ??
+              time.split('-').first.trim()),
+    );
+
+    // Jika pengguna sudah membooking jadwal ini:
+    // Langsung arahkan ke halaman menunggu konfirmasi dokter (dengan tombol kembali).
+    // Jika sudah dikonfirmasi oleh dokter, diarahkan ke halaman awal dengan tombol Mulai Konsultasi.
+    final myConsultation = _findMyConsultation(slot, time, dayDate);
+    if (myConsultation != null) {
+      final myStatus =
+          (myConsultation['status'] as String? ?? '').toLowerCase();
+      final isConfirmed =
+          myStatus == 'dikonfirmasi' || myStatus == 'berlangsung';
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MenungguKonfirmasiPage(
+            doctorId: doctor.id,
+            doctorName: doctor.name,
+            specialization: doctor.specialization,
+            consultationId: myConsultation['id'] as String?,
+            onNavigateTab: widget.onNavigateTab,
+            dateTime: '$slotDate • $startTime WIB',
+            scheduleDate: slotDate,
+            scheduleTime: slot?.time.isNotEmpty == true ? slot!.time : time,
+            dateIso: slot?.dateIso ?? '',
+            timeStart: slot?.timeStart.isNotEmpty == true
+                ? slot!.timeStart
+                : startTime,
+            timeEnd: slot?.timeEnd ?? '',
+            initialIsConfirmed: isConfirmed,
+          ),
+        ),
+      );
+      return;
+    }
+
     if (slot == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -784,13 +834,6 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
       );
       return;
     }
-
-    final slotDate = slot.date.isNotEmpty ? slot.date : dayDate;
-    final startTime = AppDates.formatHm(
-      slot.timeStart.isNotEmpty
-          ? slot.timeStart
-          : slot.time.split('-').first.trim(),
-    );
 
     // 1. Validasi sesi sudah penuh (mencapai batas limit kuota pasien)
     if (slot.isFull) {
@@ -804,7 +847,7 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
       return;
     }
 
-    // 2. Validasi sesi sudah lewat waktu sekarang (tutup otomatis)
+    // 2. Validasi sesi sudah lewat waktu sekarang
     final isPast = slot.timeEnd.isNotEmpty &&
         AppDates.isPastSlot(
           dateIso: slot.dateIso,
@@ -816,7 +859,7 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Jadwal sesi $time pada $slotDate sudah berakhir (tutup otomatis).',
+            'Jadwal sesi $time pada $slotDate sudah berakhir.',
           ),
         ),
       );
@@ -824,20 +867,20 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
     }
 
     // 3. Validasi aturan: Dibatasi 1 pasien hanya bisa konsultasi sekali dalam satu hari
-    if (Backend.useFirebase) {
-      final patient = await AuthService.loadProfile();
-      if (patient != null && patient.uid.isNotEmpty) {
-        final alreadyBookedToday =
-            await ConsultationService.hasConsultationOnDate(
-          patientUid: patient.uid,
-          dateIso: slot.dateIso,
-          scheduleDate: slotDate,
-        );
-        if (alreadyBookedToday) {
-          if (!mounted) return;
-          await _showDailyLimitDialog(slotDate);
-          return;
-        }
+    final currentPatient =
+        Backend.useFirebase ? await AuthService.loadProfile() : null;
+    final patientUid = currentPatient?.uid ?? AuthService.uid;
+    if (patientUid != null && patientUid.isNotEmpty) {
+      final alreadyBookedToday =
+          await ConsultationService.hasConsultationOnDate(
+        patientUid: patientUid,
+        dateIso: slot.dateIso,
+        scheduleDate: slotDate,
+      );
+      if (alreadyBookedToday) {
+        if (!mounted) return;
+        await _showDailyLimitDialog(slotDate);
+        return;
       }
     }
 
@@ -904,50 +947,51 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
 
     String? consultationId;
     String bookingError = '';
-    if (Backend.useFirebase) {
-      try {
-        final patient = await AuthService.loadProfile();
-        if (patient == null || patient.uid.isEmpty) {
-          throw StateError(
-            'Sesi pengguna tidak ditemukan. Silahkan login ulang.',
-          );
-        }
-        consultationId = await ConsultationService.book(
-          doctorUid: doctor.id,
-          doctorName: doctor.name,
-          specialization: doctor.specialization,
-          slotId: slot.id,
-          scheduleDate: slotDate,
-          scheduleTime: slot.time,
-          patient: patient,
-          dateIso: slot.dateIso,
-          timeStart: slot.timeStart.isNotEmpty ? slot.timeStart : startTime,
-          timeEnd: slot.timeEnd,
+    final patientToBook = currentPatient ??
+        UserProfile(
+          docId: patientUid ?? 'user_local',
+          uid: patientUid ?? 'user_local',
+          name: 'Pasien',
+          email: 'pasien@skinora.com',
+          role: 'pengguna',
         );
-      } catch (e) {
-        final msg = e.toString();
-        final lowered = msg.toLowerCase();
-        if (msg.contains('maksimal 1 kali konsultasi') ||
-            msg.contains('sudah memiliki jadwal')) {
-          bookingError =
-              'Anda sudah memiliki jadwal konsultasi pada hari ini. Maksimal 1 konsultasi per hari agar pasien lainnya kebagian jadwal.';
-        } else if (msg.contains('penuh') || lowered.contains('penuh')) {
-          bookingError =
-              'Slot jadwal sudah penuh untuk sesi ini. Silakan pilih sesi lain.';
-        } else if (msg.contains('dibooking') ||
-            lowered.contains('already booked')) {
-          bookingError =
-              'Slot sudah dibooking oleh pasien lain. Silakan pilih jadwal lain.';
-        } else if (lowered.contains('permission-denied')) {
-          bookingError =
-              'Gagal memesan jadwal karena akses ditolak. Silakan coba lagi.';
-        } else {
-          bookingError = 'Gagal memesan jadwal: $msg';
-        }
+
+    try {
+      consultationId = await ConsultationService.book(
+        doctorUid: doctor.id,
+        doctorName: doctor.name,
+        specialization: doctor.specialization,
+        slotId: slot.id,
+        scheduleDate: slotDate,
+        scheduleTime: slot.time,
+        patient: patientToBook,
+        dateIso: slot.dateIso,
+        timeStart: slot.timeStart.isNotEmpty ? slot.timeStart : startTime,
+        timeEnd: slot.timeEnd,
+      );
+    } catch (e) {
+      final msg = e.toString();
+      final lowered = msg.toLowerCase();
+      if (msg.contains('maksimal 1 kali konsultasi') ||
+          msg.contains('sudah memiliki jadwal')) {
+        bookingError =
+            'Anda sudah memiliki jadwal konsultasi pada hari ini. Maksimal 1 konsultasi per hari agar pasien lainnya kebagian jadwal.';
+      } else if (msg.contains('penuh') || lowered.contains('penuh')) {
+        bookingError =
+            'Slot jadwal sudah penuh untuk sesi ini. Silakan pilih sesi lain.';
+      } else if (msg.contains('dibooking') ||
+          lowered.contains('already booked')) {
+        bookingError =
+            'Slot sudah dibooking oleh pasien lain. Silakan pilih jadwal lain.';
+      } else if (lowered.contains('permission-denied')) {
+        bookingError =
+            'Gagal memesan jadwal karena akses ditolak. Silakan coba lagi.';
+      } else {
+        bookingError = 'Gagal memesan jadwal: $msg';
       }
     }
 
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
     Navigator.of(context, rootNavigator: true).pop();
 
@@ -958,15 +1002,19 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
       return;
     }
 
-    if (Backend.useFirebase &&
-        (consultationId == null || consultationId.isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Gagal memesan jadwal. Silakan coba lagi.'),
-        ),
-      );
-      return;
-    }
+    final confirmedId = consultationId ?? '${slot.id}_${patientToBook.uid}';
+    setState(() {
+      final map = {
+        'id': confirmedId,
+        'slotId': slot.id,
+        'status': 'menunggu_konfirmasi',
+        'scheduleDate': slotDate,
+        'scheduleTime': slot.time,
+        'doctorId': doctor.id,
+      };
+      _myConsultationsBySlotId[slot.id] = map;
+      _myConsultationsBySlotId['${slotDate}_$time'] = map;
+    });
 
     Navigator.push(
       context,
@@ -975,14 +1023,15 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
           doctorId: doctor.id,
           doctorName: doctor.name,
           specialization: doctor.specialization,
-          consultationId: consultationId,
+          consultationId: confirmedId,
           onNavigateTab: widget.onNavigateTab,
-          dateTime: '$slotDate • $startTime',
+          dateTime: '$slotDate • $startTime WIB',
           scheduleDate: slotDate,
           scheduleTime: slot.time.isNotEmpty ? slot.time : time,
           dateIso: slot.dateIso,
           timeStart: slot.timeStart.isNotEmpty ? slot.timeStart : startTime,
           timeEnd: slot.timeEnd,
+          initialIsConfirmed: false,
         ),
       ),
     );

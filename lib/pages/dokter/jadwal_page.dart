@@ -773,7 +773,7 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
                       icon: LucideIcons.calendarDays,
                       title: 'Belum ada jadwal konsultasi',
                       description:
-                          'Tambahkan slot jadwal atau terapkan sesi otomatis agar pasien dapat memesan konsultasi dengan Anda.',
+                          'Tambahkan slot jadwal agar pasien dapat memesan konsultasi dengan Anda.',
                     )
                   else
                     ..._scheduleDays.map((dayGroup) {

@@ -264,7 +264,7 @@ void main() {
   });
 
   group('ProfilDokterPenggunaPage Quota & Session Display Tests', () {
-    testWidgets('Tampil banner info praktik dokter dan badge batas 1 konsultasi per hari', (tester) async {
+    testWidgets('Jam praktik otomatis dihapus dan hanya menampilkan jadwal dokter yang dibuka', (tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -284,8 +284,8 @@ void main() {
       expect(find.text('Profil Dokter'), findsOneWidget);
       expect(find.text('JADWAL TERSEDIA'), findsOneWidget);
       expect(find.text('Maks. 1 Konsultasi / Hari'), findsOneWidget);
-      expect(find.textContaining('Jam Praktik:'), findsOneWidget);
-      expect(find.textContaining('Pembagian sesi:'), findsOneWidget);
+      expect(find.textContaining('Jam Praktik:'), findsNothing);
+      expect(find.textContaining('Tutup Otomatis'), findsNothing);
     });
   });
 }
