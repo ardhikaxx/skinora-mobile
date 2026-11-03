@@ -68,7 +68,9 @@ class UserService {
   }) {
     final settings = (d['settings'] as Map<String, dynamic>?) ?? const {};
     return UserProfile(
-      uid: (d['uid'] as String?) ?? '',
+      uid: (d['uid'] as String?)?.isNotEmpty == true
+          ? (d['uid'] as String)
+          : docId,
       docId: docId,
       registered: registered,
       name: (d['name'] as String?) ?? '',

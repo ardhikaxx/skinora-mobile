@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:skinora_app/pages/dokter/chat_konsultasi_page.dart';
 import 'package:skinora_app/pages/pengguna/menunggu_konfirmasi_page.dart';
 import 'package:skinora_app/pages/pengguna/profil_dokter_page.dart';
+import 'package:skinora_app/services/consultation_service.dart';
 import 'package:skinora_app/services/schedule_service.dart';
 import 'package:skinora_app/utils/app_dates.dart';
 
@@ -199,6 +200,228 @@ void main() {
       // Kembali ke halaman konsultasi dokter: status adalah Berlangsung dan tombol tetap "Masuk Ruang Chat"
       expect(find.text('Berlangsung'), findsOneWidget);
       expect(find.text('Masuk Ruang Chat'), findsOneWidget);
+    });
+  });
+
+  group('Validasi Jadwal Lewat Waktu & Jadwal Terkonfirmasi', () {
+    testWidgets('Jadwal yang sudah lewat tanggal atau jamnya tidak dapat dipilih dan berstatus Selesai', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      // Siapkan tanggal yang sudah lampau (kemarin)
+      final pastDate = AppDates.nowWib().subtract(const Duration(days: 2));
+      final pastDateDisplay = AppDates.display(pastDate).toUpperCase();
+
+      final doctor = DoctorProfileDetailModel(
+        id: 'doc_past',
+        name: 'dr. Budi Sp.KK',
+        specialization: 'Spesialis Kulit',
+        experience: '8 Tahun',
+        bio: 'Dokter spesialis kulit.',
+        schedules: [
+          DoctorScheduleModel(
+            dayDate: pastDateDisplay,
+            timeSlots: const ['09.00 - 09.30'],
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProfilDokterPenggunaPage(
+            doctorId: doctor.id,
+            doctorName: doctor.name,
+            specialization: doctor.specialization,
+            initialDoctor: doctor,
+            initialSlots: [
+              SlotRecord(
+                id: 'slot_past_1',
+                doctorId: 'doc_past',
+                date: pastDateDisplay,
+                time: '09.00 - 09.30',
+                timeStart: '09.00',
+                timeEnd: '09.30',
+                quota: 1,
+                bookedCount: 0,
+                isBooked: false,
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Memastikan slot yang lampau menampilkan badge Selesai
+      expect(find.text('09.00 - 09.30'), findsOneWidget);
+      expect(find.text('Selesai'), findsOneWidget);
+
+      // Tap slot yang lampau
+      await tester.tap(find.text('09.00 - 09.30'));
+      await tester.pump();
+
+      // Menampilkan SnackBar peringatan bahwa jadwal sudah berakhir
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.textContaining('sudah berakhir dan tidak dapat dipilih'), findsOneWidget);
+    });
+
+    testWidgets('Jadwal yang sudah dikonfirmasi dokter jika diklik lagi diarahkan ke MenungguKonfirmasiPage dengan tombol Mulai Konsultasi', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final futureDate = AppDates.nowWib().add(const Duration(days: 1));
+      final dateDisplay = AppDates.display(futureDate).toUpperCase();
+
+      final doctor = DoctorProfileDetailModel(
+        id: 'doc_confirmed',
+        name: 'dr. Maya Sp.KK',
+        specialization: 'Spesialis Kulit',
+        experience: '4 Tahun',
+        bio: 'Dokter spesialis kulit.',
+        schedules: [
+          DoctorScheduleModel(
+            dayDate: dateDisplay,
+            timeSlots: const ['14.00 - 14.30'],
+          ),
+        ],
+      );
+
+      final slot = SlotRecord(
+        id: 'slot_conf_1',
+        doctorId: 'doc_confirmed',
+        date: dateDisplay,
+        time: '14.00 - 14.30',
+        timeStart: '14.00',
+        timeEnd: '14.30',
+        quota: 1,
+        bookedCount: 1,
+        isBooked: true,
+        patientId: 'user_local',
+      );
+
+      // Simulasikan konsultasi sudah terdaftar dan terkonfirmasi
+      ConsultationService.setInMemoryConsultation('slot_conf_1_user_local', {
+        'id': 'slot_conf_1_user_local',
+        'slotId': 'slot_conf_1',
+        'doctorId': 'doc_confirmed',
+        'doctorName': 'dr. Maya Sp.KK',
+        'specialization': 'Spesialis Kulit',
+        'patientId': 'user_local',
+        'patientName': 'Pasien',
+        'status': 'dikonfirmasi',
+        'scheduleDate': dateDisplay,
+        'scheduleTime': '14.00 - 14.30',
+        'timeStart': '14.00',
+        'timeEnd': '14.30',
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProfilDokterPenggunaPage(
+            doctorId: doctor.id,
+            doctorName: doctor.name,
+            specialization: doctor.specialization,
+            initialDoctor: doctor,
+            initialSlots: [slot],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Slot berstatus Terverifikasi
+      expect(find.text('Terverifikasi'), findsOneWidget);
+
+      // Pasien klik slot yang sudah terverifikasi tersebut
+      await tester.tap(find.text('14.00 - 14.30'));
+      await tester.pumpAndSettle();
+
+      // Langsung diarahkan ke halaman MenungguKonfirmasiPage dengan tampilan Jadwal Terverifikasi dan tombol Mulai Konsultasi
+      expect(find.text('Jadwal Terverifikasi'), findsOneWidget);
+      expect(find.text('Mulai Konsultasi'), findsOneWidget);
+      expect(find.byIcon(LucideIcons.chevronLeft), findsOneWidget);
+    });
+  });
+
+  group('Batas Waktu Menunggu Verifikasi (Auto-Cancel / Expired) & Pengembalian Kuota', () {
+    testWidgets('MenungguKonfirmasiPage menampilkan status Jadwal Kedaluwarsa dan tombol Pilih Jadwal Lain jika melewati batas waktu', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      // Siapkan tanggal lampau
+      final pastDate = AppDates.nowWib().subtract(const Duration(days: 1));
+      final pastDateDisplay = AppDates.display(pastDate).toUpperCase();
+      final dateIso = AppDates.iso(pastDate);
+
+      ConsultationService.setInMemoryConsultation('c_expired_1', {
+        'id': 'c_expired_1',
+        'doctorId': 'doc_test',
+        'doctorName': 'dr. Sarah Sp.KK',
+        'patientId': 'user_local',
+        'patientName': 'Pasien',
+        'status': 'menunggu_konfirmasi',
+        'scheduleDate': pastDateDisplay,
+        'dateIso': dateIso,
+        'timeStart': '10.00',
+        'timeEnd': '10.30',
+        'scheduleTime': '10.00 - 10.30',
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MenungguKonfirmasiPage(
+            consultationId: 'c_expired_1',
+            doctorId: 'doc_test',
+            doctorName: 'dr. Sarah Sp.KK',
+            specialization: 'Spesialis Kulit',
+            dateTime: '$pastDateDisplay • 10.00 WIB',
+            scheduleDate: pastDateDisplay,
+            scheduleTime: '10.00 - 10.30',
+            dateIso: dateIso,
+            timeStart: '10.00',
+            timeEnd: '10.30',
+            initialIsConfirmed: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Memastikan status berubah menjadi Kedaluwarsa dan ada tombol Pilih Jadwal Lain
+      expect(find.text('Kedaluwarsa'), findsOneWidget);
+      expect(find.text('Jadwal Kedaluwarsa'), findsOneWidget);
+      expect(find.text('Pilih Jadwal Lain'), findsOneWidget);
+      expect(find.textContaining('Kuota konsultasi Anda hari ini telah dikembalikan'), findsOneWidget);
+    });
+
+    test('hasConsultationOnDate mengembalikan false dan mengembalikan kuota harian jika jadwal menunggu verifikasi telah kedaluwarsa', () async {
+      final pastDate = AppDates.nowWib().subtract(const Duration(days: 1));
+      final pastDateDisplay = AppDates.display(pastDate).toUpperCase();
+      final dateIso = AppDates.iso(pastDate);
+
+      ConsultationService.setInMemoryConsultation('c_expired_limit', {
+        'id': 'c_expired_limit',
+        'doctorId': 'doc_1',
+        'patientId': 'patient_test_quota',
+        'status': 'menunggu_konfirmasi',
+        'scheduleDate': pastDateDisplay,
+        'dateIso': dateIso,
+        'timeStart': '08.00',
+        'timeEnd': '08.30',
+        'scheduleTime': '08.00 - 08.30',
+      });
+
+      final hasLimit = await ConsultationService.hasConsultationOnDate(
+        patientUid: 'patient_test_quota',
+        dateIso: dateIso,
+        scheduleDate: pastDateDisplay,
+      );
+
+      // Kuota harian dikembalikan (hasLimit bernilai false sehingga pasien bebas memilih jadwal baru)
+      expect(hasLimit, isFalse);
     });
   });
 }

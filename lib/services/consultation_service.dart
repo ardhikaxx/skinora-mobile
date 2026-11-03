@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/user_profile.dart';
 import '../services/activity_service.dart';
+import '../services/auth_service.dart';
 import '../services/backend.dart';
 import '../services/notification_payload.dart';
 import '../services/notification_service.dart';
@@ -48,6 +49,8 @@ class ConsultationService {
   // ---------------------------------------------------------------------------
   /// Memeriksa apakah pasien sudah memiliki jadwal konsultasi pada tanggal
   /// tertentu ([dateIso] atau [scheduleDate]) dengan status aktif (bukan dibatalkan).
+  /// Bila ditemukan konsultasi 'menunggu_konfirmasi' yang sudah melewati jam mulai sesi,
+  /// sistem otomatis membatalkan konsultasi tersebut dan mengembalikan kuota harian pasien.
   static Future<bool> hasConsultationOnDate({
     required String patientUid,
     required String dateIso,
@@ -59,6 +62,23 @@ class ConsultationService {
         if (doc['patientId'] == patientUid) {
           final status = ((doc['status'] as String?) ?? '').toLowerCase();
           if (status != 'dibatalkan') {
+            if (status == 'menunggu_konfirmasi') {
+              final dIso = (doc['dateIso'] as String?) ?? '';
+              final sDate = (doc['scheduleDate'] as String?) ?? '';
+              final tStart = (doc['timeStart'] as String?) ?? '';
+              final tEnd = (doc['timeEnd'] as String?) ?? '';
+              if (AppDates.isSlotPastBooking(
+                dateIso: dIso,
+                scheduleDate: sDate,
+                timeStart: tStart,
+                timeEnd: tEnd,
+              )) {
+                doc['status'] = 'dibatalkan';
+                doc['cancelReason'] =
+                    'Kedaluwarsa: Melewati batas waktu konfirmasi dokter';
+                continue;
+              }
+            }
             if (dateIso.isNotEmpty && doc['dateIso'] == dateIso) return true;
             if (scheduleDate != null &&
                 scheduleDate.isNotEmpty &&
@@ -77,9 +97,25 @@ class ConsultationService {
             .where('dateIso', isEqualTo: dateIso)
             .get();
         for (final doc in snap.docs) {
+          final data = doc.data();
           final status =
-              ((doc.data()['status'] as String?) ?? '').toLowerCase();
+              ((data['status'] as String?) ?? '').toLowerCase();
           if (status != 'dibatalkan') {
+            if (status == 'menunggu_konfirmasi') {
+              final dIso = (data['dateIso'] as String?) ?? '';
+              final sDate = (data['scheduleDate'] as String?) ?? '';
+              final tStart = (data['timeStart'] as String?) ?? '';
+              final tEnd = (data['timeEnd'] as String?) ?? '';
+              if (AppDates.isSlotPastBooking(
+                dateIso: dIso,
+                scheduleDate: sDate,
+                timeStart: tStart,
+                timeEnd: tEnd,
+              )) {
+                unawaited(autoCancelExpiredConsultation(doc.id));
+                continue;
+              }
+            }
             return true;
           }
         }
@@ -90,9 +126,25 @@ class ConsultationService {
             .where('scheduleDate', isEqualTo: scheduleDate)
             .get();
         for (final doc in dateSnap.docs) {
+          final data = doc.data();
           final status =
-              ((doc.data()['status'] as String?) ?? '').toLowerCase();
+              ((data['status'] as String?) ?? '').toLowerCase();
           if (status != 'dibatalkan') {
+            if (status == 'menunggu_konfirmasi') {
+              final dIso = (data['dateIso'] as String?) ?? '';
+              final sDate = (data['scheduleDate'] as String?) ?? '';
+              final tStart = (data['timeStart'] as String?) ?? '';
+              final tEnd = (data['timeEnd'] as String?) ?? '';
+              if (AppDates.isSlotPastBooking(
+                dateIso: dIso,
+                scheduleDate: sDate,
+                timeStart: tStart,
+                timeEnd: tEnd,
+              )) {
+                unawaited(autoCancelExpiredConsultation(doc.id));
+                continue;
+              }
+            }
             return true;
           }
         }
@@ -145,9 +197,17 @@ class ConsultationService {
       return consultationDocId;
     }
 
+    final authUid = AuthService.uid;
+    final effectiveUid = (patient.uid.isNotEmpty && patient.uid != 'user_local')
+        ? patient.uid
+        : (authUid ?? patient.uid);
+    final effectiveName = patient.name.trim().isNotEmpty
+        ? patient.name.trim()
+        : 'Pasien';
+
     // 1 Pasien 1 Konsultasi per Hari agar adil untuk semua pasien.
     final alreadyBooked = await hasConsultationOnDate(
-      patientUid: patient.uid,
+      patientUid: effectiveUid,
       dateIso: dateIso,
       scheduleDate: scheduleDate,
     );
@@ -159,14 +219,14 @@ class ConsultationService {
 
     // ID deterministik per kombinasi slot + pasien: mendukung kuota > 1
     // pasien per slot tanpa saling menimpa.
-    final consultationDocId = '${slotId}_${patient.uid}';
+    final consultationDocId = '${slotId}_$effectiveUid';
     final consultationRef = _col.doc(consultationDocId);
     final slotRef = _db
         .collection('users')
         .doc(doctorUid)
         .collection('slots')
         .doc(slotId);
-    final linkRef = _links.doc(linkId(patient.uid, doctorUid));
+    final linkRef = _links.doc(linkId(effectiveUid, doctorUid));
     final now = FieldValue.serverTimestamp();
 
     // Satu transaksi atomik: slot + konsultasi + care_link.
@@ -195,8 +255,8 @@ class ConsultationService {
         bookedCount = quota;
       }
 
-      if (patientIds.contains(patient.uid) ||
-          slotData['patientId'] == patient.uid) {
+      if (patientIds.contains(effectiveUid) ||
+          slotData['patientId'] == effectiveUid) {
         throw StateError('Anda sudah terdaftar pada sesi jadwal ini.');
       }
 
@@ -206,21 +266,21 @@ class ConsultationService {
 
       final newBookedCount = bookedCount + 1;
       final newIsBooked = newBookedCount >= quota;
-      final newPatientIds = List<String>.from(patientIds)..add(patient.uid);
-      final newPatientNames = List<String>.from(patientNames)..add(patient.name);
+      final newPatientIds = List<String>.from(patientIds)..add(effectiveUid);
+      final newPatientNames = List<String>.from(patientNames)..add(effectiveName);
 
       tx.update(slotRef, {
         'bookedCount': newBookedCount,
         'isBooked': newIsBooked,
         'patientIds': newPatientIds,
         'patientNames': newPatientNames,
-        'patientId': patient.uid,
-        'patientName': patient.name,
+        'patientId': effectiveUid,
+        'patientName': effectiveName,
         'updatedAt': now,
       });
       tx.set(consultationRef, {
-        'patientId': patient.uid,
-        'patientName': patient.name,
+        'patientId': effectiveUid,
+        'patientName': effectiveName,
         'doctorId': doctorUid,
         'doctorName': doctorName,
         'specialization': specialization,
@@ -233,15 +293,15 @@ class ConsultationService {
         'diagnosis': null,
         'notes': null,
         'slotId': slotId,
-        'createdBy': patient.uid,
+        'createdBy': effectiveUid,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
       tx.set(linkRef, {
-        'patientId': patient.uid,
+        'patientId': effectiveUid,
         'doctorId': doctorUid,
         'slotId': slotId,
-        'createdBy': patient.uid,
+        'createdBy': effectiveUid,
         'createdAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     });
@@ -249,23 +309,23 @@ class ConsultationService {
     await ActivityService.log(
       title: 'Booking konsultasi dengan $doctorName',
       tag: 'Booking',
-      actor: patient.name,
-      actorUid: patient.uid,
+      actor: effectiveName,
+      actorUid: effectiveUid,
     );
     await NotificationService.notifyUser(
       uid: doctorUid,
       title: 'Penjadwalan Konsultasi Baru',
       description:
-          '${patient.name} memilih jadwal konsultasi pada $scheduleDate $scheduleTime. Silakan verifikasi jadwal ini.',
+          '$effectiveName memilih jadwal konsultasi pada $scheduleDate $scheduleTime. Silakan verifikasi jadwal ini.',
       iconKey: 'calendar',
       type: NotificationType.bookingCreated,
       entityId: consultationRef.id,
       consultationId: consultationRef.id,
       audienceRole: NotificationRole.dokter,
-      createdBy: patient.uid,
+      createdBy: effectiveUid,
     );
     await NotificationService.notifyUser(
-      uid: patient.uid,
+      uid: effectiveUid,
       title: 'Menunggu Verifikasi Dokter',
       description:
           'Jadwal konsultasi Anda bersama $doctorName pada $scheduleDate $scheduleTime sedang menunggu verifikasi dokter.',
@@ -275,17 +335,17 @@ class ConsultationService {
       consultationId: consultationRef.id,
       route: NotificationPageRoute.penggunaRiwayatKonsultasi,
       audienceRole: NotificationRole.pengguna,
-      createdBy: patient.uid,
+      createdBy: effectiveUid,
     );
     // Admin dashboard: booking baru (satu dokumen per admin, idempoten).
     await NotificationService.notifyAdmins(
       title: 'Konsultasi Baru',
-      body: '${patient.name} memesan konsultasi dengan $doctorName '
+      body: '$effectiveName memesan konsultasi dengan $doctorName '
           'pada $scheduleDate $scheduleTime',
       type: NotificationType.bookingCreated,
       iconKey: 'calendar',
       entityId: consultationRef.id,
-      createdBy: patient.uid,
+      createdBy: effectiveUid,
     );
     // Refresh chat feed agar listener pesan aktif segera untuk konsultasi baru.
     unawaited(NotificationService.refreshChatFeed());
@@ -333,13 +393,17 @@ class ConsultationService {
       final initial = _inMemoryStore.values
           .where((m) =>
               m['doctorId'] == doctorUid &&
-              (includeFinished || (m['status'] as String?) != 'selesai'))
+              (includeFinished ||
+                  ((m['status'] as String?) != 'selesai' &&
+                      (m['status'] as String?) != 'dibatalkan')))
           .toList();
       return _inMemoryCtrl.stream
           .map((list) => list
               .where((m) =>
                   m['doctorId'] == doctorUid &&
-                  (includeFinished || (m['status'] as String?) != 'selesai'))
+                  (includeFinished ||
+                      ((m['status'] as String?) != 'selesai' &&
+                          (m['status'] as String?) != 'dibatalkan')))
               .toList())
           .startWith(initial);
     }
@@ -360,7 +424,9 @@ class ConsultationService {
             });
             return docs
                 .where((m) =>
-                    includeFinished || (m['status'] as String?) != 'selesai')
+                    includeFinished ||
+                    ((m['status'] as String?) != 'selesai' &&
+                        (m['status'] as String?) != 'dibatalkan'))
                 .toList();
           },
         );
@@ -597,6 +663,106 @@ class ConsultationService {
     );
     // Refresh chat feed agar listener pesan aktif segera di sisi dokter & pasien.
     unawaited(NotificationService.refreshChatFeed());
+  }
+
+  /// Membatalkan konsultasi secara otomatis apabila jam mulai sesi tiba namun
+  /// belum diverifikasi oleh dokter, sehingga kuota harian pasien dikembalikan.
+  static Future<bool> autoCancelExpiredConsultation(String id) async {
+    if (id.isEmpty) return false;
+    if (!Backend.useFirebase) {
+      final doc = _inMemoryStore[id];
+      if (doc == null) return false;
+      final status = ((doc['status'] as String?) ?? '').toLowerCase();
+      if (status != 'menunggu_konfirmasi') return false;
+
+      doc['status'] = 'dibatalkan';
+      doc['cancelReason'] =
+          'Jadwal konsultasi telah kedaluwarsa karena melewati batas waktu konfirmasi dokter. Kuota konsultasi Anda hari ini telah dikembalikan.';
+      doc['cancelledAt'] = DateTime.now();
+      doc['updatedAt'] = DateTime.now();
+      _inMemoryCtrl.add(_inMemoryStore.values.toList());
+      return true;
+    }
+
+    try {
+      final ref = _col.doc(id);
+      final snap = await ref.get();
+      if (!snap.exists) return false;
+      final data = snap.data();
+      if (data == null) return false;
+      final status = ((data['status'] as String?) ?? '').toLowerCase();
+      if (status != 'menunggu_konfirmasi') return false;
+
+      final patientId = (data['patientId'] as String?) ?? '';
+      final doctorId = (data['doctorId'] as String?) ?? '';
+      final doctorName = (data['doctorName'] as String?) ?? 'Dokter';
+      final scheduleDate = (data['scheduleDate'] as String?) ?? '';
+      final scheduleTime = (data['scheduleTime'] as String?) ?? '';
+      final slotId = (data['slotId'] as String?) ?? '';
+
+      await ref.update({
+        'status': 'dibatalkan',
+        'cancelReason':
+            'Jadwal konsultasi telah kedaluwarsa karena melewati batas waktu konfirmasi dokter. Kuota konsultasi Anda hari ini telah dikembalikan.',
+        'cancelledAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Lepas kuota slot dokter bila ada
+      if (slotId.isNotEmpty && doctorId.isNotEmpty) {
+        try {
+          final slotRef = _db
+              .collection('users')
+              .doc(doctorId)
+              .collection('slots')
+              .doc(slotId);
+          await _db.runTransaction((tx) async {
+            final sSnap = await tx.get(slotRef);
+            if (!sSnap.exists) return;
+            final sData = sSnap.data()!;
+            final pIds =
+                List<String>.from((sData['patientIds'] as List?) ?? []);
+            pIds.remove(patientId);
+            final currentCount = (sData['bookedCount'] as num?)?.toInt() ?? 0;
+            final newCount = currentCount > 0 ? currentCount - 1 : 0;
+            final quota = (sData['quota'] as num?)?.toInt() ?? 1;
+            tx.update(slotRef, {
+              'bookedCount': newCount,
+              'isBooked': newCount >= quota,
+              'patientIds': pIds,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          });
+        } catch (_) {}
+      }
+
+      if (patientId.isNotEmpty) {
+        await ActivityService.log(
+          title: 'Jadwal konsultasi dibatalkan otomatis (kedaluwarsa)',
+          tag: 'Konsultasi',
+          actor: 'Sistem',
+          actorUid: patientId,
+        );
+
+        await NotificationService.notifyUser(
+          uid: patientId,
+          title: 'Jadwal Konsultasi Dibatalkan Otomatis',
+          description:
+              'Jadwal konsultasi bersama $doctorName pada $scheduleDate $scheduleTime telah kedaluwarsa karena melewati batas waktu konfirmasi dokter. Kuota konsultasi Anda hari ini telah dikembalikan.',
+          iconKey: 'calendar',
+          type: NotificationType.bookingCancelled,
+          entityId: id,
+          consultationId: id,
+          route: NotificationPageRoute.penggunaRiwayatKonsultasi,
+          audienceRole: NotificationRole.pengguna,
+          createdBy: patientId,
+        );
+      }
+
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Tandai status konsultasi selesai (persisten ke Firestore saat jam slot berakhir).

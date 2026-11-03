@@ -17,6 +17,18 @@ service cloud.firestore {
       return get(userDoc(uid)).data;
     }
 
+    function slotDoc(doctorId, slotId) {
+      return /databases/$(database)/documents/users/$(doctorId)/slots/$(slotId);
+    }
+
+    function slotExists(doctorId, slotId) {
+      return exists(slotDoc(doctorId, slotId));
+    }
+
+    function slotData(doctorId, slotId) {
+      return get(slotDoc(doctorId, slotId)).data;
+    }
+
     function isOwner(uid) {
       return signedIn() && request.auth.uid == uid;
     }
@@ -252,13 +264,18 @@ service cloud.firestore {
           resource.data.patientId == request.auth.uid
           || resource.data.doctorId == request.auth.uid
         ));
-      // Dibuat pasien saat booking; target harus dokter terverifikasi.
+      // Dibuat atau diperbarui oleh pasien saat booking dokter.
       allow create: if signedIn()
         && request.resource.data.patientId == request.auth.uid
         && request.resource.data.createdBy == request.auth.uid
-        && get(userDoc(request.resource.data.doctorId)).data.role == 'dokter'
-        && get(userDoc(request.resource.data.doctorId)).data.status == 'terverifikasi';
-      allow update, delete: if isAdmin();
+        && userExists(request.resource.data.doctorId)
+        && (get(userDoc(request.resource.data.doctorId)).data.role in ['dokter', 'admin']);
+      allow update: if isAdmin()
+        || (signedIn()
+          && (resource.data.patientId == request.auth.uid || resource.data.doctorId == request.auth.uid)
+          && request.resource.data.patientId == resource.data.patientId
+          && request.resource.data.doctorId == resource.data.doctorId);
+      allow delete: if isAdmin();
     }
 
     match /consultations/{id} {
@@ -269,7 +286,7 @@ service cloud.firestore {
         ));
 
       // Create hanya oleh pasien yang sedang mem-book slot yang ada,
-      // berstatus terjadwal, tanpa diagnosis awal.
+      // berstatus terjadwal / menunggu_konfirmasi, tanpa diagnosis awal.
       allow create: if signedIn()
         && request.resource.data.patientId == request.auth.uid
         && request.resource.data.createdBy == request.auth.uid
@@ -277,23 +294,24 @@ service cloud.firestore {
         && request.resource.data.diagnosis == null
         && request.resource.data.notes == null
         && request.resource.data.slotId is string
-        && exists(/databases/$(database)/documents/users/$(request.resource.data.doctorId)/slots/$(request.resource.data.slotId))
-        && get(userDoc(request.resource.data.doctorId)).data.role == 'dokter'
-        && get(userDoc(request.resource.data.doctorId)).data.status == 'terverifikasi'
+        && slotExists(request.resource.data.doctorId, request.resource.data.slotId)
+        && userExists(request.resource.data.doctorId)
+        && (userData(request.resource.data.doctorId).role in ['dokter', 'admin'])
         && request.resource.data.createdAt == request.time
-        && request.resource.data.patientName == userData(request.auth.uid).name
+        && request.resource.data.patientName is string
+        && request.resource.data.patientName.size() > 0
         && (
           // Saat transaksi booking: slot pre-state belum penuh, belum dipatient, atau pasien terdaftar
-          get(/databases/$(database)/documents/users/$(request.resource.data.doctorId)/slots/$(request.resource.data.slotId)).data.isBooked != true
-          || get(/databases/$(database)/documents/users/$(request.resource.data.doctorId)/slots/$(request.resource.data.slotId)).data.patientId == null
-          || get(/databases/$(database)/documents/users/$(request.resource.data.doctorId)/slots/$(request.resource.data.slotId)).data.patientId == request.auth.uid
-          || (get(/databases/$(database)/documents/users/$(request.resource.data.doctorId)/slots/$(request.resource.data.slotId)).data.patientIds is list
-              && get(/databases/$(database)/documents/users/$(request.resource.data.doctorId)/slots/$(request.resource.data.slotId)).data.patientIds.hasAny([request.auth.uid]))
+          slotData(request.resource.data.doctorId, request.resource.data.slotId).isBooked != true
+          || slotData(request.resource.data.doctorId, request.resource.data.slotId).patientId == null
+          || slotData(request.resource.data.doctorId, request.resource.data.slotId).patientId == request.auth.uid
+          || (slotData(request.resource.data.doctorId, request.resource.data.slotId).patientIds is list
+              && slotData(request.resource.data.doctorId, request.resource.data.slotId).patientIds.hasAny([request.auth.uid]))
         );
 
-      // Update: hanya dokter terkait (atau admin) yang mengubah status/diagnosis.
-      // Pasien TIDAK boleh update konsultasi (termasuk menyetel selesai).
-      // Field identitas dikunci; status tidak boleh mundur dari selesai.
+      // Update: dokter terkait (atau admin) yang mengubah status/diagnosis.
+      // Pasien diizinkan membatalkan konsultasi miliknya HANYA jika status masih 'menunggu_konfirmasi'
+      // (misalnya auto-cancel saat jam mulai sesi tiba sebelum verifikasi dokter).
       allow update: if isAdmin()
         || (signedIn()
           && request.auth.uid == resource.data.doctorId
@@ -305,11 +323,21 @@ service cloud.firestore {
           && request.resource.data.slotId == resource.data.slotId
           && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['status', 'diagnosis', 'notes', 'updatedAt',
-                        'completedAt', 'confirmedAt'])
+                        'completedAt', 'confirmedAt', 'cancelReason', 'cancelledAt'])
           && resource.data.status != 'selesai'
           && request.resource.data.status in ['terjadwal', 'menunggu_konfirmasi',
                                               'dikonfirmasi', 'berlangsung',
-                                              'selesai', 'dibatalkan']);
+                                              'selesai', 'dibatalkan'])
+        || (signedIn()
+          && request.auth.uid == resource.data.patientId
+          && resource.data.status == 'menunggu_konfirmasi'
+          && request.resource.data.patientId == resource.data.patientId
+          && request.resource.data.doctorId == resource.data.doctorId
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.slotId == resource.data.slotId
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['status', 'cancelReason', 'cancelledAt', 'updatedAt'])
+          && request.resource.data.status == 'dibatalkan');
 
       allow delete: if isAdmin();
 

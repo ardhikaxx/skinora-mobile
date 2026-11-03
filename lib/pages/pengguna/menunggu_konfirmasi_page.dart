@@ -49,13 +49,21 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
   static const Color peachIconBg = Color(0xFFFFD5C8);
 
   StreamSubscription<Map<String, dynamic>?>? _statusSub;
+  Timer? _expirationCheckTimer;
   bool _isConfirmed = false;
+  bool _isCancelledOrExpired = false;
+  String _cancelReason = '';
 
   @override
   void initState() {
     super.initState();
     _isConfirmed = widget.initialIsConfirmed;
+    _checkTimeExpiration();
     _subscribeStatus();
+    _expirationCheckTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _checkTimeExpiration(),
+    );
   }
 
   @override
@@ -68,22 +76,74 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
     }
   }
 
+  void _checkTimeExpiration() {
+    if (_isConfirmed || _isCancelledOrExpired) return;
+    final isPastStart = AppDates.isSlotPastBooking(
+      dateIso: widget.dateIso ?? '',
+      scheduleDate: widget.scheduleDate,
+      timeStart: widget.timeStart,
+      timeEnd: widget.timeEnd,
+    );
+    if (isPastStart) {
+      final cid = widget.consultationId;
+      if (cid != null && cid.isNotEmpty) {
+        unawaited(ConsultationService.autoCancelExpiredConsultation(cid));
+      }
+      if (mounted) {
+        setState(() {
+          _isCancelledOrExpired = true;
+          _isConfirmed = false;
+        });
+      }
+    }
+  }
+
   void _subscribeStatus() {
     final cid = widget.consultationId;
-    if (cid == null || cid.isEmpty) return;
+    if (cid == null || cid.isEmpty) {
+      _checkTimeExpiration();
+      return;
+    }
 
     _statusSub = ConsultationService.streamById(cid).listen((doc) {
       if (!mounted || doc == null) return;
       final st = ((doc['status'] as String?) ?? '').toLowerCase();
-      setState(() {
-        _isConfirmed = st == 'dikonfirmasi' || st == 'berlangsung';
-      });
+      final dateIso = (doc['dateIso'] as String?) ?? widget.dateIso ?? '';
+      final schedDate =
+          (doc['scheduleDate'] as String?) ?? widget.scheduleDate ?? '';
+      final tStart = (doc['timeStart'] as String?) ?? widget.timeStart ?? '';
+      final tEnd = (doc['timeEnd'] as String?) ?? widget.timeEnd ?? '';
+
+      final isPastStart = AppDates.isSlotPastBooking(
+        dateIso: dateIso,
+        scheduleDate: schedDate,
+        timeStart: tStart,
+        timeEnd: tEnd,
+      );
+
+      if (st == 'dibatalkan' || (st == 'menunggu_konfirmasi' && isPastStart)) {
+        if (st == 'menunggu_konfirmasi' && isPastStart) {
+          unawaited(ConsultationService.autoCancelExpiredConsultation(cid));
+        }
+        setState(() {
+          _isConfirmed = false;
+          _isCancelledOrExpired = true;
+          _cancelReason = (doc['cancelReason'] as String?) ??
+              'Jadwal konsultasi telah kedaluwarsa karena melewati batas waktu konfirmasi dokter sebelum jam sesi dimulai. Kuota konsultasi Anda hari ini telah dikembalikan.';
+        });
+      } else {
+        setState(() {
+          _isConfirmed = st == 'dikonfirmasi' || st == 'berlangsung';
+          _isCancelledOrExpired = false;
+        });
+      }
     }, onError: (_) {});
   }
 
   @override
   void dispose() {
     _statusSub?.cancel();
+    _expirationCheckTimer?.cancel();
     super.dispose();
   }
 
@@ -317,21 +377,27 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: _isConfirmed
-                                    ? const Color(0xFFDCFCE7)
-                                    : const Color(0xFFFEF3C7),
+                                color: _isCancelledOrExpired
+                                    ? const Color(0xFFFEE2E2)
+                                    : (_isConfirmed
+                                        ? const Color(0xFFDCFCE7)
+                                        : const Color(0xFFFEF3C7)),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                _isConfirmed
-                                    ? 'Terverifikasi'
-                                    : 'Menunggu Verifikasi',
+                                _isCancelledOrExpired
+                                    ? 'Kedaluwarsa'
+                                    : (_isConfirmed
+                                        ? 'Terverifikasi'
+                                        : 'Menunggu Verifikasi'),
                                 style: TextStyle(
                                   fontSize: 11.0,
                                   fontWeight: FontWeight.bold,
-                                  color: _isConfirmed
-                                      ? const Color(0xFF16A34A)
-                                      : const Color(0xFFB45309),
+                                  color: _isCancelledOrExpired
+                                      ? const Color(0xFFB91C1C)
+                                      : (_isConfirmed
+                                          ? const Color(0xFF16A34A)
+                                          : const Color(0xFFB45309)),
                                 ),
                               ),
                             ),
@@ -368,26 +434,34 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
                           width: 72,
                           height: 72,
                           decoration: BoxDecoration(
-                            color: _isConfirmed
-                                ? const Color(0xFFDCFCE7)
-                                : const Color(0xFFFFFBEB),
+                            color: _isCancelledOrExpired
+                                ? const Color(0xFFFEE2E2)
+                                : (_isConfirmed
+                                    ? const Color(0xFFDCFCE7)
+                                    : const Color(0xFFFFFBEB)),
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: _isConfirmed
-                                  ? const Color(0xFF86EFAC)
-                                  : const Color(0xFFFDE68A),
+                              color: _isCancelledOrExpired
+                                  ? const Color(0xFFFECACA)
+                                  : (_isConfirmed
+                                      ? const Color(0xFF86EFAC)
+                                      : const Color(0xFFFDE68A)),
                               width: 2,
                             ),
                           ),
                           child: Center(
                             child: Icon(
-                              _isConfirmed
-                                  ? LucideIcons.circleCheck
-                                  : LucideIcons.clock,
+                              _isCancelledOrExpired
+                                  ? LucideIcons.calendarX
+                                  : (_isConfirmed
+                                      ? LucideIcons.circleCheck
+                                      : LucideIcons.clock),
                               size: 34,
-                              color: _isConfirmed
-                                  ? const Color(0xFF16A34A)
-                                  : const Color(0xFFD97706),
+                              color: _isCancelledOrExpired
+                                  ? const Color(0xFFDC2626)
+                                  : (_isConfirmed
+                                      ? const Color(0xFF16A34A)
+                                      : const Color(0xFFD97706)),
                             ),
                           ),
                         ),
@@ -395,9 +469,11 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
                         const SizedBox(height: 18),
 
                         Text(
-                          _isConfirmed
-                              ? 'Jadwal Telah Diverifikasi'
-                              : 'Menunggu Verifikasi Dokter',
+                          _isCancelledOrExpired
+                              ? 'Jadwal Kedaluwarsa'
+                              : (_isConfirmed
+                                  ? 'Jadwal Telah Diverifikasi'
+                                  : 'Menunggu Verifikasi Dokter'),
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             fontSize: 17.5,
@@ -409,9 +485,13 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
                         const SizedBox(height: 10),
 
                         Text(
-                          _isConfirmed
-                              ? 'Dokter telah memverifikasi jadwal konsultasi Anda. Anda sekarang dapat memasuki ruangan chat konsultasi.'
-                              : 'Jadwal konsultasi Anda telah berhasil diajukan ke dokter. Mohon menunggu verifikasi dokter sebelum memasuki ruangan chat konsultasi.\n\nNotifikasi akan dikirimkan otomatis setelah dokter memverifikasi jadwal Anda.',
+                          _isCancelledOrExpired
+                              ? (_cancelReason.isNotEmpty
+                                  ? _cancelReason
+                                  : 'Jadwal konsultasi Anda telah kedaluwarsa karena telah melewati jam mulai konsultasi sebelum dikonfirmasi oleh dokter.\n\nKuota konsultasi Anda hari ini telah dikembalikan. Anda dapat memilih jadwal konsultasi lain sekarang.')
+                              : (_isConfirmed
+                                  ? 'Dokter telah memverifikasi jadwal konsultasi Anda. Anda sekarang dapat memasuki ruangan chat konsultasi.'
+                                  : 'Jadwal konsultasi Anda telah berhasil diajukan ke dokter. Mohon menunggu verifikasi dokter sebelum memasuki ruangan chat konsultasi.\n\nNotifikasi akan dikirimkan otomatis setelah dokter memverifikasi jadwal Anda.'),
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             fontSize: 13.0,
@@ -423,7 +503,60 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
                         const SizedBox(height: 24),
 
                         // Action Button
-                        if (_isConfirmed) ...[
+                        if (_isCancelledOrExpired) ...[
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton.icon(
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(
+                                LucideIcons.calendar,
+                                size: 18,
+                                color: Colors.white,
+                              ),
+                              label: const Text(
+                                'Pilih Jadwal Lain',
+                                style: TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: primaryMaroon,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 46,
+                            child: OutlinedButton(
+                              onPressed: _goToRiwayat,
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(
+                                  color: primaryMaroon,
+                                  width: 1.2,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: const Text(
+                                'Lihat Riwayat Konsultasi',
+                                style: TextStyle(
+                                  fontSize: 14.0,
+                                  fontWeight: FontWeight.bold,
+                                  color: primaryMaroon,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ] else if (_isConfirmed) ...[
                           SizedBox(
                             width: double.infinity,
                             height: 48,

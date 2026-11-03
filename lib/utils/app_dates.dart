@@ -439,6 +439,70 @@ class AppDates {
     return '${formatHm(candidateStr)} WIB';
   }
 
+  /// Apakah slot konsultasi sudah melewati batas waktu untuk booking?
+  /// Sesuai aturan: jika jam konsultasinya adalah 15.30, pasien hanya dapat memilih
+  /// jadwal SEBELUM jam 15.30 WIB. Jika waktu sekarang sudah mencapai atau melewati jam 15.30,
+  /// atau tanggal jadwal berada di masa lalu, maka slot sudah tidak dapat dipilih.
+  static bool isSlotPastBooking({
+    required String dateIso,
+    String? scheduleDate,
+    String? timeStart,
+    String? timeEnd,
+  }) {
+    DateTime? date;
+    final trimmedIso = dateIso.trim();
+    if (trimmedIso.isNotEmpty) {
+      final cleanIso = trimmedIso.contains('•')
+          ? trimmedIso.split('•').first.trim()
+          : (trimmedIso.contains(' - ') && !trimmedIso.startsWith('202')
+              ? trimmedIso.split(' - ').first.trim()
+              : (trimmedIso.length >= 10 ? trimmedIso.substring(0, 10).trim() : trimmedIso));
+      date = tryParseIso(cleanIso) ?? tryParseDisplay(cleanIso) ?? tryParseIso(trimmedIso) ?? tryParseDisplay(trimmedIso);
+    }
+    if (date == null && scheduleDate != null && scheduleDate.trim().isNotEmpty) {
+      date = tryParseDisplay(scheduleDate) ?? tryParseIso(scheduleDate);
+    }
+    if (date == null) return false;
+
+    final now = nowWib();
+    final wallNow = DateTime(now.year, now.month, now.day, now.hour, now.minute);
+    final today = DateTime(now.year, now.month, now.day);
+    final slotDay = DateTime(date.year, date.month, date.day);
+
+    if (slotDay.isBefore(today)) return true;
+    if (slotDay.isAfter(today)) return false;
+
+    // Hari ini sama dengan tanggal jadwal: bandingkan dengan jam mulai konsultasi
+    var rawStart = (timeStart != null && timeStart.trim().isNotEmpty)
+        ? timeStart.trim()
+        : '';
+    if (rawStart.isEmpty && timeEnd != null && timeEnd.trim().isNotEmpty) {
+      rawStart = timeEnd.split('-').first.trim();
+    }
+    if (rawStart.isEmpty) {
+      if (dateIso.contains('•')) {
+        rawStart = dateIso.split('•').last.trim().split('-').first.trim();
+      } else if (scheduleDate != null && scheduleDate.contains('•')) {
+        rawStart = scheduleDate.split('•').last.trim().split('-').first.trim();
+      } else if (scheduleDate != null && scheduleDate.contains('-') && !scheduleDate.startsWith('202')) {
+        rawStart = scheduleDate.split('-').first.trim();
+      }
+    }
+    if (rawStart.isEmpty) return false;
+
+    final cleanStart = rawStart.toUpperCase().replaceAll('WIB', '').trim();
+    final parts = cleanStart.replaceAll(':', '.').split('-');
+    final normalized = parts.first.trim();
+    final hm = normalized.split('.');
+    final h = int.tryParse(hm[0].trim());
+    final m = hm.length > 1 ? int.tryParse(hm[1].trim()) : 0;
+    if (h == null) return false;
+
+    final wallStart = DateTime(today.year, today.month, today.day, h, m ?? 0);
+    // Jika waktu sekarang >= wallStart (sudah masuk atau lewat jam mulai sesi), booking ditutup
+    return !wallNow.isBefore(wallStart);
+  }
+
   /// Slot sudah lewat (tanggal/jam WIB lampau)?
   /// Menerima dateIso ("yyyy-MM-dd"), [scheduleDate], atau jam "HH:mm"/"HH.mm"/"HH.mm - HH.mm WIB".
   static bool isPastSlot({

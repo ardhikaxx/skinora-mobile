@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/empty_state.dart';
@@ -93,8 +94,19 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
   /// Streaming konsultasi aktif dokter dari Firestore / backend.
   void _loadFromBackend() {
     if (widget.initialConsultations != null) return;
-    final uid = AuthService.uid;
-    if (uid == null) return;
+    final uid = AuthService.uid ??
+        (Backend.useFirebase
+            ? FirebaseAuth.instance.currentUser?.uid
+            : null);
+    if (uid == null) {
+      if (Backend.useFirebase) {
+        FirebaseAuth.instance.authStateChanges().firstWhere((u) => u != null).then((u) {
+          if (mounted && u != null) _loadFromBackend();
+        }).catchError((_) {});
+      }
+      return;
+    }
+    _sub?.cancel();
     _sub = ConsultationService.streamForDoctor(uid).listen(
       (items) {
         if (!mounted) return;
@@ -103,7 +115,29 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
           _consultations
             ..clear()
             ..addAll(items
-                .where((m) => ((m['status'] as String?) ?? '') != 'selesai')
+                .where((m) {
+                  final status = ((m['status'] as String?) ?? '').toLowerCase();
+                  if (status == 'selesai' || status == 'dibatalkan') return false;
+                  if (status == 'menunggu_konfirmasi') {
+                    final dIso = (m['dateIso'] as String?) ?? '';
+                    final sDate = (m['scheduleDate'] as String?) ?? '';
+                    final ts = (m['timeStart'] as String?) ?? '';
+                    final te = (m['timeEnd'] as String?) ?? '';
+                    if (AppDates.isSlotPastBooking(
+                      dateIso: dIso,
+                      scheduleDate: sDate,
+                      timeStart: ts,
+                      timeEnd: te,
+                    )) {
+                      final id = (m['id'] as String?) ?? '';
+                      if (id.isNotEmpty) {
+                        unawaited(ConsultationService.autoCancelExpiredConsultation(id));
+                      }
+                      return false;
+                    }
+                  }
+                  return true;
+                })
                 .map((m) {
               final id = (m['id'] as String?) ?? '';
               _backendMeta[id] = m;

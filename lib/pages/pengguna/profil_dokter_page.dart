@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
@@ -111,7 +112,8 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
   }
 
   void _listenPatientConsultations() {
-    final patientUid = AuthService.uid;
+    final patientUid =
+        AuthService.uid ?? (Backend.useFirebase ? null : 'user_local');
     if (patientUid == null || patientUid.isEmpty) return;
     _patientConsultationsSub?.cancel();
     _patientConsultationsSub =
@@ -157,7 +159,8 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
     if (_myConsultationsBySlotId.containsKey(key)) {
       return _myConsultationsBySlotId[key];
     }
-    final currentUid = AuthService.uid;
+    final currentUid =
+        AuthService.uid ?? (Backend.useFirebase ? null : 'user_local');
     if (currentUid != null && currentUid.isNotEmpty && slot != null) {
       if (slot.patientId == currentUid || slot.patientIds.contains(currentUid)) {
         return _myConsultationsBySlotId[slot.id] ??
@@ -577,14 +580,27 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
         myStatus == 'dikonfirmasi' || myStatus == 'berlangsung';
 
     final isFull = slot?.isFull ?? false;
-    final isExpired = slot != null &&
-        slot.timeEnd.isNotEmpty &&
-        AppDates.isPastSlot(
-          dateIso: slot.dateIso,
-          scheduleDate: slot.date,
-          timeStart: slot.timeStart,
-          timeEnd: slot.timeEnd,
-        );
+    final slotDate = slot?.date.isNotEmpty == true ? slot!.date : dayDate;
+    final timeStart = slot?.timeStart.isNotEmpty == true
+        ? slot!.timeStart
+        : time.split('-').first.trim();
+    final timeEnd = slot?.timeEnd.isNotEmpty == true
+        ? slot!.timeEnd
+        : (time.contains('-') ? time.split('-').last.trim() : '');
+
+    final isPastBooking = AppDates.isSlotPastBooking(
+      dateIso: slot?.dateIso ?? '',
+      scheduleDate: slotDate,
+      timeStart: timeStart,
+      timeEnd: timeEnd,
+    );
+    final isSlotEnded = AppDates.isPastSlot(
+      dateIso: slot?.dateIso ?? '',
+      scheduleDate: slotDate,
+      timeStart: timeStart,
+      timeEnd: timeEnd,
+    );
+    final isExpired = isSlotEnded;
     final remaining = slot?.remainingQuota ?? 1;
 
     Color bgColor = timeChipBg;
@@ -592,19 +608,32 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
     String statusBadge = 'Sisa $remaining kuota';
     Color statusColor = const Color(0xFFC2410C);
 
-    if (isMyBooking) {
+    if (isSlotEnded) {
+      // Jadwal sesi sudah berakhir/lewat
+      bgColor = const Color(0xFFF3F4F6);
+      textColor = const Color(0xFF9CA3AF);
+      statusBadge = 'Selesai';
+      statusColor = const Color(0xFF9CA3AF);
+    } else if (isMyBooking) {
       if (isConfirmed) {
         bgColor = const Color(0xFFDCFCE7);
         textColor = const Color(0xFF15803D);
         statusBadge = 'Terverifikasi';
         statusColor = const Color(0xFF16A34A);
+      } else if (isPastBooking) {
+        // Belum diverifikasi dokter dan jam mulai konsultasi sudah tiba/lewat
+        bgColor = const Color(0xFFF3F4F6);
+        textColor = const Color(0xFF9CA3AF);
+        statusBadge = 'Selesai';
+        statusColor = const Color(0xFF9CA3AF);
       } else {
         bgColor = const Color(0xFFFFF7ED);
         textColor = const Color(0xFFC2410C);
         statusBadge = 'Menunggu Verifikasi';
         statusColor = const Color(0xFFD97706);
       }
-    } else if (isExpired) {
+    } else if (isPastBooking) {
+      // Belum dibooking, tetapi jam mulai konsultasi sudah tiba/lewat
       bgColor = const Color(0xFFF3F4F6);
       textColor = const Color(0xFF9CA3AF);
       statusBadge = 'Selesai';
@@ -790,16 +819,74 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
           : (slot?.time.split('-').first.trim() ??
               time.split('-').first.trim()),
     );
+    final endTime = slot?.timeEnd.isNotEmpty == true
+        ? slot!.timeEnd
+        : (time.contains('-') ? time.split('-').last.trim() : '');
 
-    // Jika pengguna sudah membooking jadwal ini:
-    // Langsung arahkan ke halaman menunggu konfirmasi dokter (dengan tombol kembali).
-    // Jika sudah dikonfirmasi oleh dokter, diarahkan ke halaman awal dengan tombol Mulai Konsultasi.
+    final isPastBooking = AppDates.isSlotPastBooking(
+      dateIso: slot?.dateIso ?? '',
+      scheduleDate: slotDate,
+      timeStart: startTime,
+      timeEnd: endTime,
+    );
+    final isSlotEnded = AppDates.isPastSlot(
+      dateIso: slot?.dateIso ?? '',
+      scheduleDate: slotDate,
+      timeStart: startTime,
+      timeEnd: endTime,
+    );
+
     final myConsultation = _findMyConsultation(slot, time, dayDate);
+    final myStatus =
+        (myConsultation?['status'] as String? ?? '').toLowerCase();
+    final isConfirmed =
+        myStatus == 'dikonfirmasi' || myStatus == 'berlangsung';
+
+    // 1. Validasi sesi sudah lewat/berakhir
+    if (isSlotEnded) {
+      if (myConsultation != null && myStatus == 'menunggu_konfirmasi') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Jadwal konsultasi sesi $time pada $slotDate sudah kadaluarsa karena telah melewati jam konsultasi. Silakan pilih jadwal lain yang masih tersedia.',
+            ),
+          ),
+        );
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Jadwal sesi $time pada $slotDate sudah berakhir dan tidak dapat dipilih.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    // 2. Jika pengguna sudah membooking jadwal ini:
+    // Jika belum dikonfirmasi dokter dan jam mulai sesi sudah tiba/lewat,
+    // batalkan otomatis dan kembalikan kuota harian.
     if (myConsultation != null) {
-      final myStatus =
-          (myConsultation['status'] as String? ?? '').toLowerCase();
-      final isConfirmed =
-          myStatus == 'dikonfirmasi' || myStatus == 'berlangsung';
+      if (!isConfirmed && isPastBooking) {
+        final cid = myConsultation['id'] as String?;
+        if (cid != null && cid.isNotEmpty) {
+          unawaited(ConsultationService.autoCancelExpiredConsultation(cid));
+        }
+        setState(() {
+          _myConsultationsBySlotId.remove(slot?.id);
+          _myConsultationsBySlotId.remove('${slotDate}_$time');
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Jadwal sesi $time pada $slotDate telah dibatalkan otomatis karena melewati batas waktu konfirmasi dokter sebelum jam sesi dimulai. Kuota konsultasi Anda hari ini telah dikembalikan.',
+            ),
+          ),
+        );
+        return;
+      }
+
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -813,11 +900,22 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
             scheduleDate: slotDate,
             scheduleTime: slot?.time.isNotEmpty == true ? slot!.time : time,
             dateIso: slot?.dateIso ?? '',
-            timeStart: slot?.timeStart.isNotEmpty == true
-                ? slot!.timeStart
-                : startTime,
-            timeEnd: slot?.timeEnd ?? '',
+            timeStart: startTime,
+            timeEnd: endTime,
             initialIsConfirmed: isConfirmed,
+          ),
+        ),
+      );
+      return;
+    }
+
+    // 3. Validasi jam booking sudah lewat (misal sekarang sudah >= jam 15.30):
+    // Pasien hanya dapat memilih sebelum jam konsultasi dimulai.
+    if (isPastBooking) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Jadwal sesi $time pada $slotDate sudah melewati jam mulainya ($startTime WIB). Silakan pilih jadwal sesi lainnya.',
           ),
         ),
       );
@@ -835,7 +933,7 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
       return;
     }
 
-    // 1. Validasi sesi sudah penuh (mencapai batas limit kuota pasien)
+    // 4. Validasi sesi sudah penuh (mencapai batas limit kuota pasien)
     if (slot.isFull) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -847,29 +945,15 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
       return;
     }
 
-    // 2. Validasi sesi sudah lewat waktu sekarang
-    final isPast = slot.timeEnd.isNotEmpty &&
-        AppDates.isPastSlot(
-          dateIso: slot.dateIso,
-          scheduleDate: slot.date,
-          timeStart: slot.timeStart,
-          timeEnd: slot.timeEnd,
-        );
-    if (isPast) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Jadwal sesi $time pada $slotDate sudah berakhir.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    // 3. Validasi aturan: Dibatasi 1 pasien hanya bisa konsultasi sekali dalam satu hari
+    // 5. Validasi aturan: Dibatasi 1 pasien hanya bisa konsultasi sekali dalam satu hari
     final currentPatient =
         Backend.useFirebase ? await AuthService.loadProfile() : null;
-    final patientUid = currentPatient?.uid ?? AuthService.uid;
+    final authUser =
+        Backend.useFirebase ? FirebaseAuth.instance.currentUser : null;
+    final patientUid = (currentPatient?.uid.isNotEmpty == true &&
+            currentPatient!.uid != 'user_local')
+        ? currentPatient.uid
+        : (AuthService.uid ?? authUser?.uid);
     if (patientUid != null && patientUid.isNotEmpty) {
       final alreadyBookedToday =
           await ConsultationService.hasConsultationOnDate(
@@ -884,6 +968,7 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
       }
     }
 
+    // 6. Tampilkan dialog proses pengajuan booking
     if (!mounted) return;
     showDialog(
       context: context,
@@ -947,14 +1032,28 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
 
     String? consultationId;
     String bookingError = '';
-    final patientToBook = currentPatient ??
-        UserProfile(
-          docId: patientUid ?? 'user_local',
-          uid: patientUid ?? 'user_local',
-          name: 'Pasien',
-          email: 'pasien@skinora.com',
-          role: 'pengguna',
-        );
+    final effectivePatientUid = patientUid ?? 'user_local';
+    final effectivePatientName = (currentPatient?.name.isNotEmpty == true &&
+            currentPatient!.name != 'Pasien')
+        ? currentPatient.name
+        : (authUser?.displayName?.isNotEmpty == true
+            ? authUser!.displayName!
+            : (currentPatient?.name.isNotEmpty == true
+                ? currentPatient!.name
+                : 'Pasien'));
+    final effectivePatientEmail = (currentPatient?.email.isNotEmpty == true)
+        ? currentPatient!.email
+        : (authUser?.email ?? 'pasien@skinora.com');
+
+    final patientToBook = UserProfile(
+      docId: effectivePatientUid,
+      uid: effectivePatientUid,
+      name: effectivePatientName,
+      email: effectivePatientEmail,
+      role: currentPatient?.role.isNotEmpty == true
+          ? currentPatient!.role
+          : 'pengguna',
+    );
 
     try {
       consultationId = await ConsultationService.book(
@@ -966,8 +1065,8 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
         scheduleTime: slot.time,
         patient: patientToBook,
         dateIso: slot.dateIso,
-        timeStart: slot.timeStart.isNotEmpty ? slot.timeStart : startTime,
-        timeEnd: slot.timeEnd,
+        timeStart: startTime,
+        timeEnd: endTime,
       );
     } catch (e) {
       final msg = e.toString();
@@ -1029,8 +1128,8 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
           scheduleDate: slotDate,
           scheduleTime: slot.time.isNotEmpty ? slot.time : time,
           dateIso: slot.dateIso,
-          timeStart: slot.timeStart.isNotEmpty ? slot.timeStart : startTime,
-          timeEnd: slot.timeEnd,
+          timeStart: startTime,
+          timeEnd: endTime,
           initialIsConfirmed: false,
         ),
       ),
