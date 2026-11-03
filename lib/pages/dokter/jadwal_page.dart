@@ -96,10 +96,36 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
     super.initState();
     _dateController =
         TextEditingController(text: AppDates.display(DateTime.now()));
+    _startTimeController.addListener(() {
+      _autoFillEndTime(_startTimeController.text);
+    });
     _scheduleDays = widget.initialScheduleDays != null
         ? List.from(widget.initialScheduleDays!)
         : <DayScheduleModel>[];
     _loadFromBackend();
+  }
+
+  void _autoFillEndTime(String startText) {
+    final clean = startText.replaceAll(':', '.').trim();
+    final parts = clean.split('.');
+    if (parts.length == 2) {
+      final hour = int.tryParse(parts[0]);
+      final minute = int.tryParse(parts[1]);
+      if (hour != null &&
+          minute != null &&
+          hour >= 0 &&
+          hour < 24 &&
+          minute >= 0 &&
+          minute < 60) {
+        final totalMinutes = (hour * 60 + minute + 30) % (24 * 60);
+        final endHour = (totalMinutes ~/ 60).toString().padLeft(2, '0');
+        final endMin = (totalMinutes % 60).toString().padLeft(2, '0');
+        final calculatedEnd = '$endHour.$endMin';
+        if (_endTimeController.text != calculatedEnd) {
+          _endTimeController.text = calculatedEnd;
+        }
+      }
+    }
   }
 
   /// Stream slot realtime dokter (booking pasien langsung terlihat).
@@ -312,417 +338,6 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
     );
   }
 
-  /// Otomatis membuat sesi-sesi konsultasi berdasarkan rentang jam buka & tutup
-  /// yang sudah diatur oleh dokter.
-  Future<void> _handleGenerateSessions() async {
-    final date = _dateController.text.trim();
-    if (date.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pilih tanggal terlebih dahulu')),
-      );
-      return;
-    }
-
-    final sessions = _practiceSettings.generateSessions();
-    if (sessions.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Pengaturan jam praktik tidak valid (jam selesai harus setelah jam buka).',
-          ),
-        ),
-      );
-      return;
-    }
-
-    if (Backend.useFirebase) {
-      final uid = AuthService.uid;
-      if (uid != null) {
-        try {
-          final created = await ScheduleService.generatePracticeSlots(
-            doctorUid: uid,
-            date: date,
-            settings: _practiceSettings,
-          );
-          if (!mounted) return;
-          AdminSuccessDialog.show(
-            context,
-            message:
-                '$created sesi praktik berhasil dibuat untuk $date dengan limit ${_practiceSettings.quotaPerSession} pasien per sesi.',
-          );
-          return;
-        } catch (e) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Gagal membuat sesi: $e')),
-          );
-          return;
-        }
-      }
-    }
-
-    // Fallback tanpa Firebase (simulasi/test)
-    setState(() {
-      final dayGroup = _scheduleDays.firstWhere(
-        (d) => d.date.toLowerCase() == date.toLowerCase(),
-        orElse: () {
-          final newDay = DayScheduleModel(date: date, slots: []);
-          _scheduleDays.insert(0, newDay);
-          return newDay;
-        },
-      );
-      for (final s in sessions) {
-        final key = s.displayRange;
-        if (!dayGroup.slots.any((x) => x.time == key)) {
-          dayGroup.slots.add(
-            ScheduleSlotModel(
-              id: '${DateTime.now().millisecondsSinceEpoch}_${s.timeStart}',
-              time: s.displayRange,
-              quota: s.quota,
-              bookedCount: 0,
-              isBooked: false,
-              timeStart: s.timeStart,
-              timeEnd: s.timeEnd,
-            ),
-          );
-        }
-      }
-    });
-
-    if (!mounted) return;
-    AdminSuccessDialog.show(
-      context,
-      message:
-          '${sessions.length} sesi praktik berhasil dibuat untuk $date dengan limit ${_practiceSettings.quotaPerSession} pasien per sesi.',
-    );
-  }
-
-  /// Dialog pengaturan jam buka, jam selesai, durasi sesi, dan limit kuota
-  /// pasien yang diatur sendiri oleh dokter (bukan admin).
-  void _openSettingsDialog() {
-    final startCtrl =
-        TextEditingController(text: _practiceSettings.practiceStartTime);
-    final endCtrl =
-        TextEditingController(text: _practiceSettings.practiceEndTime);
-    int selectedDuration = _practiceSettings.sessionDurationMinutes;
-    int selectedQuota = _practiceSettings.quotaPerSession;
-    int selectedDailyLimit = _practiceSettings.dailyPatientLimit;
-    bool autoCloseVal = _practiceSettings.autoClose;
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (bContext) {
-        return StatefulBuilder(
-          builder: (sheetContext, setSheetState) {
-            return Container(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-                top: 20,
-                left: 20,
-                right: 20,
-              ),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFD5C8),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            LucideIcons.settings,
-                            size: 20,
-                            color: primaryMaroon,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
-                                'Pengaturan Praktik & Kuota',
-                                style: TextStyle(
-                                  fontSize: 16.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: darkText,
-                                ),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'Dokter mengatur jam buka, sesi & limit pasien',
-                                style: TextStyle(
-                                  fontSize: 12.0,
-                                  color: subText,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 24),
-
-                    // Jam Buka & Jam Selesai
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildFormLabel('JAM BUKA PRAKTIK'),
-                              const SizedBox(height: 6),
-                              _buildFormTextField(
-                                controller: startCtrl,
-                                hintText: '09.00',
-                                onTap: () => _pickSlotTime(startCtrl),
-                                suffixIcon: LucideIcons.clock,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildFormLabel('JAM TUTUP / SELESAI'),
-                              const SizedBox(height: 6),
-                              _buildFormTextField(
-                                controller: endCtrl,
-                                hintText: '12.00',
-                                onTap: () => _pickSlotTime(endCtrl),
-                                suffixIcon: LucideIcons.clock,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Durasi Sesi Konsultasi
-                    _buildFormLabel('PEMBAGIAN DURASI SESI'),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      children: [15, 20, 30, 45, 60].map((dur) {
-                        final isSel = selectedDuration == dur;
-                        return ChoiceChip(
-                          label: Text('$dur Menit'),
-                          selected: isSel,
-                          selectedColor: primaryMaroon,
-                          backgroundColor: const Color(0xFFF3F4F6),
-                          labelStyle: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            color: isSel ? Colors.white : darkText,
-                          ),
-                          onSelected: (_) {
-                            setSheetState(() => selectedDuration = dur);
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Limit Pasien per Sesi
-                    _buildFormLabel('LIMIT PASIEN PER SESI'),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      children: [1, 2, 3, 5].map((q) {
-                        final isSel = selectedQuota == q;
-                        return ChoiceChip(
-                          label: Text('$q Pasien'),
-                          selected: isSel,
-                          selectedColor: primaryMaroon,
-                          backgroundColor: const Color(0xFFF3F4F6),
-                          labelStyle: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            color: isSel ? Colors.white : darkText,
-                          ),
-                          onSelected: (_) {
-                            setSheetState(() => selectedQuota = q);
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Limit Pasien Harian
-                    _buildFormLabel('LIMIT TOTAL PASIEN PER HARI'),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      children: [5, 10, 15, 20, 30].map((dl) {
-                        final isSel = selectedDailyLimit == dl;
-                        return ChoiceChip(
-                          label: Text('$dl Pasien'),
-                          selected: isSel,
-                          selectedColor: primaryMaroon,
-                          backgroundColor: const Color(0xFFF3F4F6),
-                          labelStyle: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            color: isSel ? Colors.white : darkText,
-                          ),
-                          onSelected: (_) {
-                            setSheetState(() => selectedDailyLimit = dl);
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Auto Close Switch
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF9FAFB),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            LucideIcons.clockAlert,
-                            size: 18,
-                            color: primaryMaroon,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
-                                Text(
-                                  'Tutup Otomatis Pas Selesai',
-                                  style: TextStyle(
-                                    fontSize: 13.0,
-                                    fontWeight: FontWeight.bold,
-                                    color: darkText,
-                                  ),
-                                ),
-                                Text(
-                                  'Sesi yang melewati jam selesai otomatis ditutup',
-                                  style: TextStyle(
-                                    fontSize: 11.0,
-                                    color: subText,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Switch(
-                            value: autoCloseVal,
-                            activeThumbColor: primaryMaroon,
-                            activeTrackColor: const Color(0xFFFFD5C8),
-                            onChanged: (val) {
-                              setSheetState(() => autoCloseVal = val);
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Simpan Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 46,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final newSettings = DoctorPracticeSettings(
-                            practiceStartTime: startCtrl.text.trim().isNotEmpty
-                                ? startCtrl.text.trim()
-                                : '09.00',
-                            practiceEndTime: endCtrl.text.trim().isNotEmpty
-                                ? endCtrl.text.trim()
-                                : '12.00',
-                            sessionDurationMinutes: selectedDuration,
-                            quotaPerSession: selectedQuota,
-                            dailyPatientLimit: selectedDailyLimit,
-                            autoClose: autoCloseVal,
-                          );
-
-                          Navigator.pop(bContext);
-
-                          setState(() {
-                            _practiceSettings = newSettings;
-                            _quotaController.text = selectedQuota.toString();
-                          });
-
-                          if (Backend.useFirebase) {
-                            final uid = AuthService.uid;
-                            if (uid != null) {
-                              await ScheduleService.savePracticeSettings(
-                                uid,
-                                newSettings,
-                              );
-                            }
-                          }
-
-                          if (!mounted) return;
-                          AdminSuccessDialog.show(
-                            context,
-                            message:
-                                'Pengaturan jadwal praktik dan kuota berhasil disimpan',
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryMaroon,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text(
-                          'Simpan Pengaturan Praktik',
-                          style: TextStyle(
-                            fontSize: 14.0,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   /// Tanggal memakai date picker, tampil di dalam kolom input.
   Future<void> _pickSlotDate() async {
     final now = AppDates.nowWib();
@@ -748,7 +363,10 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
   }
 
   /// Jam memakai clock picker (TimePicker), tampil di kolom input.
-  Future<void> _pickSlotTime(TextEditingController controller) async {
+  Future<void> _pickSlotTime(
+    TextEditingController controller, {
+    bool isStartTime = false,
+  }) async {
     final picked = await showTimePicker(
       context: context,
       initialTime: AppDates.timeOfDayWib(),
@@ -765,7 +383,13 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
     );
     if (picked != null && mounted) {
       final raw = '${picked.hour}:${picked.minute.toString().padLeft(2, '0')}';
-      setState(() => controller.text = AppDates.formatHm(raw));
+      final formatted = AppDates.formatHm(raw);
+      setState(() {
+        controller.text = formatted;
+        if (isStartTime) {
+          _autoFillEndTime(formatted);
+        }
+      });
     }
   }
 
@@ -1133,11 +757,7 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
                   _buildStatusKetersediaanCard(),
                   const SizedBox(height: 14),
 
-                  // 2. Card Pengaturan Praktik & Kuota Dokter
-                  _buildPracticeSettingsCard(),
-                  const SizedBox(height: 16),
-
-                  // 3. "+ Tambah Slot Baru" / "✕ Tutup Form" Button
+                  // 2. "+ Tambah Slot Baru" / "✕ Tutup Form" Button
                   _buildToggleFormButton(),
 
                   if (_isFormOpen) ...[
@@ -1184,224 +804,7 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
     );
   }
 
-  /// Card Pengaturan Jadwal & Kuota Praktik (diatur langsung oleh dokter)
-  Widget _buildPracticeSettingsCard() {
-    final isEnded = _practiceSettings.isPracticeEndedNow();
 
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: const Color(0xFFEEEEEE),
-          width: 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFD5C8),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  LucideIcons.clock,
-                  size: 16,
-                  color: primaryMaroon,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Jadwal & Kuota Praktik',
-                      style: TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.bold,
-                        color: darkText,
-                      ),
-                    ),
-                    Text(
-                      'Dikelola langsung oleh dokter',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: subText,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: isEnded
-                      ? const Color(0xFFFEE2E2)
-                      : const Color(0xFFDCFCE7),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  isEnded ? 'Tutup Otomatis' : 'Praktik Buka',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.bold,
-                    color: isEnded
-                        ? const Color(0xFFB91C1C)
-                        : const Color(0xFF15803D),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF9FAFB),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFF3F4F6)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                Column(
-                  children: [
-                    const Text(
-                      'Jam Praktik',
-                      style: TextStyle(fontSize: 11, color: subText),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${_practiceSettings.practiceStartTime} - ${_practiceSettings.practiceEndTime}',
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.bold,
-                        color: darkText,
-                      ),
-                    ),
-                  ],
-                ),
-                Container(width: 1, height: 26, color: Colors.grey.shade300),
-                Column(
-                  children: [
-                    const Text(
-                      'Durasi Sesi',
-                      style: TextStyle(fontSize: 11, color: subText),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${_practiceSettings.sessionDurationMinutes} Menit',
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.bold,
-                        color: darkText,
-                      ),
-                    ),
-                  ],
-                ),
-                Container(width: 1, height: 26, color: Colors.grey.shade300),
-                Column(
-                  children: [
-                    const Text(
-                      'Limit Pasien',
-                      style: TextStyle(fontSize: 11, color: subText),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${_practiceSettings.quotaPerSession} Pasien/Sesi',
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.bold,
-                        color: darkText,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 38,
-                  child: OutlinedButton.icon(
-                    onPressed: _openSettingsDialog,
-                    icon: const Icon(
-                      LucideIcons.slidersHorizontal,
-                      size: 15,
-                      color: primaryMaroon,
-                    ),
-                    label: const Text(
-                      'Atur Jam & Kuota',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.bold,
-                        color: primaryMaroon,
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: primaryMaroon, width: 1.2),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: SizedBox(
-                  height: 38,
-                  child: ElevatedButton.icon(
-                    onPressed: _handleGenerateSessions,
-                    icon: const Icon(
-                      LucideIcons.sparkles,
-                      size: 15,
-                      color: Colors.white,
-                    ),
-                    label: const Text(
-                      'Terapkan Sesi',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryMaroon,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   /// Status Ketersediaan Card
   Widget _buildStatusKetersediaanCard() {
@@ -1587,7 +990,10 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
                     _buildFormTextField(
                       controller: _startTimeController,
                       hintText: '09.00',
-                      onTap: () => _pickSlotTime(_startTimeController),
+                      onTap: () => _pickSlotTime(
+                        _startTimeController,
+                        isStartTime: true,
+                      ),
                       suffixIcon: LucideIcons.clock,
                     ),
                   ],
@@ -1818,26 +1224,26 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
                           color: darkText,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE53935).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'Penuh (${slot.bookedCount}/${slot.quota})',
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFB71C1C),
-                          ),
-                        ),
-                      ),
                     ],
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE53935).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Penuh (${slot.bookedCount}/${slot.quota})',
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFB71C1C),
+                      ),
+                    ),
                   ),
                   if (allNames.isNotEmpty) ...[
                     const SizedBox(height: 4),
@@ -1866,6 +1272,7 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
                 ],
               ),
             ),
+            const SizedBox(width: 8),
             Row(
               children: const [
                 Icon(
@@ -1919,26 +1326,26 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
                           color: darkText,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF3C7),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'Sisa ${slot.remainingQuota}/${slot.quota}',
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFB45309),
-                          ),
-                        ),
-                      ),
                     ],
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Sisa ${slot.remainingQuota}/${slot.quota}',
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFB45309),
+                      ),
+                    ),
                   ),
                   if (allNames.isNotEmpty) ...[
                     const SizedBox(height: 4),
@@ -1967,6 +1374,7 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
                 ],
               ),
             ),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
@@ -2020,30 +1428,31 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
                           color: Color(0xFF1E1E1E),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDCFCE7),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'Limit ${slot.quota} Pasien',
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF15803D),
-                          ),
-                        ),
-                      ),
                     ],
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Limit ${slot.quota} Pasien',
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF15803D),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
             Material(
               color: Colors.transparent,
               child: InkWell(

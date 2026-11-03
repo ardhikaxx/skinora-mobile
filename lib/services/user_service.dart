@@ -647,7 +647,7 @@ class UserService {
       'bio': d.bio,
       'role': 'dokter',
       'status': doctorStatusLabel(d.status),
-      'isAvailable': true,
+      'isAvailable': d.status == DoctorStatus.terverifikasi,
       'settings': {'notificationsEnabled': true},
       'consumedByUid': null,
       'createdBy': 'admin',
@@ -669,8 +669,10 @@ class UserService {
   static Future<void> updateDokterStatus(AdminDoctorModel d) async {
     if (!Backend.useFirebase) return;
     final col = d.registered ? _users : _provisions;
+    final isVerified = d.status == DoctorStatus.terverifikasi;
     await col.doc(d.backendId).update({
       'status': doctorStatusLabel(d.status),
+      'isAvailable': isVerified,
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }

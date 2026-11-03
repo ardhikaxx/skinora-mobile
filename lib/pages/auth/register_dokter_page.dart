@@ -163,7 +163,7 @@ class _RegisterDokterPageState extends State<RegisterDokterPage> {
       AdminSuccessDialog.show(
         context,
         message:
-            'Pendaftaran akun dokter berhasil dikirim!\n\nStatus akun Anda saat ini "Menunggu Verifikasi". Tim Admin Skinora akan meninjau STR & kelengkapan data Anda. Anda dapat masuk untuk memantau status akun.',
+            'Pendaftaran akun dokter berhasil dikirim!\n\nStatus akun Anda saat ini "Menunggu Verifikasi". Tim Admin Skinora akan meninjau data dan STR Anda. Anda baru dapat masuk (login) ke aplikasi setelah akun Anda diverifikasi oleh admin.',
         onOk: () {
           Navigator.pushAndRemoveUntil(
             context,

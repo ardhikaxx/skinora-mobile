@@ -72,7 +72,18 @@ class _TambahAdminPageState extends State<TambahAdminPage> {
       return;
     }
 
-    if (password.isNotEmpty && password.length < 6) {
+    if (password.isEmpty) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password wajib diisi'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    if (password.length < 6) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -89,7 +100,7 @@ class _TambahAdminPageState extends State<TambahAdminPage> {
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name,
       email: email,
-      password: password.isNotEmpty ? password : null,
+      password: password,
       phone: phone,
       address: address,
       status: UserStatus.aktif,
@@ -227,7 +238,7 @@ class _TambahAdminPageState extends State<TambahAdminPage> {
                     const SizedBox(height: 16),
 
                     // 3. Password
-                    _buildLabel('Password Admin'),
+                    _buildLabel('Password Admin *'),
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -350,6 +361,31 @@ class _TambahAdminPageState extends State<TambahAdminPage> {
   }
 
   Widget _buildLabel(String text) {
+    if (text.endsWith('*')) {
+      final baseText = text.substring(0, text.length - 1).trimRight();
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 6.0),
+        child: Text.rich(
+          TextSpan(
+            text: '$baseText ',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: darkText,
+            ),
+            children: const [
+              TextSpan(
+                text: '*',
+                style: TextStyle(
+                  color: Colors.redAccent,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.only(bottom: 6.0),
       child: Text(

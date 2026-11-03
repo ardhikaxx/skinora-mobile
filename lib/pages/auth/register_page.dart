@@ -91,6 +91,28 @@ class _RegisterPageState extends State<RegisterPage> {
       if (!mounted) return;
       // Registrasi berhasil -> tampilkan dialog dulu, navigasi di onOk
       // (hanya pengguna & dokter; admin tidak bisa register).
+      if (role == 'dokter' && profile?.status != 'terverifikasi') {
+        // Dokter baru (baik mandiri maupun provision admin) berstatus 'menunggu'
+        // -> tidak bisa langsung masuk, wajib menunggu verifikasi admin.
+        await AuthService.signOut();
+        if (!mounted) return;
+        setState(() => _busy = false);
+        AdminSuccessDialog.show(
+          context,
+          title: 'Menunggu Verifikasi',
+          message:
+              'Pendaftaran akun dokter berhasil!\n\nStatus akun Anda saat ini "Menunggu Verifikasi". Tim Admin Skinora akan meninjau data Anda. Anda baru dapat masuk (login) ke aplikasi setelah akun Anda diverifikasi oleh admin.',
+          onOk: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const LoginPage()),
+              (route) => false,
+            );
+          },
+        );
+        return;
+      }
+
       final Widget home = role == 'dokter'
           ? const DokterMainPage()
           : const PenggunaMainPage();

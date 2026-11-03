@@ -46,8 +46,16 @@ class UserProfile {
     this.eveningReminder = '',
   });
 
-  bool get canLogin =>
-      status != 'ditangguhkan' && !(role == 'dokter' && status == 'ditolak');
+  bool get canLogin {
+    final s = status.trim().toLowerCase();
+    if (s == 'ditangguhkan') return false;
+    if (role == 'dokter') {
+      // Dokter hanya dapat login jika sudah diverifikasi oleh admin ('terverifikasi' atau 'aktif').
+      // Dokter dengan status 'menunggu' atau 'ditolak' TIDAK BISA login.
+      return s == 'terverifikasi' || s == 'aktif';
+    }
+    return true;
+  }
 
   String get initials {
     final parts =

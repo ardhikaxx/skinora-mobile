@@ -142,8 +142,47 @@ class AuthService {
     await _auth.signOut();
   }
 
-  static Future<void> sendPasswordReset(String email) {
-    return _auth.sendPasswordResetEmail(email: email.trim());
+  static Future<void> sendPasswordReset(String email) async {
+    final cleanEmail = email.trim().toLowerCase();
+    if (!Backend.useAuth) {
+      throw const FormatException('Firebase Auth belum aktif.');
+    }
+    try {
+      await _auth.setLanguageCode('id');
+    } catch (_) {
+      // Best-effort pada platform yang belum mendukung setLanguageCode
+    }
+    return _auth.sendPasswordResetEmail(email: cleanEmail);
+  }
+
+  /// Pesan error khusus reset kata sandi dalam Bahasa Indonesia yang ramah.
+  static String describePasswordResetError(Object error) {
+    debugPrint('AuthService.describePasswordResetError: ${error.runtimeType} → $error');
+    if (error is FirebaseAuthException) {
+      switch (error.code) {
+        case 'invalid-email':
+          return 'Format alamat email tidak valid.';
+        case 'user-not-found':
+          return 'Akun dengan email ini tidak ditemukan.';
+        case 'user-disabled':
+          return 'Akun Anda telah dinonaktifkan oleh administrator.';
+        case 'too-many-requests':
+          return 'Terlalu banyak permintaan reset kata sandi. Silakan tunggu beberapa saat.';
+        case 'network-request-failed':
+          return 'Koneksi gagal. Periksa jaringan internet Anda.';
+        case 'missing-email':
+          return 'Silakan masukkan alamat email Anda.';
+        case 'operation-not-allowed':
+          return 'Metode reset kata sandi belum diaktifkan di Firebase Console.';
+        default:
+          debugPrint('Unhandled reset password error code: ${error.code}');
+          return error.message ?? 'Gagal mengirim email reset kata sandi.';
+      }
+    }
+    if (error is FormatException) {
+      return error.message;
+    }
+    return 'Terjadi kesalahan. Silakan coba lagi.';
   }
 
   static Future<UserProfile?> loadProfile() async {

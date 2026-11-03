@@ -120,8 +120,8 @@ void main() {
     });
   });
 
-  group('JadwalDokterPage Doctor Practice Settings & Auto Sesi UI Tests', () {
-    testWidgets('Tampil card Jadwal & Kuota Praktik dan tombol Atur Jam & Kuota', (tester) async {
+  group('JadwalDokterPage Slot Baru & Quota UI Tests', () {
+    testWidgets('Card Jadwal & Kuota Praktik tidak ada, hanya tombol Tambah Slot Baru', (tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -134,13 +134,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Jadwal & Kuota Praktik'), findsOneWidget);
-      expect(find.text('Dikelola langsung oleh dokter'), findsOneWidget);
-      expect(find.text('Atur Jam & Kuota'), findsOneWidget);
-      expect(find.text('Terapkan Sesi'), findsOneWidget);
+      expect(find.text('Jadwal & Kuota Praktik'), findsNothing);
+      expect(find.text('Atur Jam & Kuota'), findsNothing);
+      expect(find.text('Terapkan Sesi'), findsNothing);
+      expect(find.text('Tambah Slot Baru'), findsOneWidget);
     });
 
-    testWidgets('Buka bottom sheet Atur Jam & Kuota dan ubah pengaturan praktik', (tester) async {
+    testWidgets('Buka form Tambah Slot Baru dan otomatis mengisi jam selesai saat jam mulai diisi', (tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -153,63 +153,62 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Tap "Atur Jam & Kuota"
-      await tester.tap(find.text('Atur Jam & Kuota'));
+      // Buka form Slot Baru
+      await tester.tap(find.text('Tambah Slot Baru'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Pengaturan Praktik & Kuota'), findsOneWidget);
-      expect(find.text('Dokter mengatur jam buka, sesi & limit pasien'), findsOneWidget);
-      expect(find.text('JAM BUKA PRAKTIK'), findsOneWidget);
-      expect(find.text('JAM TUTUP / SELESAI'), findsOneWidget);
-      expect(find.text('PEMBAGIAN DURASI SESI'), findsOneWidget);
-      expect(find.text('LIMIT PASIEN PER SESI'), findsOneWidget);
-      expect(find.text('Tutup Otomatis Pas Selesai'), findsOneWidget);
+      expect(find.text('Slot Baru'), findsOneWidget);
+      expect(find.text('JAM MULAI'), findsOneWidget);
+      expect(find.text('JAM SELESAI'), findsOneWidget);
+      expect(find.text('LIMIT PASIEN (KUOTA PER SESI)'), findsOneWidget);
 
-      // Pilih durasi sesi 30 Menit
-      await tester.tap(find.text('30 Menit'));
+      // Cari input jam mulai dan jam selesai
+      final textFields = find.byType(TextField);
+      expect(textFields, findsNWidgets(4)); // tanggal, jam mulai, jam selesai, kuota
+
+      // Input jam mulai 10.00
+      await tester.enterText(textFields.at(1), '10.00');
       await tester.pumpAndSettle();
 
-      // Pilih limit 2 Pasien
-      await tester.tap(find.text('2 Pasien'));
+      // Jam selesai otomatis terisi 10.30 (+30 menit)
+      final endField = tester.widget<TextField>(textFields.at(2));
+      expect(endField.controller?.text, '10.30');
+    });
+
+    testWidgets('Simpan slot baru dari form Tambah Slot Baru berhasil', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: JadwalDokterPage(),
+        ),
+      );
       await tester.pumpAndSettle();
 
-      // Tap Simpan Pengaturan Praktik
-      await tester.tap(find.text('Simpan Pengaturan Praktik'));
+      // Buka form
+      await tester.tap(find.text('Tambah Slot Baru'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Pengaturan jadwal praktik dan kuota berhasil disimpan'), findsOneWidget);
+      final textFields = find.byType(TextField);
+      await tester.enterText(textFields.at(0), 'Senin, 3 November 2026');
+      await tester.enterText(textFields.at(1), '13.00');
+      await tester.pumpAndSettle();
+
+      // Tap Simpan Slot
+      await tester.tap(find.text('Simpan Slot'));
+      await tester.pumpAndSettle();
+
+      // Muncul dialog berhasil
+      expect(find.text('Slot jadwal berhasil disimpan'), findsOneWidget);
       await tester.tap(find.text('OK'));
       await tester.pumpAndSettle();
 
-      // Kembali ke layar jadwal dan tampilkan durasi 30 menit
-      expect(find.text('30 Menit'), findsOneWidget);
-    });
-
-    testWidgets('Terapkan sesi praktik otomatis menghasilkan sesi dengan limit pasien', (tester) async {
-      tester.view.physicalSize = const Size(1080, 2400);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: JadwalDokterPage(),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // Tap "Terapkan Sesi"
-      await tester.tap(find.text('Terapkan Sesi'));
-      await tester.pumpAndSettle();
-
-      // Muncul dialog sukses
-      expect(find.text('Berhasil'), findsOneWidget);
-      await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
-
-      // Sesi 09.00 - 09.15 atau rentang waktu terbuat di jadwal dokter
-      expect(find.textContaining('09.00 - 09.15'), findsWidgets);
-      expect(find.textContaining('Limit'), findsWidgets);
+      // Slot 13.00 - 13.30 muncul di jadwal
+      expect(find.text('13.00 - 13.30'), findsOneWidget);
+      expect(find.text('Limit 2 Pasien'), findsOneWidget);
     });
 
     testWidgets('Slot yang terisi sebagian atau penuh menampilkan indikator kuota yang tepat', (tester) async {

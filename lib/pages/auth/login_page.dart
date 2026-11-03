@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../models/user_profile.dart';
 import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
@@ -9,6 +8,7 @@ import '../../services/login_preference_service.dart';
 import '../admin/admin_main_page.dart';
 import '../dokter/dokter_main_page.dart';
 import '../pengguna/pengguna_main_page.dart';
+import 'forgot_password_page.dart';
 import 'register_page.dart';
 import 'register_dokter_page.dart';
 
@@ -180,51 +180,62 @@ class _LoginPageState extends State<LoginPage> {
     }
     if (!profile.canLogin) {
       await AuthService.signOut();
+      final statusLower = profile.status.trim().toLowerCase();
       setState(() {
-        _errorMessage = profile!.role == 'dokter' && profile.status == 'ditolak'
-            ? 'Pendaftaran dokter Anda ditolak oleh admin. Silahkan hubungi administrator.'
-            : 'Akun Anda ditangguhkan. Hubungi administrator.';
+        if (profile!.role == 'dokter') {
+          if (statusLower == 'menunggu') {
+            _errorMessage =
+                'Akun dokter Anda sedang menunggu verifikasi oleh Admin Skinora. Silakan tunggu hingga akun diverifikasi sebelum masuk.';
+          } else if (statusLower == 'ditolak') {
+            _errorMessage =
+                'Pendaftaran dokter Anda ditolak oleh admin. Silahkan hubungi administrator.';
+          } else {
+            _errorMessage =
+                'Akun dokter Anda ditangguhkan. Hubungi administrator.';
+          }
+        } else {
+          _errorMessage = 'Akun Anda ditangguhkan. Hubungi administrator.';
+        }
         _busy = false;
       });
-      return;
-    }
 
-    if (profile.role == 'dokter' && profile.status == 'menunggu') {
-      if (!mounted) return;
-      await showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Row(
-            children: [
-              Icon(LucideIcons.clock, color: Colors.orange, size: 24),
-              SizedBox(width: 10),
-              Text(
-                'Menunggu Verifikasi',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      if (profile.role == 'dokter' && statusLower == 'menunggu' && mounted) {
+        await showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Row(
+              children: [
+                Icon(LucideIcons.clock, color: Colors.orange, size: 24),
+                SizedBox(width: 10),
+                Text(
+                  'Menunggu Verifikasi',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            content: const Text(
+              'Akun dokter Anda saat ini masih dalam proses verifikasi oleh Admin Skinora.\n\nAnda belum dapat masuk ke aplikasi hingga akun Anda diverifikasi oleh administrator.',
+              style: TextStyle(fontSize: 13.5, height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  'Mengerti',
+                  style: TextStyle(
+                    color: primaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),
-          content: const Text(
-            'Akun dokter Anda saat ini masih dalam proses verifikasi oleh Admin Skinora.\n\nAnda dapat masuk untuk melihat profil Anda, namun belum dapat membuka jadwal atau melayani konsultasi hingga akun terverifikasi.',
-            style: TextStyle(fontSize: 13.5, height: 1.4),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text(
-                'Mengerti',
-                style: TextStyle(
-                  color: primaryColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
+        );
+      }
+      return;
     }
 
     // ── Tahap 3: Log aktivitas (non-blocking — gagal tidak menghalangi login) ──
@@ -249,34 +260,19 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _handleForgotPassword() {
-    final email = _emailController.text.trim().toLowerCase();
-    if (!Backend.useFirebase) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Backend Firebase belum terkonfigurasi.'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-    if (email.isEmpty) {
-      setState(() {
-        _errorMessage = 'Masukkan email terlebih dahulu untuk reset password.';
-      });
-      return;
-    }
-    AuthService.sendPasswordReset(email).then((_) {
-      if (!mounted) return;
-      AdminSuccessDialog.show(
-        context,
-        message: 'Email reset password telah dikirim.',
-      );
-    }).catchError((Object e) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = AuthService.describeAuthError(e);
-      });
+    setState(() {
+      _errorMessage = null;
     });
+
+    final currentEmail = _emailController.text.trim();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ForgotPasswordPage(
+          initialEmail: currentEmail,
+        ),
+      ),
+    );
   }
 
   @override

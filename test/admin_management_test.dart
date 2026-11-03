@@ -107,7 +107,7 @@ void main() {
   });
 
   group('TambahAdminPage Form & Validation', () {
-    testWidgets('validasi nama dan email kosong', (tester) async {
+    testWidgets('validasi form: nama, email, dan password wajib diisi dengan format benar', (tester) async {
       tester.view.physicalSize = const Size(800, 1200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -121,19 +121,38 @@ void main() {
       expect(find.text('Tambah Admin Baru'), findsOneWidget);
       expect(find.text('Simpan Admin'), findsOneWidget);
 
-      // Coba submit kosong
+      // Verifikasi label dengan tanda bintang
+      expect(find.text('Nama Lengkap *'), findsOneWidget);
+      expect(find.text('Email Admin *'), findsOneWidget);
+      expect(find.text('Password Admin *'), findsOneWidget);
+
+      // 1. Coba submit saat semua kosong -> gagal di nama
       await tester.ensureVisible(find.text('Simpan Admin'));
       await tester.tap(find.text('Simpan Admin'));
       await tester.pump();
 
       expect(find.text('Nama lengkap wajib diisi'), findsOneWidget);
 
-      // Isi nama saja, email kosong
+      // 2. Isi nama saja, email kosong -> gagal di email
       await tester.enterText(find.byType(TextField).at(0), 'Admin Tester');
       await tester.tap(find.text('Simpan Admin'));
       await tester.pump();
 
       expect(find.text('Email valid wajib diisi'), findsOneWidget);
+
+      // 3. Isi email valid, password kosong -> gagal di password wajib
+      await tester.enterText(find.byType(TextField).at(1), 'admin@skinora.id');
+      await tester.tap(find.text('Simpan Admin'));
+      await tester.pump();
+
+      expect(find.text('Password wajib diisi'), findsOneWidget);
+
+      // 4. Isi password kurang dari 6 karakter -> gagal minimal 6 karakter
+      await tester.enterText(find.byType(TextField).at(2), '12345');
+      await tester.tap(find.text('Simpan Admin'));
+      await tester.pump();
+
+      expect(find.text('Password minimal 6 karakter'), findsOneWidget);
     });
 
     testWidgets('berhasil submit form tambah admin', (tester) async {
