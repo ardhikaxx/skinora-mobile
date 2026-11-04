@@ -44,6 +44,9 @@ class ConsultationService {
     _inMemoryCtrl.add(_inMemoryStore.values.toList());
   }
 
+  static Map<String, dynamic>? getInMemoryConsultation(String id) =>
+      _inMemoryStore[id];
+
   // ---------------------------------------------------------------------------
   // Aturan 1 Pasien 1 Konsultasi per Hari
   // ---------------------------------------------------------------------------
@@ -67,7 +70,7 @@ class ConsultationService {
               final sDate = (doc['scheduleDate'] as String?) ?? '';
               final tStart = (doc['timeStart'] as String?) ?? '';
               final tEnd = (doc['timeEnd'] as String?) ?? '';
-              if (AppDates.isSlotPastBooking(
+              if (AppDates.isPastSlot(
                 dateIso: dIso,
                 scheduleDate: sDate,
                 timeStart: tStart,
@@ -75,7 +78,7 @@ class ConsultationService {
               )) {
                 doc['status'] = 'dibatalkan';
                 doc['cancelReason'] =
-                    'Kedaluwarsa: Melewati batas waktu konfirmasi dokter';
+                    'Kedaluwarsa: Melewati batas waktu konsultasi tanpa konfirmasi dokter';
                 continue;
               }
             }
@@ -106,7 +109,7 @@ class ConsultationService {
               final sDate = (data['scheduleDate'] as String?) ?? '';
               final tStart = (data['timeStart'] as String?) ?? '';
               final tEnd = (data['timeEnd'] as String?) ?? '';
-              if (AppDates.isSlotPastBooking(
+              if (AppDates.isPastSlot(
                 dateIso: dIso,
                 scheduleDate: sDate,
                 timeStart: tStart,
@@ -135,7 +138,7 @@ class ConsultationService {
               final sDate = (data['scheduleDate'] as String?) ?? '';
               final tStart = (data['timeStart'] as String?) ?? '';
               final tEnd = (data['timeEnd'] as String?) ?? '';
-              if (AppDates.isSlotPastBooking(
+              if (AppDates.isPastSlot(
                 dateIso: dIso,
                 scheduleDate: sDate,
                 timeStart: tStart,

@@ -106,15 +106,22 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
+      final futureDate = AppDates.nowWib().add(const Duration(days: 1));
+      final dateDisplay = AppDates.display(futureDate).toUpperCase();
+      final dateIso = AppDates.iso(futureDate);
+
       await tester.pumpWidget(
-        const MaterialApp(
+        MaterialApp(
           home: MenungguKonfirmasiPage(
             doctorId: 'doc_1',
             doctorName: 'dr. Sarah Sp.KK',
             specialization: 'Spesialis Kulit',
-            dateTime: 'Senin, 3 November 2026 • 15.30 WIB',
-            scheduleDate: 'Senin, 3 November 2026',
+            dateTime: '$dateDisplay • 15.30 WIB',
+            scheduleDate: dateDisplay,
             scheduleTime: '15.30 - 16.00',
+            dateIso: dateIso,
+            timeStart: '15.30',
+            timeEnd: '16.00',
             initialIsConfirmed: false,
           ),
         ),
@@ -128,14 +135,17 @@ void main() {
 
       // Tampilkan dengan status sudah diverifikasi (initialIsConfirmed: true)
       await tester.pumpWidget(
-        const MaterialApp(
+        MaterialApp(
           home: MenungguKonfirmasiPage(
             doctorId: 'doc_1',
             doctorName: 'dr. Sarah Sp.KK',
             specialization: 'Spesialis Kulit',
-            dateTime: 'Senin, 3 November 2026 • 15.30 WIB',
-            scheduleDate: 'Senin, 3 November 2026',
+            dateTime: '$dateDisplay • 15.30 WIB',
+            scheduleDate: dateDisplay,
             scheduleTime: '15.30 - 16.00',
+            dateIso: dateIso,
+            timeStart: '15.30',
+            timeEnd: '16.00',
             initialIsConfirmed: true,
           ),
         ),
@@ -422,6 +432,39 @@ void main() {
 
       // Kuota harian dikembalikan (hasLimit bernilai false sehingga pasien bebas memilih jadwal baru)
       expect(hasLimit, isFalse);
+    });
+
+    test('Skenario spesifik: slot 09.00 - 09.15 jika telah lewat jam konsultasi otomatis kedaluwarsa dan kuota harian dikembalikan', () async {
+      // Skenario hari ini namun jam konsultasi sudah lewat (misal slot 09.00 - 09.15 di waktu lampau)
+      final pastDate = AppDates.nowWib().subtract(const Duration(days: 1));
+      final pastDateDisplay = AppDates.display(pastDate).toUpperCase();
+      final dateIso = AppDates.iso(pastDate);
+
+      ConsultationService.setInMemoryConsultation('c_slot_0915', {
+        'id': 'c_slot_0915',
+        'doctorId': 'doc_spesifik',
+        'patientId': 'patient_0915',
+        'status': 'menunggu_konfirmasi',
+        'scheduleDate': pastDateDisplay,
+        'dateIso': dateIso,
+        'timeStart': '09.00',
+        'timeEnd': '09.15',
+        'scheduleTime': '09.00 - 09.15',
+      });
+
+      // Pengecekan hasConsultationOnDate mendeteksi bahwa slot 09.00-09.15 telah lewat jamnya
+      final hasLimit = await ConsultationService.hasConsultationOnDate(
+        patientUid: 'patient_0915',
+        dateIso: dateIso,
+        scheduleDate: pastDateDisplay,
+      );
+
+      expect(hasLimit, isFalse);
+
+      // Status konsultasi otomatis berubah menjadi dibatalkan
+      final doc = ConsultationService.getInMemoryConsultation('c_slot_0915');
+      expect(doc?['status'], equals('dibatalkan'));
+      expect(doc?['cancelReason'], contains('tanpa konfirmasi dokter'));
     });
   });
 }

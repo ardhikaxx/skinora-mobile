@@ -128,6 +128,24 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
             final slotId = item['slotId'] as String? ?? '';
             final status = (item['status'] as String? ?? '').toLowerCase();
             if (status != 'selesai' && status != 'dibatalkan') {
+              if (status == 'menunggu_konfirmasi') {
+                final dIso = item['dateIso'] as String? ?? '';
+                final sDate = item['scheduleDate'] as String? ?? '';
+                final ts = item['timeStart'] as String? ?? '';
+                final te = item['timeEnd'] as String? ?? '';
+                if (AppDates.isPastSlot(
+                  dateIso: dIso,
+                  scheduleDate: sDate,
+                  timeStart: ts,
+                  timeEnd: te,
+                )) {
+                  final id = item['id'] as String? ?? '';
+                  if (id.isNotEmpty) {
+                    unawaited(ConsultationService.autoCancelExpiredConsultation(id));
+                  }
+                  continue;
+                }
+              }
               if (slotId.isNotEmpty) {
                 map[slotId] = item;
               }
@@ -865,10 +883,10 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
     }
 
     // 2. Jika pengguna sudah membooking jadwal ini:
-    // Jika belum dikonfirmasi dokter dan jam mulai sesi sudah tiba/lewat,
+    // Jika belum dikonfirmasi dokter dan jam sesi konsultasi sudah lewat (misal lewat jam 09.15 di jam 19.16),
     // batalkan otomatis dan kembalikan kuota harian.
     if (myConsultation != null) {
-      if (!isConfirmed && isPastBooking) {
+      if (!isConfirmed && (isSlotEnded || isPastBooking)) {
         final cid = myConsultation['id'] as String?;
         if (cid != null && cid.isNotEmpty) {
           unawaited(ConsultationService.autoCancelExpiredConsultation(cid));
@@ -880,7 +898,7 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Jadwal sesi $time pada $slotDate telah dibatalkan otomatis karena melewati batas waktu konfirmasi dokter sebelum jam sesi dimulai. Kuota konsultasi Anda hari ini telah dikembalikan.',
+              'Jadwal sesi $time pada $slotDate telah dibatalkan otomatis karena melewati jam konsultasi sebelum diverifikasi oleh dokter. Kuota konsultasi Anda hari ini telah dikembalikan.',
             ),
           ),
         );

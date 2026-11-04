@@ -123,7 +123,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
                     final sDate = (m['scheduleDate'] as String?) ?? '';
                     final ts = (m['timeStart'] as String?) ?? '';
                     final te = (m['timeEnd'] as String?) ?? '';
-                    if (AppDates.isSlotPastBooking(
+                    if (AppDates.isPastSlot(
                       dateIso: dIso,
                       scheduleDate: sDate,
                       timeStart: ts,

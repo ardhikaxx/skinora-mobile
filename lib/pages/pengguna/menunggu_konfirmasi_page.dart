@@ -78,13 +78,13 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
 
   void _checkTimeExpiration() {
     if (_isConfirmed || _isCancelledOrExpired) return;
-    final isPastStart = AppDates.isSlotPastBooking(
+    final isExpired = AppDates.isPastSlot(
       dateIso: widget.dateIso ?? '',
       scheduleDate: widget.scheduleDate,
       timeStart: widget.timeStart,
       timeEnd: widget.timeEnd,
     );
-    if (isPastStart) {
+    if (isExpired) {
       final cid = widget.consultationId;
       if (cid != null && cid.isNotEmpty) {
         unawaited(ConsultationService.autoCancelExpiredConsultation(cid));
@@ -114,22 +114,22 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
       final tStart = (doc['timeStart'] as String?) ?? widget.timeStart ?? '';
       final tEnd = (doc['timeEnd'] as String?) ?? widget.timeEnd ?? '';
 
-      final isPastStart = AppDates.isSlotPastBooking(
+      final isExpired = AppDates.isPastSlot(
         dateIso: dateIso,
         scheduleDate: schedDate,
         timeStart: tStart,
         timeEnd: tEnd,
       );
 
-      if (st == 'dibatalkan' || (st == 'menunggu_konfirmasi' && isPastStart)) {
-        if (st == 'menunggu_konfirmasi' && isPastStart) {
+      if (st == 'dibatalkan' || (st == 'menunggu_konfirmasi' && isExpired)) {
+        if (st == 'menunggu_konfirmasi' && isExpired) {
           unawaited(ConsultationService.autoCancelExpiredConsultation(cid));
         }
         setState(() {
           _isConfirmed = false;
           _isCancelledOrExpired = true;
           _cancelReason = (doc['cancelReason'] as String?) ??
-              'Jadwal konsultasi telah kedaluwarsa karena melewati batas waktu konfirmasi dokter sebelum jam sesi dimulai. Kuota konsultasi Anda hari ini telah dikembalikan.';
+              'Jadwal konsultasi telah kedaluwarsa karena melewati jam konsultasi sebelum diverifikasi oleh dokter. Kuota konsultasi Anda hari ini telah dikembalikan.';
         });
       } else {
         setState(() {
