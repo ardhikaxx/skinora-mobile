@@ -613,6 +613,23 @@ class ConsultationService {
   static Future<void> markBerlangsung(String id) async {
     if (!Backend.useFirebase) {
       if (_inMemoryStore.containsKey(id)) {
+        final doc = _inMemoryStore[id]!;
+        final dIso = (doc['dateIso'] as String?) ?? '';
+        final sDate = (doc['scheduleDate'] as String?) ?? '';
+        final ts = (doc['timeStart'] as String?) ?? '';
+        final te = (doc['timeEnd'] as String?) ?? '';
+        final sTime = (doc['scheduleTime'] as String?) ?? '';
+        if (AppDates.isSlotUpcoming(
+          dateIso: dIso,
+          scheduleDate: sDate,
+          scheduleTime: sTime,
+          timeStart: ts,
+          timeEnd: te,
+        )) {
+          throw StateError(
+            'Konsultasi belum dapat dimulai karena belum memasuki jam jadwal konsultasi.',
+          );
+        }
         _inMemoryStore[id]!['status'] = 'berlangsung';
         _inMemoryStore[id]!['updatedAt'] = DateTime.now();
         _inMemoryCtrl.add(_inMemoryStore.values.toList());
@@ -631,6 +648,22 @@ class ConsultationService {
       if (status == 'selesai' || status == 'berlangsung') return false;
       if (status != 'terjadwal' && status != 'dikonfirmasi') {
         throw StateError('Status konsultasi tidak valid untuk dimulai.');
+      }
+      final dateIso = (snap.data()?['dateIso'] as String?) ?? '';
+      final scheduleDate = (snap.data()?['scheduleDate'] as String?) ?? '';
+      final timeStart = (snap.data()?['timeStart'] as String?) ?? '';
+      final timeEnd = (snap.data()?['timeEnd'] as String?) ?? '';
+      final scheduleTime = (snap.data()?['scheduleTime'] as String?) ?? '';
+      if (AppDates.isSlotUpcoming(
+        dateIso: dateIso,
+        scheduleDate: scheduleDate,
+        scheduleTime: scheduleTime,
+        timeStart: timeStart,
+        timeEnd: timeEnd,
+      )) {
+        throw StateError(
+          'Konsultasi belum dapat dimulai karena belum memasuki jam jadwal konsultasi.',
+        );
       }
       patientId = (snap.data()?['patientId'] as String?) ?? '';
       patientName = (snap.data()?['patientName'] as String?) ?? '';

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:skinora_app/pages/auth/login_page.dart';
 import 'package:skinora_app/pages/auth/register_dokter_page.dart';
 
@@ -47,6 +48,16 @@ void main() {
       // Memastikan berada di RegisterDokterPage
       expect(find.byType(RegisterDokterPage), findsOneWidget);
       expect(find.text('Pendaftaran Dokter'), findsOneWidget);
+
+      // Memastikan tombol kembali menggunakan icon arrow ios back (LucideIcons.chevronLeft)
+      final backBtn = find.byIcon(LucideIcons.chevronLeft);
+      expect(backBtn, findsOneWidget);
+
+      // Tap tombol kembali dan pastikan kembali ke LoginPage
+      await tester.tap(backBtn);
+      await tester.pumpAndSettle();
+      expect(find.byType(RegisterDokterPage), findsNothing);
+      expect(find.byType(LoginPage), findsOneWidget);
     });
 
     testWidgets('RegisterDokterPage menampilkan semua field form & info verifikasi',

@@ -294,7 +294,8 @@ class _RiwayatKonsultasiPenggunaPageState
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
           onTap: () {
-            if (item.status == ConsultationStatus.menungguKonfirmasi) {
+            if (item.status == ConsultationStatus.menungguKonfirmasi ||
+                item.status == ConsultationStatus.terjadwal) {
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -309,6 +310,8 @@ class _RiwayatKonsultasiPenggunaPageState
                     dateIso: item.dateIso,
                     timeStart: item.timeStart,
                     timeEnd: item.timeEnd,
+                    initialIsConfirmed:
+                        item.status == ConsultationStatus.terjadwal,
                   ),
                 ),
               );

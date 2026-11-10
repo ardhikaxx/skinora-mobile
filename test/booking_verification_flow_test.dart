@@ -467,4 +467,167 @@ void main() {
       expect(doc?['cancelReason'], contains('tanpa konfirmasi dokter'));
     });
   });
+
+  group('Validasi Jam Konsultasi: Tombol Mulai Konsultasi Nonaktif (Abu-abu / Disable) Sebelum Jam Sesi Tiba', () {
+    testWidgets('Role Dokter: Tombol Mulai Konsultasi disable (abu-abu) jika sudah diverifikasi tapi belum waktunya', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final futureDate = AppDates.nowWib().add(const Duration(days: 1));
+      final futureDateIso = AppDates.iso(futureDate);
+      final futureDateDisplay = AppDates.display(futureDate).toUpperCase();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChatKonsultasiPage(
+            showBottomNav: false,
+            initialConsultations: [
+              ConsultationItemModel(
+                id: 'c_doc_upcoming',
+                patientName: 'Pasien Masa Depan',
+                dateTime: '$futureDateDisplay • 15:30 - 16:00',
+                status: 'Terjadwal',
+                dateIso: futureDateIso,
+                scheduleDate: futureDateDisplay,
+                timeStart: '15.30',
+                timeEnd: '16.00',
+                scheduleTime: '15.30 - 16.00',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Cari tombol Mulai Konsultasi
+      final btnFinder = find.widgetWithText(ElevatedButton, 'Mulai Konsultasi');
+      expect(btnFinder, findsOneWidget);
+
+      final button = tester.widget<ElevatedButton>(btnFinder);
+      // Tombol harus disabled (onPressed null)
+      expect(button.onPressed, isNull);
+
+      // Keterangan menunggu jadwal konsultasi tampil
+      expect(find.text('Menunggu jam jadwal konsultasi untuk memulai'), findsOneWidget);
+
+      // Dicoba tap tidak bereaksi dan tidak pindah ke ruang chat
+      await tester.tap(btnFinder);
+      await tester.pumpAndSettle();
+      expect(find.text('Selesaikan Konsultasi?'), findsNothing);
+    });
+
+    testWidgets('Role Pasien: Tombol Mulai Konsultasi disable (abu-abu) di MenungguKonfirmasiPage jika sudah diverifikasi tapi belum jamnya', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final futureDate = AppDates.nowWib().add(const Duration(days: 1));
+      final futureDateIso = AppDates.iso(futureDate);
+      final futureDateDisplay = AppDates.display(futureDate).toUpperCase();
+
+      ConsultationService.setInMemoryConsultation('c_patient_upcoming', {
+        'id': 'c_patient_upcoming',
+        'doctorId': 'doc_1',
+        'doctorName': 'dr. Sarah Sp.KK',
+        'patientId': 'patient_local',
+        'patientName': 'Pasien Uji',
+        'status': 'terjadwal',
+        'scheduleDate': futureDateDisplay,
+        'dateIso': futureDateIso,
+        'timeStart': '15.30',
+        'timeEnd': '16.00',
+        'scheduleTime': '15.30 - 16.00',
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MenungguKonfirmasiPage(
+            consultationId: 'c_patient_upcoming',
+            doctorId: 'doc_1',
+            doctorName: 'dr. Sarah Sp.KK',
+            specialization: 'Spesialis Kulit',
+            dateTime: '$futureDateDisplay • 15.30 - 16.00 WIB',
+            scheduleDate: futureDateDisplay,
+            scheduleTime: '15.30 - 16.00',
+            dateIso: futureDateIso,
+            timeStart: '15.30',
+            timeEnd: '16.00',
+            status: 'terjadwal',
+            initialIsConfirmed: true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Memastikan status Jadwal Terverifikasi
+      expect(find.text('Jadwal Terverifikasi'), findsOneWidget);
+
+      // Cari tombol Mulai Konsultasi
+      final btnFinder = find.widgetWithText(ElevatedButton, 'Mulai Konsultasi');
+      expect(btnFinder, findsOneWidget);
+
+      final button = tester.widget<ElevatedButton>(btnFinder);
+      // Tombol harus disabled (onPressed null)
+      expect(button.onPressed, isNull);
+
+      // Menampilkan petunjuk tombol akan aktif saat jam jadwal dimulai
+      expect(find.text('Tombol akan aktif otomatis saat jam jadwal konsultasi dimulai'), findsOneWidget);
+    });
+
+    testWidgets('Role Pasien: Tombol Mulai Konsultasi aktif jika jadwal sudah tiba', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      // Buat tanggal lampau beberapa jam yang lalu hari ini atau kemarin
+      final pastDate = AppDates.nowWib().subtract(const Duration(hours: 1));
+      final pastDateIso = AppDates.iso(pastDate);
+      final pastDateDisplay = AppDates.display(pastDate).toUpperCase();
+
+      ConsultationService.setInMemoryConsultation('c_patient_active', {
+        'id': 'c_patient_active',
+        'doctorId': 'doc_1',
+        'doctorName': 'dr. Sarah Sp.KK',
+        'patientId': 'patient_local',
+        'patientName': 'Pasien Uji',
+        'status': 'terjadwal',
+        'scheduleDate': pastDateDisplay,
+        'dateIso': pastDateIso,
+        'timeStart': '08.00',
+        'timeEnd': '08.30',
+        'scheduleTime': '08.00 - 08.30',
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MenungguKonfirmasiPage(
+            consultationId: 'c_patient_active',
+            doctorId: 'doc_1',
+            doctorName: 'dr. Sarah Sp.KK',
+            specialization: 'Spesialis Kulit',
+            dateTime: '$pastDateDisplay • 08.00 - 08.30 WIB',
+            scheduleDate: pastDateDisplay,
+            scheduleTime: '08.00 - 08.30',
+            dateIso: pastDateIso,
+            timeStart: '08.00',
+            timeEnd: '08.30',
+            status: 'terjadwal',
+            initialIsConfirmed: true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final btnFinder = find.widgetWithText(ElevatedButton, 'Mulai Konsultasi');
+      expect(btnFinder, findsOneWidget);
+
+      final button = tester.widget<ElevatedButton>(btnFinder);
+      // Tombol aktif karena waktu sudah tiba
+      expect(button.onPressed, isNotNull);
+    });
+  });
 }

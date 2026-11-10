@@ -18,12 +18,22 @@ class ConsultationItemModel {
   final String patientName;
   final String dateTime;
   String status; // 'Terjadwal' or 'Berlangsung'
+  final String? dateIso;
+  final String? scheduleDate;
+  final String? timeStart;
+  final String? timeEnd;
+  final String? scheduleTime;
 
   ConsultationItemModel({
     required this.id,
     required this.patientName,
     required this.dateTime,
     required this.status,
+    this.dateIso,
+    this.scheduleDate,
+    this.timeStart,
+    this.timeEnd,
+    this.scheduleTime,
   });
 }
 
@@ -61,17 +71,38 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
   // id Firestore -> data mentah untuk persist aksi status.
   final Map<String, Map<String, dynamic>> _backendMeta = {};
   StreamSubscription<List<Map<String, dynamic>>>? _sub;
+  Timer? _ticker;
 
   @override
   void initState() {
     super.initState();
     _loadFromBackend();
+    _ticker = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
+    _ticker?.cancel();
     _sub?.cancel();
     super.dispose();
+  }
+
+  bool _isItemUpcoming(ConsultationItemModel item) {
+    final meta = _backendMeta[item.id];
+    final dateIso = item.dateIso ?? (meta?['dateIso'] as String?) ?? item.dateTime;
+    final scheduleDate = item.scheduleDate ?? (meta?['scheduleDate'] as String?);
+    final timeStart = item.timeStart ?? (meta?['timeStart'] as String?);
+    final timeEnd = item.timeEnd ?? (meta?['timeEnd'] as String?);
+    final scheduleTime = item.scheduleTime ?? (meta?['scheduleTime'] as String?);
+    return AppDates.isSlotUpcoming(
+      dateIso: dateIso,
+      scheduleDate: scheduleDate,
+      scheduleTime: scheduleTime,
+      timeStart: timeStart,
+      timeEnd: timeEnd,
+    );
   }
 
   String _labelStatus(String raw) {
@@ -146,16 +177,20 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
               final date = scheduleDate.isNotEmpty ? scheduleDate : dateIso;
               final ts = (m['timeStart'] as String?) ?? '';
               final te = (m['timeEnd'] as String?) ?? '';
+              final rawSt = (m['scheduleTime'] as String?) ?? '';
               final time = ts.isNotEmpty
                   ? '${AppDates.formatHm(ts)} - ${AppDates.formatHm(te.isNotEmpty ? te : ts)}'
-                  : AppDates.formatRange(
-                      (m['scheduleTime'] as String?) ?? '',
-                    );
+                  : AppDates.formatRange(rawSt);
               return ConsultationItemModel(
                 id: id,
                 patientName: (m['patientName'] as String?) ?? 'Pasien',
                 dateTime: time.isNotEmpty ? '$date • $time' : date,
                 status: _labelStatus((m['status'] as String?) ?? 'terjadwal'),
+                dateIso: dateIso,
+                scheduleDate: scheduleDate,
+                timeStart: ts,
+                timeEnd: te,
+                scheduleTime: rawSt.isNotEmpty ? rawSt : time,
               );
             }));
         });
@@ -206,6 +241,17 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
   }
 
   Future<void> _handleConsultationAction(ConsultationItemModel item) async {
+    if (_isItemUpcoming(item)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Konsultasi belum dapat dimulai karena belum memasuki jam jadwal konsultasi.',
+          ),
+          backgroundColor: primaryMaroon,
+        ),
+      );
+      return;
+    }
     setState(() {
       item.status = 'Berlangsung';
     });
@@ -492,6 +538,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
     final isWaiting = item.status == 'Menunggu Verifikasi' ||
         item.status == 'Menunggu Konfirmasi';
     final isOngoing = item.status == 'Berlangsung';
+    final isUpcoming = !isWaiting && !isOngoing && _isItemUpcoming(item);
 
     return Container(
       padding: const EdgeInsets.all(16.0),
@@ -603,17 +650,25 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
           ),
           const SizedBox(height: 14),
 
-          // Row 2: Action Button ("Konfirmasi Jadwal", "Mulai Konsultasi", or "Masuk Ruang Chat")
+          // Row 2: Action Button ("Verifikasi Sekarang", "Mulai Konsultasi", or "Masuk Ruang Chat")
           SizedBox(
             width: double.infinity,
             height: 42,
             child: ElevatedButton(
-              onPressed: () => isWaiting
-                  ? _handleConfirmSchedule(item)
-                  : _handleConsultationAction(item),
+              onPressed: isWaiting
+                  ? () => _handleConfirmSchedule(item)
+                  : (isUpcoming
+                      ? null
+                      : () => _handleConsultationAction(item)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: primaryMaroon,
-                foregroundColor: Colors.white,
+                backgroundColor: isUpcoming
+                    ? const Color(0xFFE5E7EB)
+                    : primaryMaroon,
+                foregroundColor: isUpcoming
+                    ? const Color(0xFF9CA3AF)
+                    : Colors.white,
+                disabledBackgroundColor: const Color(0xFFE5E7EB),
+                disabledForegroundColor: const Color(0xFF9CA3AF),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -627,25 +682,43 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
                         ? LucideIcons.userCheck
                         : (isOngoing
                             ? LucideIcons.messageSquare
-                            : LucideIcons.phone),
+                            : (isUpcoming
+                                ? LucideIcons.clock
+                                : LucideIcons.phone)),
                     size: 16,
-                    color: Colors.white,
+                    color: isUpcoming
+                        ? const Color(0xFF9CA3AF)
+                        : Colors.white,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     isWaiting
                         ? 'Verifikasi Sekarang'
                         : (isOngoing ? 'Masuk Ruang Chat' : 'Mulai Konsultasi'),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13.5,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: isUpcoming
+                          ? const Color(0xFF9CA3AF)
+                          : Colors.white,
                     ),
                   ),
                 ],
               ),
             ),
           ),
+          if (isUpcoming) ...[
+            const SizedBox(height: 6),
+            const Text(
+              'Menunggu jam jadwal konsultasi untuk memulai',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11.5,
+                color: Color(0xFF8E8E93),
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -13,6 +13,7 @@ class MenungguKonfirmasiPage extends StatefulWidget {
   final String doctorName;
   final String specialization;
   final String? dateTime;
+  final String? status;
   final String? scheduleDate;
   final String? scheduleTime;
   final String? dateIso;
@@ -28,6 +29,7 @@ class MenungguKonfirmasiPage extends StatefulWidget {
     this.doctorName = '',
     this.specialization = '',
     this.dateTime,
+    this.status,
     this.scheduleDate,
     this.scheduleTime,
     this.dateIso,
@@ -53,6 +55,32 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
   bool _isConfirmed = false;
   bool _isCancelledOrExpired = false;
   String _cancelReason = '';
+  String _liveStatus = '';
+  String _liveDateIso = '';
+  String _liveScheduleDate = '';
+  String _liveTimeStart = '';
+  String _liveTimeEnd = '';
+  String _liveScheduleTime = '';
+
+  bool get _isUpcoming {
+    if (!_isConfirmed) return false;
+    final st = (_liveStatus.isNotEmpty ? _liveStatus : widget.status)?.toLowerCase();
+    if (st == 'berlangsung') return false;
+
+    final dateIso = _liveDateIso.isNotEmpty ? _liveDateIso : (widget.dateIso ?? '');
+    final schedDate = _liveScheduleDate.isNotEmpty ? _liveScheduleDate : widget.scheduleDate;
+    final tStart = _liveTimeStart.isNotEmpty ? _liveTimeStart : widget.timeStart;
+    final tEnd = _liveTimeEnd.isNotEmpty ? _liveTimeEnd : widget.timeEnd;
+    final schedTime = _liveScheduleTime.isNotEmpty ? _liveScheduleTime : widget.scheduleTime;
+
+    return AppDates.isSlotUpcoming(
+      dateIso: dateIso,
+      scheduleDate: schedDate,
+      scheduleTime: schedTime,
+      timeStart: tStart,
+      timeEnd: tEnd,
+    );
+  }
 
   @override
   void initState() {
@@ -61,8 +89,11 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
     _checkTimeExpiration();
     _subscribeStatus();
     _expirationCheckTimer = Timer.periodic(
-      const Duration(seconds: 10),
-      (_) => _checkTimeExpiration(),
+      const Duration(seconds: 5),
+      (_) {
+        _checkTimeExpiration();
+        if (mounted) setState(() {});
+      },
     );
   }
 
@@ -113,6 +144,15 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
           (doc['scheduleDate'] as String?) ?? widget.scheduleDate ?? '';
       final tStart = (doc['timeStart'] as String?) ?? widget.timeStart ?? '';
       final tEnd = (doc['timeEnd'] as String?) ?? widget.timeEnd ?? '';
+      final schedTime =
+          (doc['scheduleTime'] as String?) ?? widget.scheduleTime ?? '';
+
+      _liveStatus = st;
+      _liveDateIso = dateIso;
+      _liveScheduleDate = schedDate;
+      _liveTimeStart = tStart;
+      _liveTimeEnd = tEnd;
+      _liveScheduleTime = schedTime;
 
       final isExpired = AppDates.isPastSlot(
         dateIso: dateIso,
@@ -133,7 +173,7 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
         });
       } else {
         setState(() {
-          _isConfirmed = st == 'dikonfirmasi' || st == 'berlangsung';
+          _isConfirmed = st == 'dikonfirmasi' || st == 'berlangsung' || st == 'terjadwal';
           _isCancelledOrExpired = false;
         });
       }
@@ -148,6 +188,17 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
   }
 
   void _goToChatRoom() {
+    if (_isUpcoming) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Konsultasi belum dapat dimulai karena belum memasuki jam jadwal konsultasi.',
+          ),
+          backgroundColor: primaryMaroon,
+        ),
+      );
+      return;
+    }
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -490,7 +541,9 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
                                   ? _cancelReason
                                   : 'Jadwal konsultasi Anda telah kedaluwarsa karena telah melewati jam mulai konsultasi sebelum dikonfirmasi oleh dokter.\n\nKuota konsultasi Anda hari ini telah dikembalikan. Anda dapat memilih jadwal konsultasi lain sekarang.')
                               : (_isConfirmed
-                                  ? 'Dokter telah memverifikasi jadwal konsultasi Anda. Anda sekarang dapat memasuki ruangan chat konsultasi.'
+                                  ? (_isUpcoming
+                                      ? 'Dokter telah memverifikasi jadwal konsultasi Anda. Mohon menunggu hingga jam jadwal konsultasi dimulai untuk dapat memasuki ruangan chat konsultasi.\n\nTombol mulai konsultasi akan aktif secara otomatis saat jam jadwal dimulai.'
+                                      : 'Dokter telah memverifikasi jadwal konsultasi Anda dan jam konsultasi telah dimulai. Anda sekarang dapat memasuki ruangan chat konsultasi.')
                                   : 'Jadwal konsultasi Anda telah berhasil diajukan ke dokter. Mohon menunggu verifikasi dokter sebelum memasuki ruangan chat konsultasi.\n\nNotifikasi akan dikirimkan otomatis setelah dokter memverifikasi jadwal Anda.'),
                           textAlign: TextAlign.center,
                           style: const TextStyle(
@@ -557,33 +610,77 @@ class _MenungguKonfirmasiPageState extends State<MenungguKonfirmasiPage> {
                             ),
                           ),
                         ] else if (_isConfirmed) ...[
-                          SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: ElevatedButton.icon(
-                              onPressed: _goToChatRoom,
-                              icon: const Icon(
-                                LucideIcons.messageSquare,
-                                size: 18,
-                                color: Colors.white,
-                              ),
-                              label: const Text(
-                                'Mulai Konsultasi',
-                                style: TextStyle(
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                          if (_isUpcoming) ...[
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: ElevatedButton.icon(
+                                onPressed: null,
+                                icon: const Icon(
+                                  LucideIcons.clock,
+                                  size: 18,
+                                  color: Color(0xFF9CA3AF),
                                 ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: primaryMaroon,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
+                                label: const Text(
+                                  'Mulai Konsultasi',
+                                  style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF9CA3AF),
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFE5E7EB),
+                                  disabledBackgroundColor:
+                                      const Color(0xFFE5E7EB),
+                                  disabledForegroundColor:
+                                      const Color(0xFF9CA3AF),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Tombol akan aktif otomatis saat jam jadwal konsultasi dimulai',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 12.0,
+                                color: Color(0xFF8E8E93),
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ] else ...[
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: ElevatedButton.icon(
+                                onPressed: _goToChatRoom,
+                                icon: const Icon(
+                                  LucideIcons.messageSquare,
+                                  size: 18,
+                                  color: Colors.white,
+                                ),
+                                label: const Text(
+                                  'Mulai Konsultasi',
+                                  style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primaryMaroon,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ] else ...[
                           Container(
                             padding: const EdgeInsets.symmetric(

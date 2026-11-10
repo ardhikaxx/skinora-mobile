@@ -252,10 +252,21 @@ class _RegisterDokterPageState extends State<RegisterDokterPage> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(LucideIcons.arrowLeft, color: darkTextColor),
+                  onPressed: () {
+                    if (Navigator.canPop(context)) {
+                      Navigator.of(context).pop();
+                    } else {
+                      Navigator.pushReplacementNamed(context, '/login');
+                    }
+                  },
+                  icon: const Icon(
+                    LucideIcons.chevronLeft,
+                    color: darkTextColor,
+                    size: 22,
+                  ),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
+                  tooltip: 'Kembali',
                 ),
               ),
               const SizedBox(height: 16),

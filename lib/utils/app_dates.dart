@@ -611,22 +611,37 @@ class AppDates {
     return !wallNow.isBefore(startDt) && wallNow.isBefore(endDt);
   }
 
-  /// Apakah slot konsultasi belum dimulai (jadwal di masa depan)?
+  /// Apakah slot konsultasi belum dimulai (jadwal di masa depan atau belum masuk jam mulai sesi)?
   static bool isSlotUpcoming({
     required String dateIso,
     String? scheduleDate,
     String? timeStart,
+    String? scheduleTime,
+    String? timeEnd,
   }) {
     DateTime? date;
     final trimmedIso = dateIso.trim();
     if (trimmedIso.isNotEmpty) {
       final cleanIso = trimmedIso.contains('•')
           ? trimmedIso.split('•').first.trim()
-          : (trimmedIso.length >= 10 ? trimmedIso.substring(0, 10).trim() : trimmedIso);
-      date = tryParseIso(cleanIso) ?? tryParseDisplay(cleanIso) ?? tryParseIso(trimmedIso);
+          : (trimmedIso.contains(' - ') && !trimmedIso.startsWith('202')
+              ? trimmedIso.split(' - ').first.trim()
+              : (trimmedIso.length >= 10 ? trimmedIso.substring(0, 10).trim() : trimmedIso));
+      date = tryParseIso(cleanIso) ??
+          tryParseDisplay(cleanIso) ??
+          tryParseIso(trimmedIso) ??
+          tryParseDisplay(trimmedIso);
     }
     if (date == null && scheduleDate != null && scheduleDate.trim().isNotEmpty) {
-      date = tryParseDisplay(scheduleDate) ?? tryParseIso(scheduleDate);
+      final cleanSched = scheduleDate.contains('•')
+          ? scheduleDate.split('•').first.trim()
+          : (scheduleDate.contains(' - ') && !scheduleDate.startsWith('202')
+              ? scheduleDate.split(' - ').first.trim()
+              : scheduleDate.trim());
+      date = tryParseDisplay(cleanSched) ??
+          tryParseIso(cleanSched) ??
+          tryParseDisplay(scheduleDate) ??
+          tryParseIso(scheduleDate);
     }
     if (date == null) return false;
     final now = nowWib();
@@ -636,8 +651,29 @@ class AppDates {
     if (slotDay.isAfter(today)) return true;
     if (slotDay.isBefore(today)) return false;
 
-    final rawStart = (timeStart != null && timeStart.isNotEmpty) ? timeStart : '';
+    // Hari ini sama dengan tanggal jadwal: bandingkan dengan jam mulai konsultasi
+    var rawStart = (timeStart != null && timeStart.trim().isNotEmpty)
+        ? timeStart.trim()
+        : '';
+    if (rawStart.isEmpty && scheduleTime != null && scheduleTime.trim().isNotEmpty) {
+      rawStart = scheduleTime.split('-').first.trim();
+    }
+    if (rawStart.isEmpty && timeEnd != null && timeEnd.trim().isNotEmpty) {
+      rawStart = timeEnd.split('-').first.trim();
+    }
+    if (rawStart.isEmpty) {
+      if (dateIso.contains('•')) {
+        rawStart = dateIso.split('•').last.trim().split('-').first.trim();
+      } else if (scheduleDate != null && scheduleDate.contains('•')) {
+        rawStart = scheduleDate.split('•').last.trim().split('-').first.trim();
+      } else if (scheduleDate != null && scheduleDate.contains(' - ') && !scheduleDate.startsWith('202')) {
+        rawStart = scheduleDate.split(' - ').sublist(1).join(' - ').split('-').first.trim();
+      } else if (dateIso.contains(' - ') && !dateIso.startsWith('202')) {
+        rawStart = dateIso.split(' - ').sublist(1).join(' - ').split('-').first.trim();
+      }
+    }
     if (rawStart.isEmpty) return false;
+
     final cleanStart = rawStart.toUpperCase().replaceAll('WIB', '').trim();
     final startParts = cleanStart.replaceAll(':', '.').split('-').first.trim().split('.');
     final sh = int.tryParse(startParts[0].trim());
