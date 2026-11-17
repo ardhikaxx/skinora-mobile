@@ -5,7 +5,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/dialogs/admin_action_dialogs.dart';
 import '../../components/empty_state.dart';
 import '../../components/navbottom/dokter_navbottom.dart';
-import '../../models/doctor_practice_settings.dart';
 import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
@@ -79,13 +78,8 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
   late final TextEditingController _dateController;
   final TextEditingController _startTimeController = TextEditingController();
   final TextEditingController _endTimeController = TextEditingController();
-  final TextEditingController _quotaController =
-      TextEditingController(text: '1');
 
   late List<DayScheduleModel> _scheduleDays;
-
-  DoctorPracticeSettings _practiceSettings = const DoctorPracticeSettings();
-  StreamSubscription<DoctorPracticeSettings>? _settingsSub;
 
   // Slot asli dari Firestore (id dokumen) untuk persist hapus/availability.
   bool _backendLoaded = false;
@@ -120,16 +114,6 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
         });
       },
     );
-
-    _settingsSub?.cancel();
-    _settingsSub =
-        ScheduleService.streamPracticeSettings(uid).listen((settings) {
-      if (!mounted) return;
-      setState(() {
-        _practiceSettings = settings;
-        _quotaController.text = settings.quotaPerSession.toString();
-      });
-    }, onError: (_) {});
 
     UserService.loadByUid(uid).then((profile) {
       if (!mounted || profile == null) return;
@@ -168,11 +152,9 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
   @override
   void dispose() {
     _slotSub?.cancel();
-    _settingsSub?.cancel();
     _dateController.dispose();
     _startTimeController.dispose();
     _endTimeController.dispose();
-    _quotaController.dispose();
     super.dispose();
   }
 
@@ -216,8 +198,7 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
     final date = _dateController.text.trim();
     final start = _startTimeController.text.trim();
     final end = _endTimeController.text.trim();
-    final quota = int.tryParse(_quotaController.text.trim()) ??
-        _practiceSettings.quotaPerSession;
+    const quota = 1;
 
     if (date.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -265,7 +246,7 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
             quota: quota,
           );
           await ActivityService.log(
-            title: 'Menambah jadwal $date $start - $end (Limit $quota pasien)',
+            title: 'Menambah jadwal $date $start - $end',
             tag: 'Jadwal',
             actor: 'Dokter',
             actorUid: uid,
@@ -1031,16 +1012,6 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
             ],
           ),
 
-          const SizedBox(height: 14),
-
-          _buildFormLabel('LIMIT PASIEN (KUOTA PER SESI)'),
-          const SizedBox(height: 6),
-          _buildFormTextField(
-            controller: _quotaController,
-            hintText: '2',
-            suffixIcon: LucideIcons.users,
-          ),
-
           const SizedBox(height: 18),
 
           SizedBox(
@@ -1255,7 +1226,9 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      'Penuh (${slot.bookedCount}/${slot.quota})',
+                      slot.quota > 1
+                          ? 'Penuh (${slot.bookedCount}/${slot.quota})'
+                          : 'Terisi',
                       style: const TextStyle(
                         fontSize: 10.5,
                         fontWeight: FontWeight.bold,
@@ -1458,9 +1431,9 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
                       color: const Color(0xFFDCFCE7),
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: Text(
-                      'Limit ${slot.quota} Pasien',
-                      style: const TextStyle(
+                    child: const Text(
+                      'Tersedia',
+                      style: TextStyle(
                         fontSize: 10.5,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF15803D),

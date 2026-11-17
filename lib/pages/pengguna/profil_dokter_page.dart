@@ -619,12 +619,11 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
       timeEnd: timeEnd,
     );
     final isExpired = isSlotEnded;
-    final remaining = slot?.remainingQuota ?? 1;
 
     Color bgColor = timeChipBg;
     Color textColor = darkText;
-    String statusBadge = 'Sisa $remaining kuota';
-    Color statusColor = const Color(0xFFC2410C);
+    String statusBadge = 'Tersedia';
+    Color statusColor = const Color(0xFF15803D);
 
     if (isSlotEnded) {
       // Jadwal sesi sudah berakhir/lewat
@@ -951,12 +950,12 @@ class _ProfilDokterPenggunaPageState extends State<ProfilDokterPenggunaPage> {
       return;
     }
 
-    // 4. Validasi sesi sudah penuh (mencapai batas limit kuota pasien)
+    // 4. Validasi sesi sudah penuh (sudah dibooking pasien lain)
     if (slot.isFull) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Sesi $time sudah penuh (kuota ${slot.quota} pasien telah terpenuhi). Silakan pilih sesi lainnya.',
+            'Sesi $time sudah terisi oleh pasien lain. Silakan pilih sesi lainnya.',
           ),
         ),
       );
