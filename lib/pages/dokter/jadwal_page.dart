@@ -96,39 +96,10 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
     super.initState();
     _dateController =
         TextEditingController(text: AppDates.display(DateTime.now()));
-    _startTimeController.addListener(() {
-      _autoFillEndTime(_startTimeController.text);
-    });
     _scheduleDays = widget.initialScheduleDays != null
         ? List.from(widget.initialScheduleDays!)
         : <DayScheduleModel>[];
     _loadFromBackend();
-  }
-
-  void _autoFillEndTime(String startText) {
-    final clean = startText.replaceAll(':', '.').trim();
-    final parts = clean.split('.');
-    if (parts.length == 2) {
-      final hour = int.tryParse(parts[0]);
-      final minute = int.tryParse(parts[1]);
-      if (hour != null &&
-          minute != null &&
-          hour >= 0 &&
-          hour < 24 &&
-          minute >= 0 &&
-          minute < 60) {
-        final duration = _practiceSettings.sessionDurationMinutes > 0
-            ? _practiceSettings.sessionDurationMinutes
-            : 25;
-        final totalMinutes = (hour * 60 + minute + duration) % (24 * 60);
-        final endHour = (totalMinutes ~/ 60).toString().padLeft(2, '0');
-        final endMin = (totalMinutes % 60).toString().padLeft(2, '0');
-        final calculatedEnd = '$endHour.$endMin';
-        if (_endTimeController.text != calculatedEnd) {
-          _endTimeController.text = calculatedEnd;
-        }
-      }
-    }
   }
 
   /// Stream slot realtime dokter (booking pasien langsung terlihat).
@@ -268,6 +239,19 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
       return;
     }
 
+    final startMinutes = _timeToMinutes(start);
+    final endMinutes = _timeToMinutes(end);
+    if (startMinutes != null && endMinutes != null && endMinutes <= startMinutes) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Jam selesai harus setelah jam mulai.'),
+          backgroundColor: Color(0xFFA83244),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     if (Backend.useFirebase) {
       final uid = AuthService.uid;
       if (uid != null) {
@@ -288,8 +272,14 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
           );
         } catch (e) {
           if (!mounted) return;
+          final errorMsg = e is StateError
+              ? e.message
+              : e.toString().replaceFirst('Exception: ', '').replaceFirst('Bad state: ', '');
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Gagal menyimpan slot: $e')),
+            SnackBar(
+              content: Text(errorMsg),
+              backgroundColor: const Color(0xFFA83244),
+            ),
           );
           return;
         }
@@ -365,14 +355,37 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
     }
   }
 
+  int? _timeToMinutes(String hm) {
+    final clean = hm.replaceAll(':', '.').trim();
+    final parts = clean.split('.');
+    if (parts.length != 2) return null;
+    final h = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (h == null || m == null) return null;
+    return h * 60 + m;
+  }
+
   /// Jam memakai clock picker (TimePicker), tampil di kolom input.
-  Future<void> _pickSlotTime(
-    TextEditingController controller, {
-    bool isStartTime = false,
-  }) async {
+  Future<void> _pickSlotTime(TextEditingController controller) async {
+    TimeOfDay initial = AppDates.timeOfDayWib();
+    final clean = controller.text.replaceAll(':', '.').trim();
+    final parts = clean.split('.');
+    if (parts.length == 2) {
+      final hour = int.tryParse(parts[0]);
+      final minute = int.tryParse(parts[1]);
+      if (hour != null &&
+          minute != null &&
+          hour >= 0 &&
+          hour < 24 &&
+          minute >= 0 &&
+          minute < 60) {
+        initial = TimeOfDay(hour: hour, minute: minute);
+      }
+    }
+
     final picked = await showTimePicker(
       context: context,
-      initialTime: AppDates.timeOfDayWib(),
+      initialTime: initial,
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: const ColorScheme.light(
@@ -389,9 +402,6 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
       final formatted = AppDates.formatHm(raw);
       setState(() {
         controller.text = formatted;
-        if (isStartTime) {
-          _autoFillEndTime(formatted);
-        }
       });
     }
   }
@@ -978,6 +988,7 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
             hintText: 'Pilih tanggal',
             onTap: _pickSlotDate,
             suffixIcon: LucideIcons.calendar,
+            readOnly: true,
           ),
 
           const SizedBox(height: 14),
@@ -993,11 +1004,9 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
                     _buildFormTextField(
                       controller: _startTimeController,
                       hintText: '09.00',
-                      onTap: () => _pickSlotTime(
-                        _startTimeController,
-                        isStartTime: true,
-                      ),
+                      onTap: () => _pickSlotTime(_startTimeController),
                       suffixIcon: LucideIcons.clock,
+                      readOnly: true,
                     ),
                   ],
                 ),
@@ -1014,6 +1023,7 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
                       hintText: '09.30',
                       onTap: () => _pickSlotTime(_endTimeController),
                       suffixIcon: LucideIcons.clock,
+                      readOnly: true,
                     ),
                   ],
                 ),
@@ -1083,9 +1093,11 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
     required String hintText,
     VoidCallback? onTap,
     IconData? suffixIcon,
+    bool readOnly = false,
   }) {
     return TextField(
       controller: controller,
+      readOnly: readOnly,
       onTap: onTap,
       style: const TextStyle(
         fontSize: 14.0,
@@ -1100,7 +1112,10 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
         ),
         suffixIcon: suffixIcon == null
             ? null
-            : Icon(suffixIcon, size: 16, color: const Color(0xFF9CA3AF)),
+            : GestureDetector(
+                onTap: onTap,
+                child: Icon(suffixIcon, size: 16, color: const Color(0xFF9CA3AF)),
+              ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14.0,
           vertical: 11.0,
