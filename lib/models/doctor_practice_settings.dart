@@ -3,16 +3,19 @@ import '../utils/app_dates.dart';
 /// Pengaturan jadwal praktik dan kuota konsultasi yang dikelola langsung
 /// oleh dokter (bukan admin).
 class DoctorPracticeSettings {
-  /// Jam buka praktik (format "09.00").
+  /// Jam buka praktik (format "13.00").
   final String practiceStartTime;
 
-  /// Jam selesai/tutup praktik (format "12.00").
+  /// Jam selesai/tutup praktik (format "15.00").
   final String practiceEndTime;
 
-  /// Durasi setiap sesi konsultasi dalam menit (misal 15 atau 30 menit).
+  /// Durasi setiap sesi konsultasi dalam menit (default 25 menit per pasien).
   final int sessionDurationMinutes;
 
-  /// Batas maksimal pasien per sesi konsultasi (misal 1 atau 2 pasien).
+  /// Durasi jeda istirahat antar sesi dalam menit (default 5 menit).
+  final int breakDurationMinutes;
+
+  /// Batas maksimal pasien per sesi konsultasi (default 1 pasien per sesi).
   final int quotaPerSession;
 
   /// Batas maksimal total pasien konsultasi dalam satu hari.
@@ -22,10 +25,11 @@ class DoctorPracticeSettings {
   final bool autoClose;
 
   const DoctorPracticeSettings({
-    this.practiceStartTime = '09.00',
-    this.practiceEndTime = '12.00',
-    this.sessionDurationMinutes = 15,
-    this.quotaPerSession = 2,
+    this.practiceStartTime = '13.00',
+    this.practiceEndTime = '15.00',
+    this.sessionDurationMinutes = 25,
+    this.breakDurationMinutes = 5,
+    this.quotaPerSession = 1,
     this.dailyPatientLimit = 10,
     this.autoClose = true,
   });
@@ -35,14 +39,16 @@ class DoctorPracticeSettings {
     if (data == null) return const DoctorPracticeSettings();
     return DoctorPracticeSettings(
       practiceStartTime: AppDates.formatHm(
-        (data['practiceStartTime'] as String?) ?? '09.00',
+        (data['practiceStartTime'] as String?) ?? '13.00',
       ),
       practiceEndTime: AppDates.formatHm(
-        (data['practiceEndTime'] as String?) ?? '12.00',
+        (data['practiceEndTime'] as String?) ?? '15.00',
       ),
       sessionDurationMinutes:
-          (data['sessionDurationMinutes'] as num?)?.toInt() ?? 15,
-      quotaPerSession: (data['quotaPerSession'] as num?)?.toInt() ?? 2,
+          (data['sessionDurationMinutes'] as num?)?.toInt() ?? 25,
+      breakDurationMinutes:
+          (data['breakDurationMinutes'] as num?)?.toInt() ?? 5,
+      quotaPerSession: (data['quotaPerSession'] as num?)?.toInt() ?? 1,
       dailyPatientLimit: (data['dailyPatientLimit'] as num?)?.toInt() ?? 10,
       autoClose: (data['autoClose'] as bool?) ?? true,
     );
@@ -53,6 +59,7 @@ class DoctorPracticeSettings {
         'practiceStartTime': practiceStartTime,
         'practiceEndTime': practiceEndTime,
         'sessionDurationMinutes': sessionDurationMinutes,
+        'breakDurationMinutes': breakDurationMinutes,
         'quotaPerSession': quotaPerSession,
         'dailyPatientLimit': dailyPatientLimit,
         'autoClose': autoClose,
@@ -62,6 +69,7 @@ class DoctorPracticeSettings {
     String? practiceStartTime,
     String? practiceEndTime,
     int? sessionDurationMinutes,
+    int? breakDurationMinutes,
     int? quotaPerSession,
     int? dailyPatientLimit,
     bool? autoClose,
@@ -71,6 +79,8 @@ class DoctorPracticeSettings {
       practiceEndTime: practiceEndTime ?? this.practiceEndTime,
       sessionDurationMinutes:
           sessionDurationMinutes ?? this.sessionDurationMinutes,
+      breakDurationMinutes:
+          breakDurationMinutes ?? this.breakDurationMinutes,
       quotaPerSession: quotaPerSession ?? this.quotaPerSession,
       dailyPatientLimit: dailyPatientLimit ?? this.dailyPatientLimit,
       autoClose: autoClose ?? this.autoClose,
@@ -78,10 +88,10 @@ class DoctorPracticeSettings {
   }
 
   /// Menghasilkan daftar pembagian sesi waktu berdasarkan rentang jam buka
-  /// sampai jam tutup dengan interval [sessionDurationMinutes].
+  /// sampai jam tutup dengan durasi [sessionDurationMinutes] dan jeda istirahat [breakDurationMinutes].
   ///
-  /// Contoh: Buka 09.00, Tutup 10.00, Durasi 15 menit:
-  /// -> ["09.00 - 09.15", "09.15 - 09.30", "09.30 - 09.45", "09.45 - 10.00"]
+  /// Contoh: Buka 13.00, Tutup 15.00, Durasi 25 menit, Jeda 5 menit:
+  /// -> ["13.00 - 13.25", "13.30 - 13.55", "14.00 - 14.25", "14.30 - 14.55"]
   List<TimeRangeSession> generateSessions() {
     final startMin = _parseMinutes(practiceStartTime);
     final endMin = _parseMinutes(practiceEndTime);
@@ -89,6 +99,7 @@ class DoctorPracticeSettings {
 
     final result = <TimeRangeSession>[];
     int current = startMin;
+    final step = sessionDurationMinutes + (breakDurationMinutes > 0 ? breakDurationMinutes : 0);
     while (current + sessionDurationMinutes <= endMin) {
       final s = current;
       final e = current + sessionDurationMinutes;
@@ -99,7 +110,8 @@ class DoctorPracticeSettings {
           quota: quotaPerSession,
         ),
       );
-      current += sessionDurationMinutes;
+      if (step <= 0) break;
+      current += step;
     }
     return result;
   }

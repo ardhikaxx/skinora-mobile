@@ -23,6 +23,7 @@ class ConsultationItemModel {
   final String? timeStart;
   final String? timeEnd;
   final String? scheduleTime;
+  final bool isRescheduled;
 
   ConsultationItemModel({
     required this.id,
@@ -34,6 +35,7 @@ class ConsultationItemModel {
     this.timeStart,
     this.timeEnd,
     this.scheduleTime,
+    this.isRescheduled = false,
   });
 }
 
@@ -191,6 +193,7 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
                 timeStart: ts,
                 timeEnd: te,
                 scheduleTime: rawSt.isNotEmpty ? rawSt : time,
+                isRescheduled: (m['isRescheduled'] as bool?) ?? false,
               );
             }));
         });
@@ -238,6 +241,304 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
         );
       }
     }
+  }
+
+  void _handleReschedulePrompt(ConsultationItemModel item) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          elevation: 4,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24.0),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.0),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFFF7ED),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          LucideIcons.calendarClock,
+                          color: Color(0xFFC2410C),
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Jadwalkan ke Besok?',
+                        style: TextStyle(
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Sesi konsultasi bersama ${item.patientName} akan dialihkan ke besok hari. Status verifikasi/konfirmasi tetap berlaku dan pasien akan menerima pemberitahuan otomatis.',
+                  style: const TextStyle(
+                    fontSize: 13.0,
+                    color: Color(0xFF4B5563),
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 42,
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(dialogContext),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(
+                              color: Color(0xFFE5E7EB),
+                              width: 1.2,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Batal',
+                            style: TextStyle(
+                              fontSize: 14.0,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF374151),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SizedBox(
+                        height: 42,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            Navigator.pop(dialogContext);
+                            final uid = AuthService.uid ?? '';
+                            final meta = _backendMeta[item.id];
+                            final docName =
+                                (meta?['doctorName'] as String?) ?? 'Dokter';
+                            try {
+                              await ConsultationService.rescheduleToTomorrow(
+                                id: item.id,
+                                doctorUid: uid,
+                                doctorName: docName,
+                                patientName: item.patientName,
+                              );
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Jadwal konsultasi ${item.patientName} berhasil dialihkan ke besok.',
+                                  ),
+                                  backgroundColor: primaryMaroon,
+                                ),
+                              );
+                            } catch (e) {
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Gagal menjadwalkan ulang: $e'),
+                                ),
+                              );
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFC2410C),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Ya, Alihkan',
+                            style: TextStyle(
+                              fontSize: 14.0,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _handleBulkReschedulePrompt() {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          elevation: 4,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24.0),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.0),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFFF7ED),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          LucideIcons.calendarClock,
+                          color: Color(0xFFC2410C),
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Alihkan Sisa Pasien?',
+                        style: TextStyle(
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Jika Anda merasa lelah atau berhalangan, seluruh pasien aktif pada hari ini akan dialihkan ke besok hari. Status konfirmasi pasien tetap dipertahankan dan pasien otomatis diberi tahu.',
+                  style: TextStyle(
+                    fontSize: 13.0,
+                    color: Color(0xFF4B5563),
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 42,
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(dialogContext),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(
+                              color: Color(0xFFE5E7EB),
+                              width: 1.2,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Batal',
+                            style: TextStyle(
+                              fontSize: 14.0,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF374151),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SizedBox(
+                        height: 42,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            Navigator.pop(dialogContext);
+                            final uid = AuthService.uid ?? '';
+                            try {
+                              final count = await ConsultationService
+                                  .rescheduleAllRemainingTodayToTomorrow(
+                                doctorUid: uid,
+                                doctorName: 'Dokter',
+                              );
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '$count pasien berhasil dijadwalkan ulang ke besok.',
+                                  ),
+                                  backgroundColor: primaryMaroon,
+                                ),
+                              );
+                            } catch (e) {
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Gagal mengalihkan jadwal: $e'),
+                                ),
+                              );
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFC2410C),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Ya, Alihkan Semua',
+                            style: TextStyle(
+                              fontSize: 14.0,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _handleConsultationAction(ConsultationItemModel item) async {
@@ -490,8 +791,10 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
             Container(
               height: 1,
               color: const Color(0xFFF0F0F0),
-              margin: const EdgeInsets.only(top: 8.0, bottom: 16.0),
+              margin: const EdgeInsets.only(top: 8.0, bottom: 8.0),
             ),
+
+            if (_consultations.isNotEmpty) _buildBulkRescheduleBanner(),
 
             // Main scrollable list of consultations
             Expanded(
@@ -530,6 +833,76 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
       title: 'Tidak ada konsultasi aktif',
       description:
           'Konsultasi yang dijadwalkan atau sedang berlangsung dengan pasien akan muncul di sini.',
+    );
+  }
+
+  Widget _buildBulkRescheduleBanner() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+      padding: const EdgeInsets.all(12.0),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFFEDD5), width: 1.2),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFEDD5),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              LucideIcons.calendarClock,
+              size: 18,
+              color: Color(0xFFC2410C),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Lelah Menangani Pasien Hari Ini?',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF9A3412),
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Alihkan semua sisa pasien hari ini ke besok dengan alur konfirmasi tetap.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFFC2410C),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: _handleBulkReschedulePrompt,
+            style: TextButton.styleFrom(
+              backgroundColor: const Color(0xFFC2410C),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Alihkan',
+              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -624,27 +997,43 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
               const SizedBox(width: 8),
 
               // Status Badge
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10.0,
-                  vertical: 4.0,
-                ),
-                decoration: BoxDecoration(
-                  color: isWaiting
-                      ? const Color(0xFFFEF3C7)
-                      : (isOngoing ? ongoingBadgeBg : scheduledBadgeBg),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  item.status,
-                  style: TextStyle(
-                    fontSize: 11.0,
-                    fontWeight: FontWeight.bold,
-                    color: isWaiting
-                        ? const Color(0xFFB45309)
-                        : (isOngoing ? ongoingBadgeText : scheduledBadgeText),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10.0,
+                      vertical: 4.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isWaiting
+                          ? const Color(0xFFFEF3C7)
+                          : (isOngoing ? ongoingBadgeBg : scheduledBadgeBg),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      item.status,
+                      style: TextStyle(
+                        fontSize: 11.0,
+                        fontWeight: FontWeight.bold,
+                        color: isWaiting
+                            ? const Color(0xFFB45309)
+                            : (isOngoing ? ongoingBadgeText : scheduledBadgeText),
+                      ),
+                    ),
                   ),
-                ),
+                  if (item.isRescheduled) ...[
+                    const SizedBox(height: 3),
+                    const Text(
+                      'Dialihkan',
+                      style: TextStyle(
+                        fontSize: 10.0,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFC2410C),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
@@ -719,6 +1108,34 @@ class _ChatKonsultasiPageState extends State<ChatKonsultasiPage> {
               ),
             ),
           ],
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            height: 38,
+            child: OutlinedButton.icon(
+              onPressed: () => _handleReschedulePrompt(item),
+              icon: const Icon(
+                LucideIcons.calendarClock,
+                size: 15,
+                color: Color(0xFFC2410C),
+              ),
+              label: const Text(
+                'Jadwalkan Ulang ke Besok',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFC2410C),
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFFFFEDD5)),
+                backgroundColor: const Color(0xFFFFF7ED),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

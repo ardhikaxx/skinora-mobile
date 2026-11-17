@@ -80,7 +80,7 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
   final TextEditingController _startTimeController = TextEditingController();
   final TextEditingController _endTimeController = TextEditingController();
   final TextEditingController _quotaController =
-      TextEditingController(text: '2');
+      TextEditingController(text: '1');
 
   late List<DayScheduleModel> _scheduleDays;
 
@@ -117,7 +117,10 @@ class _JadwalDokterPageState extends State<JadwalDokterPage> {
           hour < 24 &&
           minute >= 0 &&
           minute < 60) {
-        final totalMinutes = (hour * 60 + minute + 30) % (24 * 60);
+        final duration = _practiceSettings.sessionDurationMinutes > 0
+            ? _practiceSettings.sessionDurationMinutes
+            : 25;
+        final totalMinutes = (hour * 60 + minute + duration) % (24 * 60);
         final endHour = (totalMinutes ~/ 60).toString().padLeft(2, '0');
         final endMin = (totalMinutes % 60).toString().padLeft(2, '0');
         final calculatedEnd = '$endHour.$endMin';

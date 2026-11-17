@@ -893,6 +893,211 @@ class ConsultationService {
   }
 
   // ---------------------------------------------------------------------------
+  // Reschedule / Penjadwalan Ulang (Dokter Lelah / Berhalangan)
+  // Alur konfirmasi tetap dipertahankan
+  // ---------------------------------------------------------------------------
+  /// Jadwalkan ulang (reschedule) konsultasi pasien ke tanggal dan/atau jam baru.
+  /// Status konfirmasi tetap dipertahankan sesuai alur aslinya.
+  static Future<void> reschedule({
+    required String id,
+    required String doctorUid,
+    required String doctorName,
+    required String patientName,
+    required String newScheduleDate,
+    required String newDateIso,
+    required String newScheduleTime,
+    required String newTimeStart,
+    required String newTimeEnd,
+    String? reason,
+  }) async {
+    final effectiveReason = (reason != null && reason.trim().isNotEmpty)
+        ? reason.trim()
+        : 'Dokter berhalangan menangani konsultasi hari ini, sesi dialihkan ke besok.';
+
+    if (!Backend.useFirebase) {
+      if (_inMemoryStore.containsKey(id)) {
+        final doc = _inMemoryStore[id]!;
+        doc['scheduleDate'] = newScheduleDate;
+        doc['dateIso'] = newDateIso;
+        doc['scheduleTime'] = newScheduleTime;
+        doc['timeStart'] = newTimeStart;
+        doc['timeEnd'] = newTimeEnd;
+        doc['isRescheduled'] = true;
+        doc['rescheduleReason'] = effectiveReason;
+        doc['rescheduledAt'] = DateTime.now();
+        doc['updatedAt'] = DateTime.now();
+        _inMemoryCtrl.add(_inMemoryStore.values.toList());
+      }
+      return;
+    }
+
+    final ref = _col.doc(id);
+    String patientId = '';
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) throw StateError('Konsultasi tidak ditemukan.');
+      final data = snap.data() ?? {};
+      final status = ((data['status'] as String?) ?? '').toLowerCase();
+      if (status == 'selesai' || status == 'dibatalkan') {
+        throw StateError(
+          'Konsultasi yang sudah selesai atau dibatalkan tidak dapat dijadwalkan ulang.',
+        );
+      }
+      patientId = (data['patientId'] as String?) ?? '';
+
+      tx.update(ref, {
+        'scheduleDate': newScheduleDate,
+        'dateIso': newDateIso,
+        'scheduleTime': newScheduleTime,
+        'timeStart': newTimeStart,
+        'timeEnd': newTimeEnd,
+        'isRescheduled': true,
+        'rescheduleReason': effectiveReason,
+        'rescheduledAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+
+    await ActivityService.log(
+      title: 'Menjadwalkan ulang konsultasi dengan $patientName ke $newScheduleDate ($newScheduleTime)',
+      tag: 'Konsultasi',
+      actor: doctorName,
+      actorUid: doctorUid,
+    );
+
+    if (patientId.isNotEmpty) {
+      await NotificationService.notifyUser(
+        uid: patientId,
+        title: 'Jadwal Konsultasi Diperbarui',
+        description:
+            'Dokter $doctorName telah menjadwalkan ulang konsultasi Anda ke $newScheduleDate pukul $newScheduleTime ($effectiveReason). Status verifikasi jadwal Anda tetap aktif.',
+        iconKey: 'calendar',
+        type: NotificationType.scheduleChanged,
+        entityId: id,
+        consultationId: id,
+        route: NotificationPageRoute.penggunaRiwayatKonsultasi,
+        audienceRole: NotificationRole.pengguna,
+        createdBy: doctorUid,
+      );
+    }
+    unawaited(NotificationService.refreshChatFeed());
+  }
+
+  /// Menjadwalkan ulang satu konsultasi ke besok hari pada jam yang sama
+  /// (misal saat dokter kelelahan dan menunda pasien tersisa ke besok).
+  static Future<void> rescheduleToTomorrow({
+    required String id,
+    required String doctorUid,
+    required String doctorName,
+    required String patientName,
+    String? reason,
+  }) async {
+    Map<String, dynamic>? data;
+    if (!Backend.useFirebase) {
+      data = _inMemoryStore[id];
+    } else {
+      final snap = await _col.doc(id).get();
+      if (snap.exists) {
+        data = snap.data();
+      }
+    }
+    if (data == null) throw StateError('Konsultasi tidak ditemukan.');
+
+    final currentIso = (data['dateIso'] as String?) ?? '';
+    DateTime currentTarget;
+    if (currentIso.isNotEmpty) {
+      currentTarget = DateTime.tryParse(currentIso) ?? AppDates.nowWib();
+    } else {
+      currentTarget = AppDates.nowWib();
+    }
+    final tomorrow = currentTarget.add(const Duration(days: 1));
+    final newDateIso = AppDates.iso(tomorrow);
+    final newScheduleDate = AppDates.display(tomorrow);
+
+    final scheduleTime = (data['scheduleTime'] as String?) ?? '';
+    final timeStart = (data['timeStart'] as String?) ?? '';
+    final timeEnd = (data['timeEnd'] as String?) ?? '';
+
+    await reschedule(
+      id: id,
+      doctorUid: doctorUid,
+      doctorName: doctorName,
+      patientName: patientName,
+      newScheduleDate: newScheduleDate,
+      newDateIso: newDateIso,
+      newScheduleTime: scheduleTime,
+      newTimeStart: timeStart,
+      newTimeEnd: timeEnd,
+      reason: reason ?? 'Dokter berhalangan/kelelahan menangani sesi hari ini, jadwal dialihkan ke besok.',
+    );
+  }
+
+  /// Menjadwalkan ulang SEMUA pasien aktif yang tersisa di hari ini ke besok hari
+  /// (ketika dokter sudah lelah dan ingin menutup praktik hari ini).
+  static Future<int> rescheduleAllRemainingTodayToTomorrow({
+    required String doctorUid,
+    required String doctorName,
+    String? reason,
+  }) async {
+    final todayIso = AppDates.iso(AppDates.nowWib());
+    final todayDisplay = AppDates.display(AppDates.nowWib());
+    int count = 0;
+
+    if (!Backend.useFirebase) {
+      final docs = _inMemoryStore.values.where((m) {
+        final dDoc = (m['doctorId'] as String?) ?? '';
+        final status = ((m['status'] as String?) ?? '').toLowerCase();
+        final dIso = (m['dateIso'] as String?) ?? '';
+        final sDate = (m['scheduleDate'] as String?) ?? '';
+        final isToday = dIso == todayIso || sDate == todayDisplay;
+        return dDoc == doctorUid &&
+            isToday &&
+            status != 'selesai' &&
+            status != 'dibatalkan';
+      }).toList();
+
+      for (final doc in docs) {
+        final id = (doc['id'] as String?) ?? '';
+        final pName = (doc['patientName'] as String?) ?? 'Pasien';
+        if (id.isNotEmpty) {
+          await rescheduleToTomorrow(
+            id: id,
+            doctorUid: doctorUid,
+            doctorName: doctorName,
+            patientName: pName,
+            reason: reason,
+          );
+          count++;
+        }
+      }
+      return count;
+    }
+
+    final snap = await _col
+        .where('doctorId', isEqualTo: doctorUid)
+        .where('dateIso', isEqualTo: todayIso)
+        .get();
+
+    for (final doc in snap.docs) {
+      final data = doc.data();
+      final status = ((data['status'] as String?) ?? '').toLowerCase();
+      if (status != 'selesai' && status != 'dibatalkan') {
+        final pName = (data['patientName'] as String?) ?? 'Pasien';
+        await rescheduleToTomorrow(
+          id: doc.id,
+          doctorUid: doctorUid,
+          doctorName: doctorName,
+          patientName: pName,
+          reason: reason,
+        );
+        count++;
+      }
+    }
+
+    return count;
+  }
+
+  // ---------------------------------------------------------------------------
   // Chat messages (subcollection, stream realtime)
   // ---------------------------------------------------------------------------
   static CollectionReference<Map<String, dynamic>> messages(
