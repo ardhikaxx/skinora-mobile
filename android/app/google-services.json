@@ -12,7 +12,20 @@
           "package_name": "com.example.skinora_app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1018258328928-g7d1cclcaqa3ak2tm6r84qdb1m9crmbc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.skinora_app",
+            "certificate_hash": "da10cd493fd0c7ab86e5f3f17265c50289bdea73"
+          }
+        },
+        {
+          "client_id": "1018258328928-c5ji7q8d3siho7b240houcrl968tfhc3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCJ9n6wWrcZmqh-6a5EBCPbEtUZeDHNouI"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1018258328928-c5ji7q8d3siho7b240houcrl968tfhc3.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

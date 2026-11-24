@@ -96,9 +96,14 @@ class UserService {
   // Auth session profile
   // ---------------------------------------------------------------------------
 
+  static UserProfile? _mockCurrentProfile;
+
+  /// Set mock profile untuk testing atau lingkungan non-Firebase.
+  static void setMockCurrentProfile(UserProfile? p) => _mockCurrentProfile = p;
+
   /// Profile milik uid; null bila dokumen belum ada.
   static Future<UserProfile?> loadByUid(String uid) async {
-    if (!Backend.useFirebase) return null;
+    if (!Backend.useFirebase) return _mockCurrentProfile;
     final snap = await _users.doc(uid).get();
     if (!snap.exists) return null;
     return _profileFromDoc(snap.id, snap.data()!);
@@ -107,7 +112,12 @@ class UserService {
   /// Stream profil realtime — perubahan profil langsung terpancar ke
   /// halaman profil & beranda tanpa reload manual.
   static Stream<UserProfile?> streamByUid(String uid) {
-    if (!Backend.useFirebase || uid.isEmpty) return const Stream.empty();
+    if (!Backend.useFirebase || uid.isEmpty) {
+      if (_mockCurrentProfile != null) {
+        return Stream.value(_mockCurrentProfile);
+      }
+      return const Stream.empty();
+    }
     return _users.doc(uid).snapshots().map((snap) {
       if (!snap.exists) return null;
       return _profileFromDoc(snap.id, snap.data()!);
@@ -121,8 +131,23 @@ class UserService {
     required String email,
     required String name,
     required String phone,
+    String? birthDate,
+    String? gender,
   }) async {
-    if (!Backend.useFirebase) return;
+    if (!Backend.useFirebase) {
+      _mockCurrentProfile = UserProfile(
+        docId: uid,
+        uid: uid,
+        name: name,
+        email: email,
+        phone: phone,
+        birthDate: birthDate ?? '',
+        gender: gender ?? '',
+        role: 'pengguna',
+        status: 'aktif',
+      );
+      return;
+    }
     final tokenEmail =
         (FirebaseAuth.instance.currentUser?.email ?? email)
             .trim()
@@ -156,8 +181,8 @@ class UserService {
         'email': normalized,
         'phone': (p['phone'] as String?) ?? phone,
         'address': p['address'],
-        'birthDate': p['birthDate'],
-        'gender': p['gender'],
+        'birthDate': p['birthDate'] ?? birthDate ?? '',
+        'gender': p['gender'] ?? gender ?? '',
         'role': role,
         'status': p['status'] ?? 'aktif',
         'specialization': p['specialization'],
@@ -185,6 +210,8 @@ class UserService {
         'name': name,
         'email': normalized,
         'phone': phone,
+        'birthDate': birthDate ?? '',
+        'gender': gender ?? '',
         'role': 'pengguna',
         'status': 'aktif',
         'settings': {
@@ -198,6 +225,178 @@ class UserService {
       });
     }
     await batch.commit();
+  }
+
+  /// Menangani pendaftaran / login via Google Sign-In:
+  /// - Jika akun sudah ada di `users/{uid}`, kembalikan profil yang ada.
+  /// - Jika belum ada di `users/{uid}`, cek apakah ada akun `users` dengan email yang sama.
+  /// - Jika belum ada di `users`, cek `provisioned_accounts/{email}` (mewarisi role dokter/admin/pengguna).
+  /// - Jika tidak ada di provision, akun baru Google dipastikan HANYA role 'pengguna' (pasien).
+  static Future<UserProfile> handleGoogleSignIn({
+    String? uid,
+    String? email,
+    String? displayName,
+    String? photoUrl,
+    String? phoneNumber,
+    String? preferredRole,
+  }) async {
+    final currentFirebaseUser =
+        Backend.useAuth ? FirebaseAuth.instance.currentUser : null;
+    final effectiveUid = (uid != null && uid.isNotEmpty)
+        ? uid
+        : (currentFirebaseUser?.uid ??
+            (_mockCurrentProfile?.uid.isNotEmpty == true
+                ? _mockCurrentProfile!.uid
+                : 'google_user_default'));
+    final effectiveEmail = (email != null && email.isNotEmpty)
+        ? email
+        : (currentFirebaseUser?.email ??
+            (_mockCurrentProfile?.email.isNotEmpty == true
+                ? _mockCurrentProfile!.email
+                : 'user@gmail.com'));
+    final effectiveDisplayName = (displayName != null && displayName.isNotEmpty)
+        ? displayName
+        : (currentFirebaseUser?.displayName ??
+            (_mockCurrentProfile?.name.isNotEmpty == true
+                ? _mockCurrentProfile!.name
+                : null));
+    final effectivePhone = (phoneNumber != null && phoneNumber.isNotEmpty)
+        ? phoneNumber
+        : (currentFirebaseUser?.phoneNumber ??
+            (_mockCurrentProfile?.phone.isNotEmpty == true
+                ? _mockCurrentProfile!.phone
+                : null));
+
+    final normalizedEmail = effectiveEmail.trim().toLowerCase();
+    final name = (effectiveDisplayName != null &&
+            effectiveDisplayName.trim().isNotEmpty)
+        ? effectiveDisplayName.trim()
+        : (normalizedEmail.isNotEmpty
+            ? normalizedEmail.split('@').first
+            : 'Pengguna');
+
+    if (!Backend.useFirebase) {
+      if (_mockCurrentProfile != null) {
+        return _mockCurrentProfile!;
+      }
+      final newMock = UserProfile(
+        docId: effectiveUid,
+        uid: effectiveUid,
+        name: name,
+        email: normalizedEmail,
+        phone: effectivePhone ?? '',
+        birthDate: '',
+        gender: '',
+        address: '',
+        role: preferredRole ?? 'pengguna',
+        status: 'aktif',
+      );
+      _mockCurrentProfile = newMock;
+      return newMock;
+    }
+
+    // 1. Cek users/{uid}
+    final docSnap = await _users.doc(effectiveUid).get();
+    if (docSnap.exists) {
+      return _profileFromDoc(docSnap.id, docSnap.data()!);
+    }
+
+    // 2. Cek apakah ada dokumen users dengan email yang sama
+    if (normalizedEmail.isNotEmpty) {
+      final querySnap = await _users
+          .where('email', isEqualTo: normalizedEmail)
+          .limit(1)
+          .get();
+      if (querySnap.docs.isNotEmpty) {
+        final existing = querySnap.docs.first;
+        return _profileFromDoc(existing.id, existing.data());
+      }
+    }
+
+    // 3. Cek provisioned_accounts
+    Map<String, dynamic>? provisionData;
+    if (normalizedEmail.isNotEmpty) {
+      try {
+        final provSnap = await _provisions.doc(normalizedEmail).get();
+        if (provSnap.exists &&
+            provSnap.data()?['consumedByUid'] == null &&
+            provSnap.data()?['email'] == normalizedEmail) {
+          provisionData = provSnap.data();
+        }
+      } on FirebaseException {
+        provisionData = null;
+      }
+    }
+
+    final batch = _db.batch();
+    final now = FieldValue.serverTimestamp();
+
+    if (provisionData != null) {
+      final inheritedRole = (provisionData['role'] as String?) ?? 'pengguna';
+      final role = (inheritedRole == 'dokter' || inheritedRole == 'admin')
+          ? inheritedRole
+          : (preferredRole ?? 'pengguna');
+
+      final userMap = <String, dynamic>{
+        'uid': effectiveUid,
+        'name': (provisionData['name'] as String?) ?? name,
+        'email': normalizedEmail,
+        'phone': (provisionData['phone'] as String?) ?? (effectivePhone ?? ''),
+        'address': provisionData['address'] ?? '',
+        'birthDate': provisionData['birthDate'] ?? '',
+        'gender': provisionData['gender'] ?? '',
+        'role': role,
+        'status':
+            provisionData['status'] ?? (role == 'dokter' ? 'menunggu' : 'aktif'),
+        'specialization': provisionData['specialization'],
+        'experience': provisionData['experience'],
+        'str': provisionData['str'],
+        'bio': provisionData['bio'],
+        'isAvailable': provisionData['isAvailable'] ?? true,
+        'settings': provisionData['settings'] ??
+            {
+              'notificationsEnabled': true,
+              'morningReminder': '',
+              'eveningReminder': '',
+            },
+        'createdBy': effectiveUid,
+        'createdAt': now,
+        'updatedAt': now,
+      };
+
+      batch.set(_users.doc(effectiveUid), userMap);
+      batch.update(_provisions.doc(normalizedEmail), {
+        'consumedByUid': effectiveUid,
+        'updatedAt': now,
+      });
+      await batch.commit();
+
+      return _profileFromDoc(effectiveUid, userMap);
+    }
+
+    // 4. Akun baru Google tanpa provision: SELALU role 'pengguna'
+    final newUserMap = <String, dynamic>{
+      'uid': effectiveUid,
+      'name': name,
+      'email': normalizedEmail,
+      'phone': effectivePhone ?? '',
+      'birthDate': '',
+      'gender': '',
+      'address': '',
+      'role': preferredRole ?? 'pengguna',
+      'status': 'aktif',
+      'settings': {
+        'notificationsEnabled': true,
+        'morningReminder': '',
+        'eveningReminder': '',
+      },
+      'createdBy': effectiveUid,
+      'createdAt': now,
+      'updatedAt': now,
+    };
+
+    await _users.doc(effectiveUid).set(newUserMap);
+    return _profileFromDoc(effectiveUid, newUserMap);
   }
 
   /// Pendaftaran mandiri akun dokter baru.
@@ -854,7 +1053,22 @@ class UserService {
     String uid, {
     required Map<String, dynamic> fields,
   }) async {
-    if (!Backend.useFirebase) return;
+    if (!Backend.useFirebase) {
+      if (_mockCurrentProfile != null && _mockCurrentProfile!.uid == uid) {
+        _mockCurrentProfile = _mockCurrentProfile!.copyWith(
+          name: fields['name'] as String?,
+          phone: fields['phone'] as String?,
+          birthDate: fields['birthDate'] as String?,
+          gender: fields['gender'] as String?,
+          address: fields['address'] as String?,
+          specialization: fields['specialization'] as String?,
+          experience: fields['experience'] as String?,
+          str: fields['str'] as String?,
+          bio: fields['bio'] as String?,
+        );
+      }
+      return;
+    }
     await _users.doc(uid).update({
       ...fields,
       'updatedAt': FieldValue.serverTimestamp(),

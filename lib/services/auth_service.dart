@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../models/user_profile.dart';
 import 'backend.dart';
@@ -33,6 +34,72 @@ class AuthService {
     );
   }
 
+  /// Handler mock Google Sign-In untuk testing / offline environment.
+  static Future<UserCredential?> Function()? mockGoogleSignInHandler;
+
+  static Future<UserCredential> Function({
+    required String name,
+    required String email,
+    required String phone,
+    required String password,
+    String? birthDate,
+    String? gender,
+  })? mockRegisterHandler;
+
+  static bool _googleSignInInitialized = false;
+  static Future<void> _ensureGoogleSignInInitialized() async {
+    if (_googleSignInInitialized) return;
+    try {
+      await GoogleSignIn.instance.initialize();
+      _googleSignInInitialized = true;
+    } catch (e) {
+      debugPrint('[AUTH] GoogleSignIn.initialize: $e');
+    }
+  }
+
+  /// Autentikasi Google untuk semua role.
+  /// Mendukung browser/web, mobile Android/iOS, serta mock testing handler.
+  static Future<UserCredential?> signInWithGoogle() async {
+    if (mockGoogleSignInHandler != null) {
+      return await mockGoogleSignInHandler!();
+    }
+    if (!Backend.useAuth) {
+      throw const FormatException('Firebase Auth belum aktif');
+    }
+
+    try {
+      if (kIsWeb) {
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        return await _auth.signInWithPopup(googleProvider);
+      } else {
+        await _ensureGoogleSignInInitialized();
+        final GoogleSignInAccount googleUser =
+            await GoogleSignIn.instance.authenticate();
+        final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+        final OAuthCredential credential = GoogleAuthProvider.credential(
+          idToken: googleAuth.idToken,
+        );
+        return await _auth.signInWithCredential(credential);
+      }
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        return null;
+      }
+      debugPrint('[AUTH] GoogleSignInException: ${e.code} → ${e.description}');
+      rethrow;
+    } catch (e) {
+      debugPrint('[AUTH] signInWithGoogle error: $e');
+      // Fallback menggunakan signInWithProvider bila terjadi kendala credential lokal
+      try {
+        final provider = GoogleAuthProvider();
+        return await _auth.signInWithProvider(provider);
+      } catch (inner) {
+        debugPrint('[AUTH] fallback signInWithProvider gagal: $inner');
+        rethrow;
+      }
+    }
+  }
+
   /// Membuat akun Auth + dokumen profile.
   /// - Register untuk pengguna, serta dokter dan admin yang di-provision admin.
   /// - Provision role `dokter` / `admin` → diwariskan saat email cocok.
@@ -45,7 +112,27 @@ class AuthService {
     required String email,
     required String phone,
     required String password,
+    String? birthDate,
+    String? gender,
   }) async {
+    if (mockRegisterHandler != null) {
+      await UserService.createProfileOnRegister(
+        uid: 'mock_user_uid',
+        email: email.trim().toLowerCase(),
+        name: name,
+        phone: phone,
+        birthDate: birthDate,
+        gender: gender,
+      );
+      return await mockRegisterHandler!(
+        name: name,
+        email: email,
+        phone: phone,
+        password: password,
+        birthDate: birthDate,
+        gender: gender,
+      );
+    }
     // Email selalu lowercase agar cocok dengan doc ID provision
     // `provisioned_accounts/{token.email}` di Security Rules.
     final credential = await _auth.createUserWithEmailAndPassword(
@@ -69,6 +156,8 @@ class AuthService {
         email: email.trim().toLowerCase(),
         name: name,
         phone: phone,
+        birthDate: birthDate,
+        gender: gender,
       );
     } catch (_) {
       // Bersihkan Auth account bila profile gagal dibuat (tidak orphan).
@@ -187,7 +276,12 @@ class AuthService {
 
   static Future<UserProfile?> loadProfile() async {
     final u = uid;
-    if (u == null) return null;
+    if (u == null) {
+      if (!Backend.useFirebase) {
+        return UserService.loadByUid('');
+      }
+      return null;
+    }
     return UserService.loadByUid(u);
   }
 

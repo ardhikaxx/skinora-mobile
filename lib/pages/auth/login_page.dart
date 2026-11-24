@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../components/buttons/google_auth_button.dart';
+import '../../components/dialogs/lengkapi_data_diri_dialog.dart';
 import '../../models/user_profile.dart';
 import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/login_preference_service.dart';
+import '../../services/user_service.dart';
 import '../admin/admin_main_page.dart';
 import '../dokter/dokter_main_page.dart';
 import '../pengguna/pengguna_main_page.dart';
@@ -257,6 +260,130 @@ class _LoginPageState extends State<LoginPage> {
     // ── Tahap 5: Navigasi ke halaman sesuai role ──
     if (!mounted) return;
     _routeToHome(profile.role);
+  }
+
+  /// Login dengan Google untuk semua role (admin, dokter, pengguna).
+  /// Membedakan role secara otomatis dari data Firestore / provisioning:
+  /// - Admin: langsung ke AdminMainPage
+  /// - Dokter: verifikasi status login (terverifikasi / menunggu / ditolak)
+  /// - Pengguna: verifikasi kelengkapan profil; jika belum lengkap tampilkan modal template.
+  Future<void> _handleGoogleSignIn() async {
+    setState(() {
+      _errorMessage = null;
+      _busy = true;
+    });
+
+    try {
+      final credential = await AuthService.signInWithGoogle();
+      if (credential == null || credential.user == null) {
+        // Pengguna membatalkan dialog pemilihan akun Google
+        if (mounted) setState(() => _busy = false);
+        return;
+      }
+
+      final profile = await UserService.handleGoogleSignIn();
+
+      // ── Tahap: Cek Hak Akses & Status Login ──
+      if (!profile.canLogin) {
+        await AuthService.signOut();
+        final statusLower = profile.status.trim().toLowerCase();
+        if (!mounted) return;
+        setState(() {
+          if (profile.role == 'dokter') {
+            if (statusLower == 'menunggu') {
+              _errorMessage =
+                  'Akun dokter Anda sedang menunggu verifikasi oleh Admin Skinora. Silakan tunggu hingga akun diverifikasi sebelum masuk.';
+            } else if (statusLower == 'ditolak') {
+              _errorMessage =
+                  'Pendaftaran dokter Anda ditolak oleh admin. Silahkan hubungi administrator.';
+            } else {
+              _errorMessage =
+                  'Akun dokter Anda ditangguhkan. Hubungi administrator.';
+            }
+          } else {
+            _errorMessage = 'Akun Anda ditangguhkan. Hubungi administrator.';
+          }
+          _busy = false;
+        });
+
+        if (profile.role == 'dokter' && statusLower == 'menunggu' && mounted) {
+          await showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: const Row(
+                children: [
+                  Icon(LucideIcons.clock, color: Colors.orange, size: 24),
+                  SizedBox(width: 10),
+                  Text(
+                    'Menunggu Verifikasi',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              content: const Text(
+                'Akun dokter Anda saat ini masih dalam proses verifikasi oleh Admin Skinora.\n\nAnda belum dapat masuk ke aplikasi hingga akun Anda diverifikasi oleh administrator.',
+                style: TextStyle(fontSize: 13.5, height: 1.4),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text(
+                    'Mengerti',
+                    style: TextStyle(
+                      color: primaryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+
+      // ── Tahap: Khusus Role Pengguna -> Cek Kelengkapan Data Diri ──
+      UserProfile currentProfile = profile;
+      if (profile.role == 'pengguna' && !profile.isPatientProfileComplete) {
+        if (!mounted) return;
+        setState(() => _busy = false);
+        final updated = await LengkapiDataDiriDialog.show(
+          context,
+          profile: profile,
+        );
+        if (updated == null) {
+          // Batal melengkapi data diri (sudah sign out di dalam dialog)
+          return;
+        }
+        currentProfile = updated;
+      }
+
+      // ── Tahap: Log Aktivitas ──
+      try {
+        await ActivityService.log(
+          title: 'Login Google berhasil (${currentProfile.role})',
+          tag: 'Login',
+          actor: currentProfile.name,
+          actorUid: currentProfile.uid,
+        );
+      } catch (e) {
+        debugPrint('[LOGIN] ActivityService.log gagal (diabaikan): $e');
+      }
+
+      if (!mounted) return;
+      _routeToHome(currentProfile.role);
+    } catch (e) {
+      debugPrint('[LOGIN] signInWithGoogle gagal: ${e.runtimeType} → $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = AuthService.describeAuthError(e);
+          _busy = false;
+        });
+      }
+    }
   }
 
   void _handleForgotPassword() {
@@ -579,6 +706,38 @@ class _LoginPageState extends State<LoginPage> {
                               ],
                             ),
                           ),
+                        ),
+                        const SizedBox(height: 18),
+
+                        // Divider "atau masuk dengan"
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Divider(color: borderColor, thickness: 1),
+                            ),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 12),
+                              child: Text(
+                                'atau masuk dengan',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade500,
+                                ),
+                              ),
+                            ),
+                            const Expanded(
+                              child: Divider(color: borderColor, thickness: 1),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+
+                        // Tombol Masuk dengan Google
+                        GoogleAuthButton(
+                          text: 'Masuk dengan Google',
+                          busy: _busy,
+                          onPressed: _busy ? null : _handleGoogleSignIn,
                         ),
                       ],
                     ),

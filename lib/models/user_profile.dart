@@ -66,4 +66,59 @@ class UserProfile {
     }
     return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
   }
+
+  /// Memeriksa apakah data diri pasien sudah benar-benar lengkap
+  /// (nama, telepon, tanggal lahir, jenis kelamin, dan alamat).
+  bool get isPatientProfileComplete {
+    return name.trim().isNotEmpty &&
+        phone.trim().isNotEmpty &&
+        birthDate.trim().isNotEmpty &&
+        gender.trim().isNotEmpty &&
+        address.trim().isNotEmpty;
+  }
+
+  UserProfile copyWith({
+    String? uid,
+    String? docId,
+    bool? registered,
+    String? name,
+    String? email,
+    String? phone,
+    String? address,
+    String? birthDate,
+    String? gender,
+    String? role,
+    String? status,
+    String? specialization,
+    String? experience,
+    String? str,
+    String? bio,
+    bool? isAvailable,
+    bool? notificationsEnabled,
+    String? morningReminder,
+    String? eveningReminder,
+  }) {
+    return UserProfile(
+      uid: uid ?? this.uid,
+      docId: docId ?? this.docId,
+      registered: registered ?? this.registered,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      address: address ?? this.address,
+      birthDate: birthDate ?? this.birthDate,
+      gender: gender ?? this.gender,
+      role: role ?? this.role,
+      status: status ?? this.status,
+      specialization: specialization ?? this.specialization,
+      experience: experience ?? this.experience,
+      str: str ?? this.str,
+      bio: bio ?? this.bio,
+      isAvailable: isAvailable ?? this.isAvailable,
+      notificationsEnabled:
+          notificationsEnabled ?? this.notificationsEnabled,
+      morningReminder: morningReminder ?? this.morningReminder,
+      eveningReminder: eveningReminder ?? this.eveningReminder,
+    );
+  }
 }

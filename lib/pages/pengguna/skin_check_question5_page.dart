@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
-import 'skin_check_question6_page.dart';
+import '../../services/auth_service.dart';
+import '../../services/skin_service.dart';
+import '../../services/weather_service.dart';
+import '../../services/location_service.dart';
+import '../../utils/app_dates.dart';
+import 'skin_check_result_page.dart';
 
 class SkinCheckQuestion5Page extends StatefulWidget {
   final String age;
   final String gender;
   final String conditionAfterWash;
   final String oilCondition;
-  final String? initialSensitivity;
+  final String sensitivity;
+  final String humidity;
+  final String? initialTemperature;
   final ValueChanged<int>? onNavigateTab;
 
   const SkinCheckQuestion5Page({
@@ -17,7 +24,9 @@ class SkinCheckQuestion5Page extends StatefulWidget {
     required this.gender,
     required this.conditionAfterWash,
     required this.oilCondition,
-    this.initialSensitivity,
+    required this.sensitivity,
+    required this.humidity,
+    this.initialTemperature,
     this.onNavigateTab,
   });
 
@@ -28,31 +37,168 @@ class SkinCheckQuestion5Page extends StatefulWidget {
 class _SkinCheckQuestion5PageState extends State<SkinCheckQuestion5Page> {
   static const Color primaryMaroon = Color(0xFF8B2B38);
   static const Color darkText = Color(0xFF3F141E);
-  static const Color selectedPeachBg = Color(0xFFFFD5C3);
   static const Color disabledBtnBg = Color(0xFFDDD5D4);
   static const Color disabledBtnText = Color(0xFF9E9E9E);
+  static const Color iconColor = Color(0xFF8E8E93);
 
-  String? _selectedSensitivity;
-
-  final List<String> _options = const [
-    'Jarang mengalami kemerahan, perih, atau iritasi',
-    'Kadang mengalami kemerahan atau iritasi',
-    'Sering mengalami kemerahan, perih, gatal, atau iritasi',
-  ];
+  late final TextEditingController _tempController;
+  bool _checkingWeather = false;
+  String _weatherInfo = '';
 
   @override
   void initState() {
     super.initState();
-    _selectedSensitivity = widget.initialSensitivity;
+    _tempController =
+        TextEditingController(text: widget.initialTemperature ?? '');
+  }
+
+  @override
+  void dispose() {
+    _tempController.dispose();
+    super.dispose();
   }
 
   void _goBack() {
-    Navigator.pop(context, _selectedSensitivity);
+    Navigator.pop(context, _tempController.text.trim());
+  }
+
+  /// Ambil suhu realtime dari API gratis Open-Meteo (Jakarta, WIB)
+  /// lalu inputkan otomatis ke kolom.
+  Future<void> _handleCek() async {
+    if (_checkingWeather) return;
+    setState(() {
+      _checkingWeather = true;
+      _weatherInfo = '';
+    });
+    try {
+      final reading = await WeatherService.fetchCurrent();
+      final place = await LocationService.displayLocation();
+      if (!mounted) return;
+      setState(() {
+        _tempController.text = reading.temperatureLabel;
+        _weatherInfo =
+            'Realtime ${reading.temperatureLabel} • ${reading.humidityLabel} (WIB, $place)';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memuat cuaca realtime: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _checkingWeather = false);
+    }
+  }
+
+  String get _sensitivityResult => widget.sensitivity
+          .toLowerCase()
+          .contains('sering')
+      ? 'Sangat Sensitif'
+      : 'Sensitif';
+
+  /// Skor hasil skin check dari jawaban (tanpa mengubah UI).
+  String get _skinTypeResult {
+    final oil = widget.oilCondition.toLowerCase();
+    if (oil.contains('berminyak') && oil.contains('kering')) {
+      return 'Kombinasi';
+    }
+    if (oil.contains('berminyak') || oil.contains('minyak')) {
+      return 'Berminyak';
+    }
+    if (oil.contains('kering')) return 'Kering';
+    final wash = widget.conditionAfterWash.toLowerCase();
+    if (wash.contains('kering')) return 'Kering';
+    if (wash.contains('berminyak') || wash.contains('minyak')) {
+      return 'Berminyak';
+    }
+    return 'Normal';
+  }
+
+  String get _acneRiskResult {
+    final oil = widget.oilCondition.toLowerCase();
+    final wash = widget.conditionAfterWash.toLowerCase();
+    final sens = widget.sensitivity.toLowerCase();
+    var score = 0;
+    if (oil.contains('berminyak') || oil.contains('minyak')) score += 2;
+    if (wash.contains('berminyak') || wash.contains('minyak')) score += 1;
+    if (sens.contains('sering')) score += 1;
+    if (sens.contains('kadang')) score += 1;
+    return score >= 3 ? 'Rentan' : 'Tidak Rentan';
+  }
+
+  /// Simpan jawaban skin check ke Firestore (bila sesi aktif) lalu buka hasil.
+  Future<void> _submitSkinCheck() async {
+    final skinType = _skinTypeResult;
+    final sensitivity = _sensitivityResult;
+    final acneRisk = _acneRiskResult;
+    final now = AppDates.nowWib();
+    final createdDisplay = AppDates.fullDisplayWib(now);
+    final createdIso = AppDates.iso(now);
+
+    final uid = AuthService.uid;
+    if (uid != null) {
+      try {
+        final profile = await AuthService.loadProfile();
+        final name = (profile?.name.isNotEmpty ?? false) ? profile!.name : 'Pengguna';
+        await SkinService.saveSkinCheck(
+          uid: uid,
+          name: name,
+          answers: {
+            'age': widget.age,
+            'gender': widget.gender,
+            'conditionAfterWash': widget.conditionAfterWash,
+            'oilCondition': widget.oilCondition,
+            'sensitivity': widget.sensitivity,
+            'humidity': widget.humidity,
+            'temperature': _tempController.text.trim(),
+          },
+          resultSkinType: skinType,
+          resultSensitivity: sensitivity,
+          resultAcneRisk: acneRisk,
+          createdDisplay: createdDisplay,
+          createdIso: createdIso,
+        );
+      } catch (_) {
+        // hasil tetap ditampilkan bila penyimpanan gagal
+      }
+    } else {
+      // Offline / widget test mode fallback
+      await SkinService.saveSkinCheck(
+        uid: 'demo_user',
+        name: 'Pengguna',
+        answers: {
+          'age': widget.age,
+          'gender': widget.gender,
+          'conditionAfterWash': widget.conditionAfterWash,
+          'oilCondition': widget.oilCondition,
+          'sensitivity': widget.sensitivity,
+          'humidity': widget.humidity,
+          'temperature': _tempController.text.trim(),
+        },
+        resultSkinType: skinType,
+        resultSensitivity: sensitivity,
+        resultAcneRisk: acneRisk,
+        createdDisplay: createdDisplay,
+        createdIso: createdIso,
+      );
+    }
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SkinCheckResultPage(
+          skinType: skinType,
+          sensitivity: sensitivity,
+          acneRisk: acneRisk,
+          createdDisplay: createdDisplay,
+          onNavigateTab: widget.onNavigateTab,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final hasSelection = _selectedSensitivity != null;
+    final hasValue = _tempController.text.trim().isNotEmpty;
 
     return PopScope(
       canPop: false,
@@ -109,9 +255,9 @@ class _SkinCheckQuestion5PageState extends State<SkinCheckQuestion5Page> {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 20.0),
                   children: [
-                    // 2. Subtitle: "PERTANYAAN 5/7"
+                    // 2. Subtitle: "PERTANYAAN 5/5"
                     const Text(
-                      'PERTANYAAN 5/7',
+                      'PERTANYAAN 5/5',
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w800,
@@ -167,7 +313,7 @@ class _SkinCheckQuestion5PageState extends State<SkinCheckQuestion5Page> {
                           // Question Text
                           const Expanded(
                             child: Text(
-                              'Bagaimana reaksi kulit Anda terhadap produk skincare atau perubahan lingkungan?',
+                              'Bagaimana kulit Anda merespons perubahan suhu cuaca di lingkungan Anda saat ini?',
                               style: TextStyle(
                                 fontSize: 15.0,
                                 fontWeight: FontWeight.bold,
@@ -179,22 +325,119 @@ class _SkinCheckQuestion5PageState extends State<SkinCheckQuestion5Page> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
 
-                    // 4. Options List matching image copy 7.png
-                    ..._options.map((option) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 14.0),
-                        child: _buildSensitivityOptionCard(option),
-                      );
-                    }),
-
-                    const SizedBox(height: 10),
-
-                    // 5. Action Buttons Row ("< Sebelumnya" & "Selanjutnya >")
+                    // 4. Input Row with "Cek" button
                     Row(
                       children: [
-                        // Button "Sebelumnya" (Outlined white container)
+                        // Temperature Input Container
+                        Expanded(
+                          child: Container(
+                            height: 48,
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: const Color(0xFFE5E5EA),
+                                width: 1.0,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  LucideIcons.thermometer,
+                                  size: 18,
+                                  color: iconColor,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _tempController,
+                                    keyboardType: TextInputType.text,
+                                    onChanged: (_) => setState(() {}),
+                                    style: const TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: darkText,
+                                    ),
+                                    decoration: const InputDecoration(
+                                      hintText: '32°C',
+                                      hintStyle: TextStyle(
+                                        color: Color(0xFF9E9E9E),
+                                        fontSize: 14.0,
+                                      ),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding: EdgeInsets.zero,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+
+                        // Button "Cek" — realtime via API cuaca gratis.
+                        GestureDetector(
+                          onTap: _checkingWeather ? null : _handleCek,
+                          child: Container(
+                            height: 48,
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            decoration: BoxDecoration(
+                              color: _checkingWeather
+                                  ? const Color(0xFFD89CA3)
+                                  : primaryMaroon,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Center(
+                              child: _checkingWeather
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Cek',
+                                      style: TextStyle(
+                                        fontSize: 14.0,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_weatherInfo.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          const Icon(LucideIcons.cloudSun,
+                              size: 14, color: Color(0xFF8E8E93)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              _weatherInfo,
+                              style: const TextStyle(
+                                  fontSize: 12, color: Color(0xFF8E8E93)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+
+                    const SizedBox(height: 24),
+
+                    // 5. Action Buttons Row ("< Sebelumnya" & "Lihat Hasil >")
+                    Row(
+                      children: [
+                        // Button "Sebelumnya"
                         Expanded(
                           child: InkWell(
                             onTap: _goBack,
@@ -233,9 +476,9 @@ class _SkinCheckQuestion5PageState extends State<SkinCheckQuestion5Page> {
                         ),
                         const SizedBox(width: 14),
 
-                        // Button "Selanjutnya"
+                        // Button "Lihat Hasil"
                         Expanded(
-                          child: !hasSelection
+                          child: !hasValue
                               ? Container(
                                   height: 48,
                                   decoration: BoxDecoration(
@@ -244,7 +487,7 @@ class _SkinCheckQuestion5PageState extends State<SkinCheckQuestion5Page> {
                                   ),
                                   child: const Center(
                                     child: Text(
-                                      'Selanjutnya',
+                                      'Lihat Hasil',
                                       style: TextStyle(
                                         fontSize: 14.0,
                                         fontWeight: FontWeight.bold,
@@ -256,23 +499,7 @@ class _SkinCheckQuestion5PageState extends State<SkinCheckQuestion5Page> {
                               : SizedBox(
                                   height: 48,
                                   child: ElevatedButton(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              SkinCheckQuestion6Page(
-                                            age: widget.age,
-                                            gender: widget.gender,
-                                            conditionAfterWash:
-                                                widget.conditionAfterWash,
-                                            oilCondition: widget.oilCondition,
-                                            sensitivity: _selectedSensitivity!,
-                                            onNavigateTab: widget.onNavigateTab,
-                                          ),
-                                        ),
-                                      );
-                                    },
+                                    onPressed: _submitSkinCheck,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: primaryMaroon,
                                       foregroundColor: Colors.white,
@@ -286,11 +513,11 @@ class _SkinCheckQuestion5PageState extends State<SkinCheckQuestion5Page> {
                                           MainAxisAlignment.center,
                                       children: const [
                                         Text(
-                                          'Selanjutnya',
+                                          'Lihat Hasil',
                                           style: TextStyle(
                                             fontSize: 14.0,
                                             fontWeight: FontWeight.bold,
-                                            letterSpacing: 0.2,
+                                            color: Colors.white,
                                           ),
                                         ),
                                         SizedBox(width: 6),
@@ -306,8 +533,7 @@ class _SkinCheckQuestion5PageState extends State<SkinCheckQuestion5Page> {
                         ),
                       ],
                     ),
-
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),
@@ -317,95 +543,9 @@ class _SkinCheckQuestion5PageState extends State<SkinCheckQuestion5Page> {
         bottomNavigationBar: PenggunaNavBottom(
           currentIndex: 1,
           onTap: (index) {
-            Navigator.pop(context); // pop question 5
-            Navigator.pop(context); // pop question 4
-            Navigator.pop(context); // pop question 3
-            Navigator.pop(context); // pop question 2
-            Navigator.pop(context); // pop question 1
-            if (index != 1) {
-              widget.onNavigateTab?.call(index);
-            }
+            Navigator.popUntil(context, (route) => route.isFirst);
+            widget.onNavigateTab?.call(index);
           },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSensitivityOptionCard(String option) {
-    final isSelected = _selectedSensitivity == option;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isSelected ? selectedPeachBg : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isSelected ? primaryMaroon : const Color(0xFFEEEEEE),
-          width: isSelected ? 1.5 : 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: () {
-            setState(() {
-              _selectedSensitivity = option;
-            });
-          },
-          child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-            child: Row(
-              children: [
-                // Radio Circle
-                Container(
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color:
-                          isSelected ? primaryMaroon : const Color(0xFFD0D0D0),
-                      width: isSelected ? 2.0 : 1.5,
-                    ),
-                  ),
-                  child: isSelected
-                      ? Center(
-                          child: Container(
-                            width: 10,
-                            height: 10,
-                            decoration: const BoxDecoration(
-                              color: primaryMaroon,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 14),
-
-                // Option Text Label
-                Expanded(
-                  child: Text(
-                    option,
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.w500,
-                      color: darkText,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );

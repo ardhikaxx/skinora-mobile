@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../models/user_profile.dart';
+import '../../services/auth_service.dart';
+import '../../services/backend.dart';
 import '../../services/location_service.dart';
+import '../../services/user_service.dart';
 import '../../services/weather_service.dart';
+import '../../utils/app_dates.dart';
+import 'edit_profil_pengguna_page.dart';
 import 'skin_check_question1_page.dart';
 import 'riwayat_skin_check_page.dart';
 
@@ -472,7 +478,7 @@ class _SkinCheckPageState extends State<SkinCheckPage> {
     );
   }
 
-  /// 5. "7 Pertanyaan" Card
+  /// 5. "5 Pertanyaan" Card
   Widget _buildPertanyaanCard() {
     return Container(
       width: double.infinity,
@@ -504,7 +510,7 @@ class _SkinCheckPageState extends State<SkinCheckPage> {
               ),
               SizedBox(width: 8),
               Text(
-                '7 Pertanyaan',
+                '5 Pertanyaan',
                 style: TextStyle(
                   fontSize: 14.0,
                   fontWeight: FontWeight.bold,
@@ -527,22 +533,206 @@ class _SkinCheckPageState extends State<SkinCheckPage> {
     );
   }
 
+  /// Memeriksa kelengkapan data pasien sebelum memulai skin check.
+  /// Jika tanggal lahir atau jenis kelamin belum lengkap, tampilkan modal peringatan.
+  Future<void> _handleStartSkinCheck() async {
+    UserProfile? profile;
+    final uid = AuthService.uid;
+    if (Backend.useFirebase && uid != null && uid.isNotEmpty) {
+      profile = await UserService.loadByUid(uid);
+    } else {
+      profile = await UserService.loadByUid(uid ?? 'demo_user');
+      profile ??= await AuthService.loadProfile();
+    }
+
+    final birthDate = profile?.birthDate.trim() ?? '';
+    final gender = profile?.gender.trim() ?? '';
+    final age = AppDates.calculateAge(birthDate);
+
+    final isDataComplete = birthDate.isNotEmpty && gender.isNotEmpty && age > 0;
+
+    if (!isDataComplete) {
+      if (!mounted) return;
+      _showIncompleteProfileDialog(profile);
+      return;
+    }
+
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SkinCheckQuestion1Page(
+          age: '$age',
+          gender: gender,
+          onNavigateTab: widget.onNavigateTab,
+        ),
+      ),
+    );
+  }
+
+  /// Menampilkan modal template jika data profil pengguna belum lengkap.
+  void _showIncompleteProfileDialog(UserProfile? profile) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          elevation: 4,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24.0),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.0),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(22.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header: User Warning Icon + Title + Close Button
+                Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFFD5C8),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          LucideIcons.userX,
+                          color: primaryMaroon,
+                          size: 19,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Data Profil Belum Lengkap',
+                        style: TextStyle(
+                          fontSize: 16.0,
+                          fontWeight: FontWeight.bold,
+                          color: darkText,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(dialogContext),
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        padding: const EdgeInsets.all(4.0),
+                        child: const Icon(
+                          LucideIcons.x,
+                          size: 18,
+                          color: Color(0xFF9CA3AF),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Message Body
+                const Text(
+                  'Untuk melakukan Skin Check, Anda perlu melengkapi data profil terlebih dahulu (Tanggal Lahir dan Jenis Kelamin) agar analisis kondisi kulit akurat.',
+                  style: TextStyle(
+                    fontSize: 14.0,
+                    color: Color(0xFF4B5563),
+                    fontWeight: FontWeight.normal,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Action Buttons: "Nanti Saja" & "Lengkapi Profil"
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(dialogContext),
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFF374151),
+                            side: const BorderSide(
+                              color: Color(0xFFE5E7EB),
+                              width: 1.2,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Nanti Saja',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            Navigator.pop(dialogContext);
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => EditProfilPenggunaPage(
+                                  initialName: profile?.name ?? '',
+                                  initialPhone: profile?.phone ?? '',
+                                  initialAddress: profile?.address ?? '',
+                                  initialBirthDate: profile?.birthDate ?? '',
+                                  initialGender: profile?.gender ?? '',
+                                  onNavigateTab: widget.onNavigateTab,
+                                ),
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryMaroon,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Text(
+                            'Lengkapi Profil',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   /// 6. "Mulai Skin Check >" Button
   Widget _buildMulaiSkinCheckButton() {
     return SizedBox(
       width: double.infinity,
       height: 48,
       child: ElevatedButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SkinCheckQuestion1Page(
-                onNavigateTab: widget.onNavigateTab,
-              ),
-            ),
-          );
-        },
+        onPressed: _handleStartSkinCheck,
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryMaroon,
           foregroundColor: Colors.white,

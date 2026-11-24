@@ -4,13 +4,17 @@ import '../../components/navbottom/pengguna_navbottom.dart';
 import 'skin_check_question2_page.dart';
 
 class SkinCheckQuestion1Page extends StatefulWidget {
+  final String age;
+  final String gender;
+  final String? initialCondition;
   final ValueChanged<int>? onNavigateTab;
-  final String? initialAge;
 
   const SkinCheckQuestion1Page({
     super.key,
+    required this.age,
+    required this.gender,
+    this.initialCondition,
     this.onNavigateTab,
-    this.initialAge,
   });
 
   @override
@@ -20,318 +24,360 @@ class SkinCheckQuestion1Page extends StatefulWidget {
 class _SkinCheckQuestion1PageState extends State<SkinCheckQuestion1Page> {
   static const Color primaryMaroon = Color(0xFF8B2B38);
   static const Color darkText = Color(0xFF3F141E);
+  static const Color selectedPeachBg = Color(0xFFFFD5C3);
   static const Color disabledBtnBg = Color(0xFFDDD5D4);
   static const Color disabledBtnText = Color(0xFF9E9E9E);
 
-  late final TextEditingController _ageController;
-  String? _savedGender;
+  String? _selectedCondition;
+
+  final List<String> _options = const [
+    'Terasa sangat kering/kencang',
+    'Terasa cukup nyaman',
+    'Terasa sangat lembap/kenyal',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _ageController = TextEditingController(text: widget.initialAge ?? '');
+    _selectedCondition = widget.initialCondition;
   }
 
-  @override
-  void dispose() {
-    _ageController.dispose();
-    super.dispose();
-  }
-
-  bool get _isInputValid => _ageController.text.trim().isNotEmpty;
-
-  void _goToNextQuestion() async {
-    if (!_isInputValid) return;
-
-    final genderResult = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => SkinCheckQuestion2Page(
-          age: _ageController.text.trim(),
-          initialGender: _savedGender,
-          onNavigateTab: widget.onNavigateTab,
-        ),
-      ),
-    );
-
-    if (genderResult != null) {
-      setState(() {
-        _savedGender = genderResult;
-      });
-    }
+  void _goBack() {
+    Navigator.pop(context, _selectedCondition);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isValid = _isInputValid;
+    final hasSelection = _selectedCondition != null;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFFCFCFD),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // 1. Top Header: Back chevron + "Skin Check"
-            Padding(
-              padding: const EdgeInsets.only(
-                left: 12.0,
-                right: 20.0,
-                top: 14.0,
-                bottom: 10.0,
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(
-                      LucideIcons.chevronLeft,
-                      color: primaryMaroon,
-                      size: 22,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const Text(
-                    'Skin Check',
-                    style: TextStyle(
-                      fontFamily: 'serif',
-                      fontSize: 20.0,
-                      fontWeight: FontWeight.bold,
-                      color: darkText,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Subtle divider line
-            Container(
-              height: 1,
-              color: const Color(0xFFF0F0F0),
-              margin: const EdgeInsets.only(bottom: 16.0),
-            ),
-
-            // Main scrollable content
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                children: [
-                  // 2. Subtitle: "PERTANYAAN 1/7"
-                  const Text(
-                    'PERTANYAAN 1/7',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.8,
-                      color: darkText,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // 3. Question Card: Number "1" + "Berapa usia Anda?"
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(18.0),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: const Color(0xFFEEEEEE),
-                        width: 1.0,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _goBack();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFFCFCFD),
+        body: SafeArea(
+          child: Column(
+            children: [
+              // 1. Top Header: Back chevron + "Skin Check"
+              Padding(
+                padding: const EdgeInsets.only(
+                  left: 12.0,
+                  right: 20.0,
+                  top: 14.0,
+                  bottom: 10.0,
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(
+                        LucideIcons.chevronLeft,
+                        color: primaryMaroon,
+                        size: 22,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.02),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                      onPressed: _goBack,
                     ),
-                    child: Row(
-                      children: [
-                        // Number "1" Maroon Squircle
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: primaryMaroon,
-                            borderRadius: BorderRadius.circular(10),
+                    const Text(
+                      'Skin Check',
+                      style: TextStyle(
+                        fontFamily: 'serif',
+                        fontSize: 20.0,
+                        fontWeight: FontWeight.bold,
+                        color: darkText,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Subtle divider line
+              Container(
+                height: 1,
+                color: const Color(0xFFF0F0F0),
+                margin: const EdgeInsets.only(bottom: 16.0),
+              ),
+
+              // Main scrollable content
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  children: [
+                    // 2. Subtitle: "PERTANYAAN 1/5"
+                    const Text(
+                      'PERTANYAAN 1/5',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                        color: darkText,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 3. Question Card: Number "1" + Question description
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18.0),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFFEEEEEE),
+                          width: 1.0,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.02),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
                           ),
-                          child: const Center(
+                        ],
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Number "1" Maroon Squircle
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: primaryMaroon,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                '1',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+
+                          // Question Text
+                          const Expanded(
                             child: Text(
-                              '1',
+                              'Setelah mencuci wajah dan tidak menggunakan produk skincare selama beberapa waktu, bagaimana kondisi kulit Anda?',
                               style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
+                                fontSize: 15.0,
                                 fontWeight: FontWeight.bold,
+                                color: darkText,
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 4. Options List
+                    ..._options.map((option) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 14.0),
+                        child: _buildConditionOptionCard(option),
+                      );
+                    }),
+
+                    const SizedBox(height: 10),
+
+                    // 5. Action Buttons Row ("< Sebelumnya" & "Selanjutnya >")
+                    Row(
+                      children: [
+                        // Button "Sebelumnya"
+                        Expanded(
+                          child: InkWell(
+                            onTap: _goBack,
+                            borderRadius: BorderRadius.circular(14),
+                            child: Container(
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: const Color(0xFFE5E5EA),
+                                  width: 1.0,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  Icon(
+                                    LucideIcons.chevronLeft,
+                                    size: 16,
+                                    color: darkText,
+                                  ),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'Sebelumnya',
+                                    style: TextStyle(
+                                      fontSize: 14.0,
+                                      fontWeight: FontWeight.bold,
+                                      color: darkText,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
                         ),
                         const SizedBox(width: 14),
 
-                        // Question Text
-                        const Text(
-                          'Berapa usia Anda?',
-                          style: TextStyle(
-                            fontSize: 15.0,
-                            fontWeight: FontWeight.bold,
-                            color: darkText,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // 4. Input Card: Inner input box with Calendar icon + "Tahun"
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16.0),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: const Color(0xFFEEEEEE),
-                        width: 1.0,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.02),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        // Inner input field container
+                        // Button "Selanjutnya"
                         Expanded(
-                          child: Container(
-                            height: 48,
-                            padding: const EdgeInsets.symmetric(horizontal: 14.0),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFFE5E5EA),
-                                width: 1.0,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  LucideIcons.calendar,
-                                  size: 18,
-                                  color: Color(0xFF9E9E9E),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: TextField(
-                                    controller: _ageController,
-                                    keyboardType: TextInputType.number,
-                                    onChanged: (_) => setState(() {}),
-                                    style: const TextStyle(
-                                      fontSize: 15.0,
-                                      fontWeight: FontWeight.bold,
-                                      color: darkText,
+                          child: !hasSelection
+                              ? Container(
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: disabledBtnBg,
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: const Center(
+                                    child: Text(
+                                      'Selanjutnya',
+                                      style: TextStyle(
+                                        fontSize: 14.0,
+                                        fontWeight: FontWeight.bold,
+                                        color: disabledBtnText,
+                                      ),
                                     ),
-                                    decoration: const InputDecoration(
-                                      border: InputBorder.none,
-                                      isDense: true,
-                                      contentPadding: EdgeInsets.zero,
+                                  ),
+                                )
+                              : SizedBox(
+                                  height: 48,
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              SkinCheckQuestion2Page(
+                                            age: widget.age,
+                                            gender: widget.gender,
+                                            conditionAfterWash:
+                                                _selectedCondition!,
+                                            onNavigateTab: widget.onNavigateTab,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: primaryMaroon,
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: const [
+                                        Text(
+                                          'Selanjutnya',
+                                          style: TextStyle(
+                                            fontSize: 14.0,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        SizedBox(width: 6),
+                                        Icon(
+                                          LucideIcons.chevronRight,
+                                          size: 16,
+                                          color: Colors.white,
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-
-                        // Suffix "Tahun"
-                        const Text(
-                          'Tahun',
-                          style: TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w600,
-                            color: darkText,
-                          ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        bottomNavigationBar: PenggunaNavBottom(
+          currentIndex: 1,
+          onTap: (index) {
+            Navigator.popUntil(context, (route) => route.isFirst);
+            widget.onNavigateTab?.call(index);
+          },
+        ),
+      ),
+    );
+  }
 
-                  // 5. Button "Selanjutnya" (Grey when empty, Red/Maroon when filled)
-                  if (!isValid)
-                    Container(
-                      width: double.infinity,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: disabledBtnBg,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'Selanjutnya',
-                          style: TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.bold,
-                            color: disabledBtnText,
-                          ),
+  Widget _buildConditionOptionCard(String conditionText) {
+    final isSelected = _selectedCondition == conditionText;
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedCondition = conditionText;
+        });
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+        decoration: BoxDecoration(
+          color: isSelected ? selectedPeachBg : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? primaryMaroon : const Color(0xFFE5E5EA),
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? primaryMaroon : const Color(0xFFC7C7CC),
+                  width: 2.0,
+                ),
+                color: Colors.white,
+              ),
+              child: isSelected
+                  ? Center(
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: primaryMaroon,
                         ),
                       ),
                     )
-                  else
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: _goToNextQuestion,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryMaroon,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Text(
-                              'Selanjutnya',
-                              style: TextStyle(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.2,
-                              ),
-                            ),
-                            SizedBox(width: 8),
-                            Icon(
-                              LucideIcons.chevronRight,
-                              size: 16,
-                              color: Colors.white,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                  const SizedBox(height: 20),
-                ],
+                  : null,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                conditionText,
+                style: TextStyle(
+                  fontSize: 14.0,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                  color: darkText,
+                ),
               ),
             ),
           ],
         ),
-      ),
-      bottomNavigationBar: PenggunaNavBottom(
-        currentIndex: 1,
-        onTap: (index) {
-          Navigator.pop(context);
-          if (index != 1) {
-            widget.onNavigateTab?.call(index);
-          }
-        },
       ),
     );
   }

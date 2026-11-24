@@ -55,6 +55,7 @@ dependencies:
   http: ^1.2.0
   # Geolokasi device: koordinat untuk cuaca & fitur lokasi lain.
   geolocator: ^14.0.0
+  google_sign_in: ^7.2.0
 
 dev_dependencies:
   flutter_test:

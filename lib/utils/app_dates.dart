@@ -116,6 +116,23 @@ class AppDates {
     return _asWib(DateTime.utc(y, m, d));
   }
 
+  /// Menghitung usia (dalam tahun) dari tanggal lahir [birthDateStr].
+  /// Mendukung format ISO ('yyyy-MM-dd') maupun tampilan tanggal Indonesia.
+  static int calculateAge(String? birthDateStr) {
+    if (birthDateStr == null || birthDateStr.trim().isEmpty) return 0;
+    final cleaned = birthDateStr.trim();
+    final dt = tryParseIso(cleaned) ??
+        tryParseDisplay(cleaned) ??
+        DateTime.tryParse(cleaned);
+    if (dt == null) return 0;
+    final now = nowWib();
+    var age = now.year - dt.year;
+    if (now.month < dt.month || (now.month == dt.month && now.day < dt.day)) {
+      age--;
+    }
+    return age > 0 ? age : 0;
+  }
+
   /// yyyy-MM-dd
   static String iso(DateTime d) {
     final w = toWib(d);

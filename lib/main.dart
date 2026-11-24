@@ -392,11 +392,23 @@ class _SkinoraAppState extends State<SkinoraApp> {
           }
           return const DetailEdukasiPenggunaPage();
         },
-        '/pengguna/skin-check/pertanyaan-1': (context) => const SkinCheckQuestion1Page(),
+        '/pengguna/skin-check/pertanyaan-1': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          final map = (args is Map) ? args : const {};
+          return SkinCheckQuestion1Page(
+            age: (map['age'] as String?) ?? '',
+            gender: (map['gender'] as String?) ?? '',
+          );
+        },
         '/pengguna/skin-check/pertanyaan-2': (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
-          final age = (args is String) ? args : '';
-          return SkinCheckQuestion2Page(age: age);
+          final map = (args is Map) ? args : const {};
+          return SkinCheckQuestion2Page(
+            age: (map['age'] as String?) ?? '',
+            gender: (map['gender'] as String?) ?? '',
+            conditionAfterWash:
+                (map['conditionAfterWash'] as String?) ?? '',
+          );
         },
         '/pengguna/skin-check/pertanyaan-3': (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
@@ -404,6 +416,9 @@ class _SkinoraAppState extends State<SkinoraApp> {
           return SkinCheckQuestion3Page(
             age: (map['age'] as String?) ?? '',
             gender: (map['gender'] as String?) ?? '',
+            conditionAfterWash:
+                (map['conditionAfterWash'] as String?) ?? '',
+            oilCondition: (map['oilCondition'] as String?) ?? '',
           );
         },
         '/pengguna/skin-check/pertanyaan-4': (context) {
@@ -414,6 +429,8 @@ class _SkinoraAppState extends State<SkinoraApp> {
             gender: (map['gender'] as String?) ?? '',
             conditionAfterWash:
                 (map['conditionAfterWash'] as String?) ?? '',
+            oilCondition: (map['oilCondition'] as String?) ?? '',
+            sensitivity: (map['sensitivity'] as String?) ?? '',
           );
         },
         '/pengguna/skin-check/pertanyaan-5': (context) {
@@ -425,6 +442,8 @@ class _SkinoraAppState extends State<SkinoraApp> {
             conditionAfterWash:
                 (map['conditionAfterWash'] as String?) ?? '',
             oilCondition: (map['oilCondition'] as String?) ?? '',
+            sensitivity: (map['sensitivity'] as String?) ?? '',
+            humidity: (map['humidity'] as String?) ?? '',
           );
         },
         '/pengguna/skin-check/pertanyaan-6': (context) {
