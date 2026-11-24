@@ -12,11 +12,15 @@ import '../../services/user_service.dart';
 class DetailAdminPage extends StatefulWidget {
   final AdminAccountModel admin;
   final ValueChanged<int>? onNavigateTab;
+  final String? currentAdminId;
+  final String? currentAdminEmail;
 
   const DetailAdminPage({
     super.key,
     required this.admin,
     this.onNavigateTab,
+    this.currentAdminId,
+    this.currentAdminEmail,
   });
 
   @override
@@ -32,10 +36,44 @@ class _DetailAdminPageState extends State<DetailAdminPage> {
   StreamSubscription<dynamic>? _profileSub;
   bool _isProcessing = false;
 
-  bool get _isSelf =>
-      Backend.useFirebase &&
-      _admin.registered &&
-      _admin.backendId == AuthService.uid;
+  String get _currentActorId {
+    if (widget.currentAdminId != null && widget.currentAdminId!.isNotEmpty) {
+      return widget.currentAdminId!;
+    }
+    return AuthService.uid ?? '';
+  }
+
+  String get _currentActorEmail {
+    if (widget.currentAdminEmail != null &&
+        widget.currentAdminEmail!.isNotEmpty) {
+      return widget.currentAdminEmail!;
+    }
+    return AuthService.currentUser?.email ?? '';
+  }
+
+  bool get _isSelf {
+    final actor = _currentActorId;
+    if (actor.isEmpty) {
+      return Backend.useFirebase &&
+          _admin.registered &&
+          _admin.backendId == AuthService.uid;
+    }
+    return _admin.backendId == actor || _admin.id == actor;
+  }
+
+  bool get _isActorMainAdmin {
+    final actor = _currentActorId;
+    final email = _currentActorEmail.toLowerCase();
+    return actor == 'admin_1' ||
+        email == 'admin.utama@skinora.id' ||
+        email == 'admin@skinora.com';
+  }
+
+  bool get _canDelete => UserService.canDeleteAdmin(
+        targetAdmin: _admin,
+        actorUid: _currentActorId,
+        actorEmail: _currentActorEmail,
+      );
 
   @override
   void initState() {
@@ -96,6 +134,15 @@ class _DetailAdminPageState extends State<DetailAdminPage> {
       return;
     }
 
+    if (_admin.isMainAdmin && _currentActorId.isNotEmpty && !_isActorMainAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Akun Admin Utama tidak dapat ditangguhkan oleh admin lain.'),
+        ),
+      );
+      return;
+    }
+
     AdminConfirmDialog.show(
       context,
       title: 'Tangguhkan Admin',
@@ -120,6 +167,54 @@ class _DetailAdminPageState extends State<DetailAdminPage> {
           setState(() => _isProcessing = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Gagal menangguhkan admin: $e')),
+          );
+        }
+      },
+    );
+  }
+
+  void _onDeleteAdmin() {
+    if (!_canDelete) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _admin.isMainAdmin
+                ? 'Akses Ditolak: Anda tidak dapat menghapus data Admin A (${_admin.name}).'
+                : 'Akses Ditolak: Anda tidak memiliki izin untuk menghapus data ${_admin.name}.',
+          ),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+      return;
+    }
+
+    AdminConfirmDialog.show(
+      context,
+      title: 'Hapus Data Admin',
+      message:
+          'Apakah Anda yakin ingin menghapus data admin "${_admin.name}" secara permanen? Tindakan ini tidak dapat dibatalkan.',
+      confirmLabel: 'Hapus',
+      confirmColor: const Color(0xFFDC2626),
+      onConfirm: () async {
+        Navigator.pop(context);
+        setState(() => _isProcessing = true);
+        try {
+          await UserService.deleteAdmin(
+            _admin,
+            actorUid: _currentActorId,
+            actorEmail: _currentActorEmail,
+          );
+          if (!mounted) return;
+          Navigator.pop(context, {
+            'deleted': true,
+            'id': _admin.id,
+            'name': _admin.name,
+          });
+        } catch (e) {
+          if (!mounted) return;
+          setState(() => _isProcessing = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Gagal menghapus admin: $e')),
           );
         }
       },
@@ -434,7 +529,7 @@ class _DetailAdminPageState extends State<DetailAdminPage> {
                             SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                'Ini adalah akun Anda saat ini. Anda tidak dapat menangguhkan akun Anda sendiri.',
+                                'Ini adalah akun Anda saat ini. Anda tidak dapat menangguhkan atau menghapus akun Anda sendiri.',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Color(0xFF15803D),
@@ -493,6 +588,123 @@ class _DetailAdminPageState extends State<DetailAdminPage> {
                                 ),
                               ),
                       ),
+                      const SizedBox(height: 12),
+                      if (_canDelete)
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: OutlinedButton.icon(
+                            onPressed: _isProcessing ? null : _onDeleteAdmin,
+                            icon: const Icon(LucideIcons.trash2,
+                                size: 18, color: Color(0xFFDC2626)),
+                            label: const Text(
+                              'Hapus Data Admin',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFDC2626),
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(
+                                color: Color(0xFFDC2626),
+                                width: 1.2,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        )
+                      else ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14.0),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF2F2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFFFECACA),
+                              width: 1.0,
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                LucideIcons.shieldAlert,
+                                size: 18,
+                                color: Color(0xFFDC2626),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Kontrol Hak Akses',
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF991B1B),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _admin.isMainAdmin
+                                          ? 'Akun ini adalah Admin Utama (Admin A). Admin lain (Admin B) tidak dapat menghapus data Admin A.'
+                                          : 'Anda tidak memiliki hak akses untuk menghapus data admin ini. Penghapusan data admin dilindungi oleh sistem kontrol akses.',
+                                      style: const TextStyle(
+                                        fontSize: 11.5,
+                                        color: Color(0xFF7F1D1D),
+                                        height: 1.35,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    _admin.isMainAdmin
+                                        ? 'Akses Ditolak: Anda tidak dapat menghapus data Admin A (${_admin.name}).'
+                                        : 'Akses Ditolak: Anda tidak memiliki izin untuk menghapus data ${_admin.name}.',
+                                  ),
+                                  backgroundColor: const Color(0xFFDC2626),
+                                ),
+                              );
+                            },
+                            icon: const Icon(LucideIcons.lock,
+                                size: 18, color: Color(0xFF9CA3AF)),
+                            label: const Text(
+                              'Hapus Data Admin (Terkunci)',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF9CA3AF),
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(
+                                color: Color(0xFFE5E7EB),
+                                width: 1.2,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
 
                     const SizedBox(height: 32),

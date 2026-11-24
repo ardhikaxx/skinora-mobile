@@ -6,6 +6,7 @@ import '../../components/empty_state.dart';
 import '../../components/navbottom/admin_navbottom.dart';
 import '../../models/admin_article_model.dart';
 import '../../services/article_service.dart';
+import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import 'edit_artikel_page.dart';
 import 'tambah_artikel_page.dart';
@@ -19,9 +20,13 @@ class ManajemenEdukasiPage extends StatefulWidget {
     this.onNavigateTab,
     this.showBottomNav = false,
     this.initialArticles,
+    this.currentAdminId,
+    this.currentAdminEmail,
   });
 
   final List<AdminArticleModel>? initialArticles;
+  final String? currentAdminId;
+  final String? currentAdminEmail;
 
   @override
   State<ManajemenEdukasiPage> createState() => _ManajemenEdukasiPageState();
@@ -193,7 +198,40 @@ class _ManajemenEdukasiPageState extends State<ManajemenEdukasiPage> {
     );
   }
 
+  String get _currentActorId {
+    if (widget.currentAdminId != null && widget.currentAdminId!.isNotEmpty) {
+      return widget.currentAdminId!;
+    }
+    return AuthService.uid ?? '';
+  }
+
+  String get _currentActorEmail {
+    if (widget.currentAdminEmail != null &&
+        widget.currentAdminEmail!.isNotEmpty) {
+      return widget.currentAdminEmail!;
+    }
+    return AuthService.currentUser?.email ?? '';
+  }
+
   void _handleDeleteArtikel(AdminArticleModel article) {
+    final canDelete = ArticleService.canDeleteArticle(
+      article: article,
+      actorUid: _currentActorId,
+      actorEmail: _currentActorEmail,
+    );
+
+    if (!canDelete) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Akses Ditolak: Anda tidak dapat menghapus artikel "${article.title}" yang dibuat oleh admin lain.',
+          ),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+      return;
+    }
+
     AdminConfirmDialog.show(
       context,
       title: 'Hapus Artikel',
@@ -206,6 +244,9 @@ class _ManajemenEdukasiPageState extends State<ManajemenEdukasiPage> {
             await ArticleService.delete(
               article.backendId,
               title: article.title,
+              actorUid: _currentActorId,
+              actorEmail: _currentActorEmail,
+              articleCreatedBy: article.createdBy,
             );
           } catch (e) {
             if (mounted) {

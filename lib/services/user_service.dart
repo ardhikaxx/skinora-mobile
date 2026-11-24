@@ -339,18 +339,27 @@ class UserService {
     Map<String, dynamic> d, {
     required bool registered,
   }) {
+    final email = (d['email'] as String?) ?? '';
+    final name = (d['name'] as String?) ?? '';
+    final isSuper = (d['isSuperAdmin'] as bool?) ??
+        (email.toLowerCase() == 'admin.utama@skinora.id' ||
+            email.toLowerCase() == 'admin@skinora.com' ||
+            docId == 'admin_1' ||
+            name.toLowerCase().contains('admin utama'));
     return AdminAccountModel(
       id: docId,
       fsDocId: docId,
       registered: registered,
-      name: (d['name'] as String?) ?? '',
-      email: (d['email'] as String?) ?? '',
+      name: name,
+      email: email,
       phone: (d['phone'] as String?) ?? '',
       address: (d['address'] as String?) ?? '',
       birthDate: (d['birthDate'] as String?) ?? '',
       gender: (d['gender'] as String?) ?? '',
       status: userStatusFrom((d['status'] as String?) ?? 'aktif'),
       createdAt: d['createdAt'],
+      createdBy: (d['createdBy'] as String?),
+      isSuperAdmin: isSuper,
     );
   }
 
@@ -723,18 +732,118 @@ class UserService {
   }
 
   /// Update status akun admin (aktifkan / tangguhkan).
-  /// Menolak penangguhan terhadap akun admin yang sedang login.
-  static Future<void> updateAdminStatus(AdminAccountModel a) async {
-    if (!Backend.useFirebase) return;
-    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+  /// Menolak penangguhan terhadap akun admin yang sedang login dan Admin Utama.
+  static Future<void> updateAdminStatus(
+    AdminAccountModel a, {
+    String? actorUid,
+    String? actorEmail,
+  }) async {
+    final currentUid = actorUid ??
+        (Backend.useFirebase
+            ? FirebaseAuth.instance.currentUser?.uid
+            : null);
     if (a.registered && currentUid != null && a.backendId == currentUid) {
       throw StateError('Anda tidak dapat menangguhkan akun admin Anda sendiri.');
     }
+    final email = actorEmail?.toLowerCase() ?? '';
+    final isActorMainAdmin = actorUid == 'admin_1' ||
+        email == 'admin.utama@skinora.id' ||
+        email == 'admin@skinora.com';
+    if (a.isMainAdmin &&
+        actorUid != null &&
+        actorUid.isNotEmpty &&
+        !isActorMainAdmin) {
+      throw StateError('Akun Admin Utama tidak dapat ditangguhkan oleh admin lain.');
+    }
+    if (!Backend.useFirebase) return;
     final col = a.registered ? _users : _provisions;
     await col.doc(a.backendId).update({
       'status': userStatusLabel(a.status),
       'updatedAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  /// Memeriksa controlling apakah admin dengan identitas [actorUid] / [actorEmail]
+  /// diizinkan menghapus data akun [targetAdmin].
+  ///
+  /// Aturan Controlling:
+  /// 1. Admin tidak dapat menghapus akunnya sendiri (self-deletion dicegah).
+  /// 2. Admin Utama / Super Admin (Admin A) TIDAK PERNAH bisa dihapus oleh Admin B.
+  /// 3. Jika aktor adalah Admin Utama / Super Admin, ia boleh menghapus admin di bawahnya.
+  /// 4. Admin biasa (Admin B) TIDAK BISA menghapus Admin A atau admin yang bukan dibuat olehnya.
+  ///    Admin B hanya bisa menghapus akun/undangan yang ia buat sendiri (`createdBy == actorUid`).
+  static bool canDeleteAdmin({
+    required AdminAccountModel targetAdmin,
+    required String? actorUid,
+    String? actorEmail,
+  }) {
+    final actor = actorUid?.trim() ?? '';
+    final email = actorEmail?.trim().toLowerCase() ?? '';
+
+    // 1. Tidak boleh menghapus akun sendiri
+    if (actor.isNotEmpty &&
+        (targetAdmin.backendId == actor || targetAdmin.id == actor)) {
+      return false;
+    }
+
+    // 2. Admin Utama / Super Admin (Admin A) tidak pernah bisa dihapus oleh admin lain
+    if (targetAdmin.isMainAdmin) {
+      return false;
+    }
+
+    // 3. Admin Utama / Super Admin berhak menghapus admin di bawahnya
+    final isActorMainAdmin = actor == 'admin_1' ||
+        email == 'admin.utama@skinora.id' ||
+        email == 'admin@skinora.com';
+    if (isActorMainAdmin) {
+      return true;
+    }
+
+    // 4. Admin B TIDAK BISA menghapus Admin A jika Admin A bukan dibuat oleh Admin B.
+    // Admin B hanya boleh menghapus akun/undangan yang ia buat sendiri (target.createdBy == actor).
+    if (actor.isNotEmpty &&
+        targetAdmin.createdBy != null &&
+        targetAdmin.createdBy == actor) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /// Menghapus data akun admin (baik di `users` maupun di `provisioned_accounts`).
+  /// Melakukan validasi controlling melalui [canDeleteAdmin].
+  static Future<void> deleteAdmin(
+    AdminAccountModel a, {
+    String? actorUid,
+    String? actorEmail,
+  }) async {
+    final currentUid = actorUid ?? FirebaseAuth.instance.currentUser?.uid ?? '';
+    final currentEmail =
+        actorEmail ?? FirebaseAuth.instance.currentUser?.email ?? '';
+
+    if (!canDeleteAdmin(
+      targetAdmin: a,
+      actorUid: currentUid,
+      actorEmail: currentEmail,
+    )) {
+      throw StateError(
+        'Akses ditolak: Anda tidak memiliki izin untuk menghapus data ${a.name}.',
+      );
+    }
+
+    if (!Backend.useFirebase) return;
+
+    final col = a.registered ? _users : _provisions;
+    await col.doc(a.backendId).delete();
+
+    await ActivityService.log(
+      title: 'Menghapus data admin ${a.name}',
+      tag: 'Admin',
+      actor: 'Admin',
+      actorUid: currentUid.isNotEmpty
+          ? currentUid
+          : (FirebaseAuth.instance.currentUser?.uid ?? 'admin'),
+    );
   }
 
   // ---------------------------------------------------------------------------

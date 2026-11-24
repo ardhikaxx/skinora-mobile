@@ -14,11 +14,15 @@ import 'tambah_admin_page.dart';
 class ManajemenAdminPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
   final List<AdminAccountModel>? initialAdmins;
+  final String? currentAdminId;
+  final String? currentAdminEmail;
 
   const ManajemenAdminPage({
     super.key,
     this.onNavigateTab,
     this.initialAdmins,
+    this.currentAdminId,
+    this.currentAdminEmail,
   });
 
   @override
@@ -35,6 +39,23 @@ class _ManajemenAdminPageState extends State<ManajemenAdminPage> {
 
   late final List<AdminAccountModel> _admins;
   StreamSubscription<List<AdminAccountModel>>? _adminSub;
+
+  String get _currentActorId {
+    if (widget.currentAdminId != null && widget.currentAdminId!.isNotEmpty) {
+      return widget.currentAdminId!;
+    }
+    return AuthService.uid ?? '';
+  }
+
+  bool _isCardSelf(AdminAccountModel admin) {
+    final actor = _currentActorId;
+    if (actor.isNotEmpty) {
+      return admin.backendId == actor || admin.id == actor;
+    }
+    return Backend.useFirebase &&
+        admin.registered &&
+        admin.backendId == AuthService.uid;
+  }
 
   @override
   void initState() {
@@ -126,35 +147,53 @@ class _ManajemenAdminPageState extends State<ManajemenAdminPage> {
 
   Future<void> _navigateToAdminDetail(AdminAccountModel admin) async {
     final previousStatus = admin.status;
-    final result = await Navigator.push<AdminAccountModel>(
+    final result = await Navigator.push<dynamic>(
       context,
       MaterialPageRoute(
         builder: (context) => DetailAdminPage(
           admin: admin,
           onNavigateTab: widget.onNavigateTab,
+          currentAdminId: widget.currentAdminId,
+          currentAdminEmail: widget.currentAdminEmail,
         ),
       ),
     );
 
     if (result != null && mounted) {
-      setState(() {
-        final index = _admins.indexWhere((a) => a.id == result.id);
-        if (index != -1) {
-          _admins[index] = result;
-        }
-      });
+      if (result is Map && result['deleted'] == true) {
+        final targetId = result['id'];
+        final targetName = result['name'] ?? 'Admin';
+        setState(() {
+          _admins.removeWhere(
+              (a) => a.id == targetId || a.backendId == targetId);
+        });
+        AdminSuccessDialog.show(
+          context,
+          message: 'Data $targetName berhasil dihapus',
+        );
+        return;
+      }
 
-      if (previousStatus != result.status) {
-        if (result.status == UserStatus.ditangguhkan) {
-          AdminSuccessDialog.show(
-            context,
-            message: '${result.name} telah ditangguhkan',
-          );
-        } else if (result.status == UserStatus.aktif) {
-          AdminSuccessDialog.show(
-            context,
-            message: '${result.name} telah diaktifkan kembali',
-          );
+      if (result is AdminAccountModel) {
+        setState(() {
+          final index = _admins.indexWhere((a) => a.id == result.id);
+          if (index != -1) {
+            _admins[index] = result;
+          }
+        });
+
+        if (previousStatus != result.status) {
+          if (result.status == UserStatus.ditangguhkan) {
+            AdminSuccessDialog.show(
+              context,
+              message: '${result.name} telah ditangguhkan',
+            );
+          } else if (result.status == UserStatus.aktif) {
+            AdminSuccessDialog.show(
+              context,
+              message: '${result.name} telah diaktifkan kembali',
+            );
+          }
         }
       }
     }
@@ -317,9 +356,7 @@ class _ManajemenAdminPageState extends State<ManajemenAdminPage> {
   }
 
   Widget _buildAdminCard(AdminAccountModel admin) {
-    final isSelf = Backend.useFirebase &&
-        admin.registered &&
-        admin.backendId == AuthService.uid;
+    final isSelf = _isCardSelf(admin);
 
     return Container(
       decoration: BoxDecoration(

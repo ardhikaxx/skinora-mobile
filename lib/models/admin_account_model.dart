@@ -21,6 +21,12 @@ class AdminAccountModel {
 
   final dynamic createdAt;
 
+  /// UID admin yang membuat / mengundang akun ini.
+  final String? createdBy;
+
+  /// Status apakah akun ini adalah Super Admin / Admin Utama.
+  final bool isSuperAdmin;
+
   AdminAccountModel({
     required this.id,
     required this.name,
@@ -34,10 +40,20 @@ class AdminAccountModel {
     this.fsDocId,
     this.registered = true,
     this.createdAt,
+    this.createdBy,
+    this.isSuperAdmin = false,
   });
 
   /// Document id yang dipakai oleh Firestore.
   String get backendId => fsDocId ?? id;
+
+  /// Apakah akun ini adalah Admin Utama / Super Admin (Admin A).
+  bool get isMainAdmin =>
+      isSuperAdmin ||
+      id == 'admin_1' ||
+      email.toLowerCase() == 'admin.utama@skinora.id' ||
+      email.toLowerCase() == 'admin@skinora.com' ||
+      name.toLowerCase().contains('admin utama');
 
   /// Inisial nama untuk avatar (misal: "Admin Skinora" -> "AS").
   String get initials {
@@ -63,6 +79,8 @@ class AdminAccountModel {
     String? fsDocId,
     bool? registered,
     dynamic createdAt,
+    String? createdBy,
+    bool? isSuperAdmin,
   }) {
     return AdminAccountModel(
       id: id ?? this.id,
@@ -77,6 +95,8 @@ class AdminAccountModel {
       fsDocId: fsDocId ?? this.fsDocId,
       registered: registered ?? this.registered,
       createdAt: createdAt ?? this.createdAt,
+      createdBy: createdBy ?? this.createdBy,
+      isSuperAdmin: isSuperAdmin ?? this.isSuperAdmin,
     );
   }
 }

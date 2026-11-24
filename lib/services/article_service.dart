@@ -38,6 +38,8 @@ class ArticleService {
       status: statusRaw == 'diterbitkan'
           ? ArticleStatus.diterbitkan
           : ArticleStatus.draf,
+      createdBy: (m['createdBy'] as String?),
+      authorName: (m['authorName'] as String?),
     );
   }
 
@@ -143,9 +145,60 @@ class ArticleService {
     if (published) await _announcePublished(id, label, uid);
   }
 
-  static Future<void> delete(String id, {String? title}) async {
+  /// Memeriksa apakah admin [actorUid] berhak menghapus artikel ini.
+  /// Admin B tidak bisa menghapus artikel yang dibuat oleh Admin A.
+  static bool canDeleteArticle({
+    required AdminArticleModel article,
+    required String? actorUid,
+    String? actorEmail,
+  }) {
+    final actor = actorUid?.trim() ?? '';
+    final email = actorEmail?.trim().toLowerCase() ?? '';
+    if (actor.isEmpty) return false;
+
+    // Admin Utama / Super Admin selalu berhak
+    final isActorMainAdmin = actor == 'admin_1' ||
+        email == 'admin.utama@skinora.id' ||
+        email == 'admin@skinora.com';
+    if (isActorMainAdmin) return true;
+
+    // Jika artikel memiliki info createdBy, hanya author yang boleh menghapus
+    if (article.createdBy != null && article.createdBy!.isNotEmpty) {
+      return article.createdBy == actor;
+    }
+
+    return true;
+  }
+
+  static Future<void> delete(
+    String id, {
+    String? title,
+    String? actorUid,
+    String? actorEmail,
+    String? articleCreatedBy,
+  }) async {
+    final uid = actorUid ?? FirebaseAuth.instance.currentUser?.uid ?? 'admin';
+    final email =
+        actorEmail ?? FirebaseAuth.instance.currentUser?.email ?? '';
+
+    if (articleCreatedBy != null && articleCreatedBy.isNotEmpty) {
+      final dummy = AdminArticleModel(
+        id: id,
+        title: title ?? '',
+        category: '',
+        date: '',
+        content: '',
+        status: ArticleStatus.draf,
+        createdBy: articleCreatedBy,
+      );
+      if (!canDeleteArticle(article: dummy, actorUid: uid, actorEmail: email)) {
+        throw StateError(
+          'Akses ditolak: Anda tidak dapat menghapus artikel yang dibuat oleh admin lain.',
+        );
+      }
+    }
+
     if (!Backend.useFirebase) return;
-    final uid = FirebaseAuth.instance.currentUser?.uid ?? 'admin';
     await _col.doc(id).delete();
     await _log('Menghapus artikel "${title ?? id}"', uid);
   }

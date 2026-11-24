@@ -118,7 +118,26 @@ service cloud.firestore {
             'practiceSettings', 'settings', 'updatedAt'
           ]));
 
-      allow delete: if isAdmin();
+      // Delete akun:
+      // Admin tidak boleh menghapus akun sendiri.
+      // Admin B tidak bisa menghapus Admin A (Admin Utama atau admin yang bukan dibuat olehnya).
+      allow delete: if isAdmin()
+        && (
+          resource.data.role != 'admin'
+          || (
+            request.auth.uid != uid
+            && resource.data.email != 'admin.utama@skinora.id'
+            && resource.data.email != 'admin@skinora.com'
+            && (
+              request.auth.token.email == 'admin.utama@skinora.id'
+              || request.auth.token.email == 'admin@skinora.com'
+              || (
+                'createdBy' in resource.data
+                && resource.data.createdBy == request.auth.uid
+              )
+            )
+          )
+        );
 
       match /skin_checks/{doc} {
         allow read: if isAdmin() || isOwner(uid)
@@ -390,7 +409,19 @@ service cloud.firestore {
           && request.resource.data.consumedByUid == request.auth.uid);
 
       // Delete: hanya admin.
-      allow delete: if isAdmin();
+      // Admin tidak boleh menghapus admin utama atau admin yang bukan dibuat olehnya.
+      allow delete: if isAdmin()
+        && (
+          resource.data.role != 'admin'
+          || (
+            request.auth.token.email == 'admin.utama@skinora.id'
+            || request.auth.token.email == 'admin@skinora.com'
+            || (
+              'createdBy' in resource.data
+              && resource.data.createdBy == request.auth.uid
+            )
+          )
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -427,7 +458,15 @@ service cloud.firestore {
     // -----------------------------------------------------------------------
     match /articles/{doc} {
       allow read: if signedIn();
-      allow create, update, delete: if isAdmin();
+      allow create, update: if isAdmin();
+      // Admin B tidak bisa menghapus artikel yang dibuat oleh Admin A.
+      allow delete: if isAdmin()
+        && (
+          !('createdBy' in resource.data)
+          || resource.data.createdBy == request.auth.uid
+          || request.auth.token.email == 'admin.utama@skinora.id'
+          || request.auth.token.email == 'admin@skinora.com'
+        );
     }
 
     match /{document=**} {
