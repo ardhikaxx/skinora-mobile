@@ -89,6 +89,23 @@ class UserService {
       notificationsEnabled: (settings['notificationsEnabled'] as bool?) ?? true,
       morningReminder: (settings['morningReminder'] as String?) ?? '',
       eveningReminder: (settings['eveningReminder'] as String?) ?? '',
+      nik: (d['nik'] as String?) ?? '',
+      ihsNumber: (d['ihsNumber'] as String?) ?? '',
+      satuSehatStatus: (d['satuSehatStatus'] as String?) ?? '',
+      satuSehatSyncedAt: (d['satuSehatSyncedAt'] as String?) ?? '',
+      satuSehatLastError: (d['satuSehatLastError'] as String?) ?? '',
+      provinceCode: (d['provinceCode'] as String?) ?? '',
+      provinceName: (d['provinceName'] as String?) ?? '',
+      cityCode: (d['cityCode'] as String?) ?? '',
+      cityName: (d['cityName'] as String?) ?? '',
+      districtCode: (d['districtCode'] as String?) ?? '',
+      districtName: (d['districtName'] as String?) ?? '',
+      villageCode: (d['villageCode'] as String?) ?? '',
+      villageName: (d['villageName'] as String?) ?? '',
+      postalCode: (d['postalCode'] as String?) ?? '',
+      maritalStatusCode: (d['maritalStatusCode'] as String?)?.isNotEmpty == true
+          ? (d['maritalStatusCode'] as String)
+          : 'S',
     );
   }
 
@@ -510,6 +527,23 @@ class UserService {
       birthDate: (d['birthDate'] as String?) ?? '',
       gender: (d['gender'] as String?) ?? '',
       status: userStatusFrom((d['status'] as String?) ?? 'aktif'),
+      nik: (d['nik'] as String?) ?? '',
+      ihsNumber: (d['ihsNumber'] as String?) ?? '',
+      satuSehatStatus: (d['satuSehatStatus'] as String?) ?? '',
+      satuSehatSyncedAt: (d['satuSehatSyncedAt'] as String?) ?? '',
+      satuSehatLastError: (d['satuSehatLastError'] as String?) ?? '',
+      provinceCode: (d['provinceCode'] as String?) ?? '',
+      provinceName: (d['provinceName'] as String?) ?? '',
+      cityCode: (d['cityCode'] as String?) ?? '',
+      cityName: (d['cityName'] as String?) ?? '',
+      districtCode: (d['districtCode'] as String?) ?? '',
+      districtName: (d['districtName'] as String?) ?? '',
+      villageCode: (d['villageCode'] as String?) ?? '',
+      villageName: (d['villageName'] as String?) ?? '',
+      postalCode: (d['postalCode'] as String?) ?? '',
+      maritalStatusCode: (d['maritalStatusCode'] as String?)?.isNotEmpty == true
+          ? (d['maritalStatusCode'] as String)
+          : 'S',
     );
   }
 
@@ -1065,11 +1099,48 @@ class UserService {
           experience: fields['experience'] as String?,
           str: fields['str'] as String?,
           bio: fields['bio'] as String?,
+          nik: fields['nik'] as String?,
+          ihsNumber: fields['ihsNumber'] as String?,
+          satuSehatStatus: fields['satuSehatStatus'] as String?,
+          satuSehatSyncedAt: fields['satuSehatSyncedAt'] as String?,
+          satuSehatLastError: fields['satuSehatLastError'] as String?,
+          provinceCode: fields['provinceCode'] as String?,
+          provinceName: fields['provinceName'] as String?,
+          cityCode: fields['cityCode'] as String?,
+          cityName: fields['cityName'] as String?,
+          districtCode: fields['districtCode'] as String?,
+          districtName: fields['districtName'] as String?,
+          villageCode: fields['villageCode'] as String?,
+          villageName: fields['villageName'] as String?,
+          postalCode: fields['postalCode'] as String?,
+          maritalStatusCode: fields['maritalStatusCode'] as String?,
         );
       }
       return;
     }
     await _users.doc(uid).update({
+      ...fields,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Simpan hasil sinkronisasi / data SATUSEHAT pasien ke Firestore
+  /// (`users/{uid}` atau `provisioned_accounts/{email}` untuk akun provision).
+  static Future<void> saveUserSatuSehatData(
+    String docId, {
+    bool registered = true,
+    required Map<String, dynamic> fields,
+  }) async {
+    if (!Backend.useFirebase) {
+      if (_mockCurrentProfile != null &&
+          (_mockCurrentProfile!.uid == docId ||
+              _mockCurrentProfile!.docId == docId)) {
+        await updateOwnProfile(_mockCurrentProfile!.uid, fields: fields);
+      }
+      return;
+    }
+    final col = registered ? _users : _provisions;
+    await col.doc(docId).update({
       ...fields,
       'updatedAt': FieldValue.serverTimestamp(),
     });

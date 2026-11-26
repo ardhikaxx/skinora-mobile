@@ -34,6 +34,13 @@ class _ManajemenPenggunaPageState extends State<ManajemenPenggunaPage> {
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String _selectedSatuSehatFilter = 'Semua';
+
+  static const List<String> _satuSehatFilters = [
+    'Semua',
+    'Terintegrasi SATUSEHAT',
+    'Belum SATUSEHAT',
+  ];
 
   late final List<AdminUserModel> _users;
 
@@ -74,14 +81,34 @@ class _ManajemenPenggunaPageState extends State<ManajemenPenggunaPage> {
     super.dispose();
   }
 
+  bool _isIntegratedSatuSehat(AdminUserModel user) {
+    return user.ihsNumber.trim().isNotEmpty ||
+        user.satuSehatStatus.trim().toLowerCase() == 'terhubung';
+  }
+
+  int get _integratedCount => _users.where(_isIntegratedSatuSehat).length;
+
+  int get _unintegratedCount =>
+      _users.where((u) => !_isIntegratedSatuSehat(u)).length;
+
   List<AdminUserModel> get _filteredUsers {
+    Iterable<AdminUserModel> result = _users;
+
+    if (_selectedSatuSehatFilter == 'Terintegrasi SATUSEHAT') {
+      result = result.where(_isIntegratedSatuSehat);
+    } else if (_selectedSatuSehatFilter == 'Belum SATUSEHAT') {
+      result = result.where((u) => !_isIntegratedSatuSehat(u));
+    }
+
     if (_searchQuery.isEmpty) {
-      return _users;
+      return result.toList();
     }
     final q = _searchQuery.toLowerCase();
-    return _users.where((user) {
+    return result.where((user) {
       return user.name.toLowerCase().contains(q) ||
-          user.email.toLowerCase().contains(q);
+          user.email.toLowerCase().contains(q) ||
+          user.nik.toLowerCase().contains(q) ||
+          user.ihsNumber.toLowerCase().contains(q);
     }).toList();
   }
 
@@ -93,6 +120,19 @@ class _ManajemenPenggunaPageState extends State<ManajemenPenggunaPage> {
         description: 'Akun pengguna Skinora yang terdaftar akan muncul di sini.',
         actionLabel: 'Tambah Pengguna',
         onAction: _navigateToAddUser,
+      );
+    }
+    if (_selectedSatuSehatFilter != 'Semua' && _searchQuery.isEmpty) {
+      return EmptyStateWidget(
+        icon: LucideIcons.heartPulse,
+        title: 'Belum ada pasien pada filter ini',
+        description: _selectedSatuSehatFilter == 'Terintegrasi SATUSEHAT'
+            ? 'Belum ada pasien yang tersinkronisasi ke SATUSEHAT.'
+            : 'Semua pasien sudah terintegrasi ke SATUSEHAT.',
+        actionLabel: 'Tampilkan Semua',
+        onAction: () => setState(() {
+          _selectedSatuSehatFilter = 'Semua';
+        }),
       );
     }
     return NoSearchResultWidget(
@@ -281,7 +321,67 @@ class _ManajemenPenggunaPageState extends State<ManajemenPenggunaPage> {
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
+
+            // Horizontal Filter Chips (Status Integrasi SATUSEHAT)
+            SizedBox(
+              height: 36,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                scrollDirection: Axis.horizontal,
+                itemCount: _satuSehatFilters.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final filter = _satuSehatFilters[index];
+                  final isSelected = _selectedSatuSehatFilter == filter;
+                  final count = switch (filter) {
+                    'Terintegrasi SATUSEHAT' => _integratedCount,
+                    'Belum SATUSEHAT' => _unintegratedCount,
+                    _ => _users.length,
+                  };
+
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedSatuSehatFilter = filter;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14.0,
+                        vertical: 6.0,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected ? primaryMaroon : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected
+                              ? primaryMaroon
+                              : const Color(0xFFE5E7EB),
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '$filter ($count)',
+                          style: TextStyle(
+                            fontSize: 12.0,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                            color: isSelected
+                                ? Colors.white
+                                : const Color(0xFF4B5563),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: 14),
 
             // Users List
             Expanded(
@@ -391,6 +491,44 @@ class _ManajemenPenggunaPageState extends State<ManajemenPenggunaPage> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      if (_isIntegratedSatuSehat(user)) ...[
+                        const SizedBox(height: 5),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7.0,
+                                vertical: 2.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDCFCE7),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    LucideIcons.circleCheck,
+                                    size: 11,
+                                    color: Color(0xFF15803D),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    user.ihsNumber.trim().isNotEmpty
+                                        ? 'SATUSEHAT • ${user.ihsNumber.trim()}'
+                                        : 'SATUSEHAT',
+                                    style: const TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF166534),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

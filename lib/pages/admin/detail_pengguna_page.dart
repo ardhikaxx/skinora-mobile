@@ -11,6 +11,7 @@ import '../../services/backend.dart';
 import '../../services/notification_payload.dart';
 import '../../services/notification_service.dart';
 import '../../services/user_service.dart';
+import '../common/satusehat_patient_sync_page.dart';
 
 class DetailPenggunaPage extends StatefulWidget {
   final AdminUserModel user;
@@ -58,6 +59,43 @@ class _DetailPenggunaPageState extends State<DetailPenggunaPage> {
             status: profile.status.toLowerCase() == 'ditangguhkan'
                 ? UserStatus.ditangguhkan
                 : UserStatus.aktif,
+            nik: profile.nik.isNotEmpty ? profile.nik : _user.nik,
+            ihsNumber: profile.ihsNumber.isNotEmpty
+                ? profile.ihsNumber
+                : _user.ihsNumber,
+            satuSehatStatus: profile.satuSehatStatus.isNotEmpty
+                ? profile.satuSehatStatus
+                : _user.satuSehatStatus,
+            satuSehatSyncedAt: profile.satuSehatSyncedAt.isNotEmpty
+                ? profile.satuSehatSyncedAt
+                : _user.satuSehatSyncedAt,
+            provinceCode: profile.provinceCode.isNotEmpty
+                ? profile.provinceCode
+                : _user.provinceCode,
+            provinceName: profile.provinceName.isNotEmpty
+                ? profile.provinceName
+                : _user.provinceName,
+            cityCode: profile.cityCode.isNotEmpty
+                ? profile.cityCode
+                : _user.cityCode,
+            cityName: profile.cityName.isNotEmpty
+                ? profile.cityName
+                : _user.cityName,
+            districtCode: profile.districtCode.isNotEmpty
+                ? profile.districtCode
+                : _user.districtCode,
+            districtName: profile.districtName.isNotEmpty
+                ? profile.districtName
+                : _user.districtName,
+            villageCode: profile.villageCode.isNotEmpty
+                ? profile.villageCode
+                : _user.villageCode,
+            villageName: profile.villageName.isNotEmpty
+                ? profile.villageName
+                : _user.villageName,
+            postalCode: profile.postalCode.isNotEmpty
+                ? profile.postalCode
+                : _user.postalCode,
           );
         });
       }, onError: (_) {});
@@ -302,11 +340,61 @@ class _DetailPenggunaPageState extends State<DetailPenggunaPage> {
                           _buildInfoRow('Alamat', _user.address, multiline: true),
                           _buildInfoRow('Tanggal Lahir', _user.birthDate),
                           _buildInfoRow('Jenis Kelamin', _user.gender),
+                          _buildInfoRow(
+                            'NIK',
+                            _user.nik.isNotEmpty ? _user.nik : '-',
+                          ),
+                          _buildInfoRow(
+                            'IHS SATUSEHAT',
+                            _user.ihsNumber.isNotEmpty
+                                ? _user.ihsNumber
+                                : 'Belum terhubung',
+                          ),
                         ],
                       ),
                     ),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final updated = await Navigator.push<AdminUserModel>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  SatuSehatPatientSyncPage.forAdminUser(_user),
+                            ),
+                          );
+                          if (updated != null && mounted) {
+                            setState(() => _user = updated);
+                          }
+                        },
+                        icon: const Icon(
+                          LucideIcons.heartPulse,
+                          size: 18,
+                          color: primaryMaroon,
+                        ),
+                        label: const Text(
+                          'Sinkronkan ke SATUSEHAT',
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.bold,
+                            color: primaryMaroon,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: primaryMaroon),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
 
                     // Action Button
                     if (_user.status == UserStatus.aktif)

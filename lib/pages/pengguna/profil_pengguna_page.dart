@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
+import '../../models/user_profile.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/user_service.dart';
+import '../common/satusehat_patient_sync_page.dart';
 import 'edit_profil_pengguna_page.dart';
 import 'pengaturan_pengguna_page.dart';
 import 'tentang_pengguna_page.dart';
@@ -40,6 +42,10 @@ class _ProfilPenggunaPageState extends State<ProfilPenggunaPage> {
   String _address = '';
   String _birthDate = '';
   String _gender = '';
+  String _nik = '';
+  String _ihsNumber = '';
+  String _satuSehatStatus = '';
+  UserProfile? _currentProfile;
 
   StreamSubscription<dynamic>? _profileSub;
 
@@ -59,12 +65,16 @@ class _ProfilPenggunaPageState extends State<ProfilPenggunaPage> {
     _profileSub = UserService.streamByUid(uid).listen((profile) {
       if (!mounted || profile == null) return;
       setState(() {
+        _currentProfile = profile;
         _name = profile.name;
         _email = profile.email;
         _phone = profile.phone;
         _address = profile.address;
         _birthDate = profile.birthDate;
         _gender = profile.gender;
+        _nik = profile.nik;
+        _ihsNumber = profile.ihsNumber;
+        _satuSehatStatus = profile.satuSehatStatus;
       });
     }, onError: (_) {});
   }
@@ -95,12 +105,16 @@ class _ProfilPenggunaPageState extends State<ProfilPenggunaPage> {
         return;
       }
       setState(() {
+        _currentProfile = profile;
         _name = profile.name;
         _email = profile.email;
         _phone = profile.phone;
         _address = profile.address;
         _birthDate = profile.birthDate;
         _gender = profile.gender;
+        _nik = profile.nik;
+        _ihsNumber = profile.ihsNumber;
+        _satuSehatStatus = profile.satuSehatStatus;
       });
     } catch (_) {
       if (!mounted) return;
@@ -298,6 +312,7 @@ class _ProfilPenggunaPageState extends State<ProfilPenggunaPage> {
                     initialAddress: _address,
                     initialBirthDate: _birthDate,
                     initialGender: _gender,
+                    initialNik: _nik,
                     onNavigateTab: widget.onNavigateTab,
                   ),
                 ),
@@ -321,6 +336,9 @@ class _ProfilPenggunaPageState extends State<ProfilPenggunaPage> {
                   if (result['gender'] != null &&
                       result['gender']!.isNotEmpty) {
                     _gender = result['gender']!;
+                  }
+                  if (result['nik'] != null && result['nik']!.isNotEmpty) {
+                    _nik = result['nik']!;
                   }
                 });
               }
@@ -403,6 +421,16 @@ class _ProfilPenggunaPageState extends State<ProfilPenggunaPage> {
             icon: LucideIcons.user,
             label: 'JENIS KELAMIN',
             value: _gender,
+          ),
+          const SizedBox(height: 12),
+
+          // 5. NIK & Status SATUSEHAT
+          _buildInfoField(
+            icon: LucideIcons.idCard,
+            label: 'NIK / IHS SATUSEHAT',
+            value: _ihsNumber.isNotEmpty
+                ? '${_nik.isNotEmpty ? _nik : '-'} • IHS: $_ihsNumber'
+                : (_nik.isNotEmpty ? '$_nik (Belum sinkron)' : 'Belum diisi'),
           ),
         ],
       ),
@@ -489,7 +517,54 @@ class _ProfilPenggunaPageState extends State<ProfilPenggunaPage> {
       ),
       child: Column(
         children: [
-          // 1. Pengaturan
+          // 1. Integrasi SATUSEHAT
+          _buildMenuRow(
+            icon: LucideIcons.heartPulse,
+            title: _satuSehatStatus == 'terhubung' && _ihsNumber.isNotEmpty
+                ? 'Integrasi SATUSEHAT (Terhubung)'
+                : 'Integrasi SATUSEHAT',
+            onTap: () async {
+              final profileForSync = _currentProfile ??
+                  UserProfile(
+                    uid: AuthService.uid ?? '',
+                    docId: AuthService.uid ?? '',
+                    name: _name,
+                    email: _email,
+                    phone: _phone,
+                    address: _address,
+                    birthDate: _birthDate,
+                    gender: _gender,
+                    nik: _nik,
+                    ihsNumber: _ihsNumber,
+                    satuSehatStatus: _satuSehatStatus,
+                  );
+              final updated = await Navigator.push<UserProfile>(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SatuSehatPatientSyncPage.forPatient(
+                    profileForSync,
+                  ),
+                ),
+              );
+              await _loadFromBackend();
+              if (updated != null && mounted) {
+                setState(() {
+                  _currentProfile = updated;
+                  _name = updated.name;
+                  _phone = updated.phone;
+                  _address = updated.address;
+                  _birthDate = updated.birthDate;
+                  _gender = updated.gender;
+                  _nik = updated.nik;
+                  _ihsNumber = updated.ihsNumber;
+                  _satuSehatStatus = updated.satuSehatStatus;
+                });
+              }
+            },
+          ),
+          const Divider(height: 1, color: Color(0xFFF5F5F5)),
+
+          // 2. Pengaturan
           _buildMenuRow(
             icon: LucideIcons.settings,
             title: 'Pengaturan',

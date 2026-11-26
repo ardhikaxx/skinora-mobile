@@ -24,6 +24,23 @@ class UserProfile {
   String morningReminder;
   String eveningReminder;
 
+  // SATUSEHAT Patient (FHIR R4)
+  String nik;
+  String ihsNumber;
+  String satuSehatStatus; // '' | 'terhubung' | 'gagal'
+  String satuSehatSyncedAt;
+  String satuSehatLastError;
+  String provinceCode;
+  String provinceName;
+  String cityCode;
+  String cityName;
+  String districtCode;
+  String districtName;
+  String villageCode;
+  String villageName;
+  String postalCode;
+  String maritalStatusCode;
+
   UserProfile({
     this.uid = '',
     required this.docId,
@@ -44,6 +61,21 @@ class UserProfile {
     this.notificationsEnabled = true,
     this.morningReminder = '',
     this.eveningReminder = '',
+    this.nik = '',
+    this.ihsNumber = '',
+    this.satuSehatStatus = '',
+    this.satuSehatSyncedAt = '',
+    this.satuSehatLastError = '',
+    this.provinceCode = '',
+    this.provinceName = '',
+    this.cityCode = '',
+    this.cityName = '',
+    this.districtCode = '',
+    this.districtName = '',
+    this.villageCode = '',
+    this.villageName = '',
+    this.postalCode = '',
+    this.maritalStatusCode = 'S',
   });
 
   bool get canLogin {
@@ -77,6 +109,21 @@ class UserProfile {
         address.trim().isNotEmpty;
   }
 
+  /// Memeriksa apakah NIK pasien valid (16 digit angka) untuk SATUSEHAT.
+  bool get hasValidNik => RegExp(r'^\d{16}$').hasMatch(nik.trim());
+
+  /// Memeriksa apakah kode wilayah administratif (Provinsi, Kab/Kota, Kec, Kel)
+  /// sudah terisi lengkap untuk payload FHIR R4 Patient SATUSEHAT.
+  bool get hasAdministrativeRegion =>
+      provinceCode.trim().isNotEmpty &&
+      cityCode.trim().isNotEmpty &&
+      districtCode.trim().isNotEmpty &&
+      villageCode.trim().isNotEmpty;
+
+  /// True bila pasien sudah memiliki IHS Number dari SATUSEHAT.
+  bool get isSatuSehatSynced =>
+      ihsNumber.trim().isNotEmpty && satuSehatStatus == 'terhubung';
+
   UserProfile copyWith({
     String? uid,
     String? docId,
@@ -97,6 +144,21 @@ class UserProfile {
     bool? notificationsEnabled,
     String? morningReminder,
     String? eveningReminder,
+    String? nik,
+    String? ihsNumber,
+    String? satuSehatStatus,
+    String? satuSehatSyncedAt,
+    String? satuSehatLastError,
+    String? provinceCode,
+    String? provinceName,
+    String? cityCode,
+    String? cityName,
+    String? districtCode,
+    String? districtName,
+    String? villageCode,
+    String? villageName,
+    String? postalCode,
+    String? maritalStatusCode,
   }) {
     return UserProfile(
       uid: uid ?? this.uid,
@@ -119,6 +181,21 @@ class UserProfile {
           notificationsEnabled ?? this.notificationsEnabled,
       morningReminder: morningReminder ?? this.morningReminder,
       eveningReminder: eveningReminder ?? this.eveningReminder,
+      nik: nik ?? this.nik,
+      ihsNumber: ihsNumber ?? this.ihsNumber,
+      satuSehatStatus: satuSehatStatus ?? this.satuSehatStatus,
+      satuSehatSyncedAt: satuSehatSyncedAt ?? this.satuSehatSyncedAt,
+      satuSehatLastError: satuSehatLastError ?? this.satuSehatLastError,
+      provinceCode: provinceCode ?? this.provinceCode,
+      provinceName: provinceName ?? this.provinceName,
+      cityCode: cityCode ?? this.cityCode,
+      cityName: cityName ?? this.cityName,
+      districtCode: districtCode ?? this.districtCode,
+      districtName: districtName ?? this.districtName,
+      villageCode: villageCode ?? this.villageCode,
+      villageName: villageName ?? this.villageName,
+      postalCode: postalCode ?? this.postalCode,
+      maritalStatusCode: maritalStatusCode ?? this.maritalStatusCode,
     );
   }
 }

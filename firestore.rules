@@ -115,7 +115,11 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'name', 'phone', 'address', 'birthDate', 'gender',
             'specialization', 'experience', 'str', 'bio', 'isAvailable',
-            'practiceSettings', 'settings', 'updatedAt'
+            'practiceSettings', 'settings', 'updatedAt',
+            'nik', 'ihsNumber', 'satuSehatStatus', 'satuSehatSyncedAt',
+            'satuSehatLastError', 'provinceCode', 'provinceName',
+            'cityCode', 'cityName', 'districtCode', 'districtName',
+            'villageCode', 'villageName', 'postalCode', 'maritalStatusCode'
           ]));
 
       // Delete akun:

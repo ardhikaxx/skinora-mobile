@@ -13,6 +13,7 @@ class EditProfilPenggunaPage extends StatefulWidget {
   final String initialAddress;
   final String initialBirthDate;
   final String initialGender;
+  final String initialNik;
   final ValueChanged<int>? onNavigateTab;
 
   const EditProfilPenggunaPage({
@@ -22,6 +23,7 @@ class EditProfilPenggunaPage extends StatefulWidget {
     this.initialAddress = '',
     this.initialBirthDate = '',
     this.initialGender = '',
+    this.initialNik = '',
     this.onNavigateTab,
   });
 
@@ -42,6 +44,7 @@ class _EditProfilPenggunaPageState extends State<EditProfilPenggunaPage> {
   late final TextEditingController _phoneController;
   late final TextEditingController _addressController;
   late final TextEditingController _birthDateController;
+  late final TextEditingController _nikController;
   String _selectedGender = '';
 
   /// Inisial avatar, selalu diturunkan dari nama akun (bukan hardcode).
@@ -55,11 +58,26 @@ class _EditProfilPenggunaPageState extends State<EditProfilPenggunaPage> {
     _addressController = TextEditingController(text: widget.initialAddress);
     _birthDateController =
         TextEditingController(text: widget.initialBirthDate);
+    _nikController = TextEditingController(text: widget.initialNik);
     _selectedGender = widget.initialGender.isNotEmpty
         ? widget.initialGender
         : 'Perempuan';
     _currentInitials = _initialsOf(_nameController.text);
     _nameController.addListener(_updateInitials);
+    _loadNikIfNeeded();
+  }
+
+  Future<void> _loadNikIfNeeded() async {
+    if (!Backend.useFirebase || widget.initialNik.isNotEmpty) return;
+    final uid = AuthService.uid;
+    if (uid == null) return;
+    try {
+      final profile = await UserService.loadByUid(uid);
+      if (!mounted || profile == null) return;
+      if (profile.nik.isNotEmpty && _nikController.text.isEmpty) {
+        _nikController.text = profile.nik;
+      }
+    } catch (_) {}
   }
 
   @override
@@ -69,6 +87,7 @@ class _EditProfilPenggunaPageState extends State<EditProfilPenggunaPage> {
     _phoneController.dispose();
     _addressController.dispose();
     _birthDateController.dispose();
+    _nikController.dispose();
     super.dispose();
   }
 
@@ -125,6 +144,14 @@ class _EditProfilPenggunaPageState extends State<EditProfilPenggunaPage> {
     final updatedPhone = _phoneController.text.trim();
     final updatedAddress = _addressController.text.trim();
     final updatedBirth = _birthDateController.text.trim();
+    final updatedNik = _nikController.text.trim();
+
+    if (updatedNik.isNotEmpty && !RegExp(r'^\d{16}$').hasMatch(updatedNik)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('NIK harus terdiri dari 16 digit angka.')),
+      );
+      return;
+    }
 
     if (Backend.useFirebase && AuthService.uid != null) {
       try {
@@ -136,6 +163,7 @@ class _EditProfilPenggunaPageState extends State<EditProfilPenggunaPage> {
             'address': updatedAddress,
             'birthDate': updatedBirth,
             'gender': _selectedGender,
+            if (updatedNik.isNotEmpty) 'nik': updatedNik,
           },
         );
         await ActivityService.log(
@@ -168,6 +196,7 @@ class _EditProfilPenggunaPageState extends State<EditProfilPenggunaPage> {
           'address': updatedAddress,
           'birthDate': updatedBirth,
           'gender': _selectedGender,
+          'nik': updatedNik,
         });
       },
     );
@@ -518,6 +547,54 @@ class _EditProfilPenggunaPageState extends State<EditProfilPenggunaPage> {
                                   .map((g) => DropdownMenuItem(
                                       value: g, child: Text(g)))
                                   .toList(),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 18),
+
+                        // Field 6: NIK (SATUSEHAT)
+                        const Text(
+                          'NIK (OPSIONAL - SATUSEHAT)',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.6,
+                            color: labelColor,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: borderColor,
+                              width: 1.0,
+                            ),
+                          ),
+                          child: TextField(
+                            controller: _nikController,
+                            keyboardType: TextInputType.number,
+                            maxLength: 16,
+                            style: const TextStyle(
+                              fontSize: 14.0,
+                              fontWeight: FontWeight.w500,
+                              color: darkText,
+                            ),
+                            decoration: const InputDecoration(
+                              hintText: '16 digit NIK KTP',
+                              counterText: '',
+                              hintStyle: TextStyle(
+                                fontSize: 13.5,
+                                color: subText,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                                vertical: 12.0,
+                              ),
                             ),
                           ),
                         ),

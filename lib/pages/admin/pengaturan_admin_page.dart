@@ -8,6 +8,7 @@ import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/notification_service.dart';
 import '../../services/user_service.dart';
+import '../common/satusehat_patient_sync_page.dart';
 
 class PengaturanAdminPage extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
@@ -200,6 +201,84 @@ class _PengaturanAdminPageState extends State<PengaturanAdminPage> {
                   // Status izin notifikasi OS (Android 13+ / iOS): user tahu
                   // bila notifikasi diblokir sistem & bisa meminta izin ulang.
                   const SystemNotificationPermissionTile(),
+
+                  const SizedBox(height: 20),
+
+                  const Text(
+                    'INTEGRASI',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: subText,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              SatuSehatPatientSyncPage.sandboxConsole(),
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 14.0,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(0xFFEEEEEE),
+                          width: 1.0,
+                        ),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(
+                            LucideIcons.heartPulse,
+                            size: 20,
+                            color: primaryMaroon,
+                          ),
+                          SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'SATUSEHAT Sandbox (Data Pasien)',
+                                  style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: darkText,
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Tes koneksi & kirim data pasien FHIR R4',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: subText,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            LucideIcons.chevronRight,
+                            size: 18,
+                            color: subText,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
                   const SizedBox(height: 24),
 
