@@ -8,6 +8,10 @@
 # The following line activates a set of recommended lints for Flutter apps,
 # packages, and plugins designed to encourage good coding practices.
 analyzer:
+  errors:
+    # Flutter 3.47+ menandai package:flutter/material.dart & cupertino.dart sebagai deprecated;
+    # diabaikan sementara hingga proyek bermigrasi penuh ke material_ui/cupertino_ui.
+    deprecated_member_use: ignore
   exclude:
     - build/**
     - android/**
