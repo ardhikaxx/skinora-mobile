@@ -70,17 +70,19 @@ class AdminSuccessDialog extends StatelessWidget {
                 const SizedBox(width: 12),
 
                 // Title: "Berhasil"
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16.5,
-                    fontWeight: FontWeight.bold,
-                    color: darkText,
-                    letterSpacing: -0.2,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16.5,
+                      fontWeight: FontWeight.bold,
+                      color: darkText,
+                      letterSpacing: -0.2,
+                    ),
                   ),
                 ),
 
-                const Spacer(),
+                const SizedBox(width: 8),
 
                 // Close Button "X"
                 GestureDetector(
@@ -235,17 +237,19 @@ class AdminConfirmDialog extends StatelessWidget {
                 const SizedBox(width: 12),
 
                 // Title
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16.0,
-                    fontWeight: FontWeight.bold,
-                    color: darkText,
-                    letterSpacing: -0.2,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16.0,
+                      fontWeight: FontWeight.bold,
+                      color: darkText,
+                      letterSpacing: -0.2,
+                    ),
                   ),
                 ),
 
-                const Spacer(),
+                const SizedBox(width: 8),
 
                 // Close Button "X"
                 GestureDetector(

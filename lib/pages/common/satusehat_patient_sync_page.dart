@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -84,8 +82,6 @@ class _SatuSehatPatientSyncPageState extends State<SatuSehatPatientSyncPage> {
   bool _testingConnection = false;
   bool _searchingNik = false;
   bool _syncing = false;
-  bool _showPayloadPreview = false;
-  bool _showResponseJson = false;
 
   String _ihsNumber = '';
   String _satuSehatStatus = '';
@@ -93,7 +89,6 @@ class _SatuSehatPatientSyncPageState extends State<SatuSehatPatientSyncPage> {
   String _errorMessage = '';
 
   SatuSehatOrganizationInfo? _orgInfo;
-  SatuSehatPatientSyncResult? _lastResult;
   SatuSehatPatientRecord? _foundRecord;
 
   @override
@@ -204,7 +199,7 @@ class _SatuSehatPatientSyncPageState extends State<SatuSehatPatientSyncPage> {
         await _loadCities(_provinceCode, preserveSelection: true);
       }
     } catch (_) {
-      // Master wilayah tetap bisa diisi via tombol contoh sandbox bila offline.
+      // Master wilayah tetap bisa diisi ulang saat koneksi tersedia.
     } finally {
       if (mounted) setState(() => _loadingRegions = false);
     }
@@ -289,23 +284,6 @@ class _SatuSehatPatientSyncPageState extends State<SatuSehatPatientSyncPage> {
     } finally {
       if (mounted) setState(() => _loadingRegions = false);
     }
-  }
-
-  void _applyJakartaSandboxPreset() {
-    setState(() {
-      _provinceCode = '31';
-      _provinceName = 'DKI Jakarta';
-      _cityCode = '3171';
-      _cityName = 'Kota Adm. Jakarta Pusat';
-      _districtCode = '317101';
-      _districtName = 'Gambir';
-      _villageCode = '3171011001';
-      _villageName = 'Gambir';
-      if (_postalCodeController.text.trim().isEmpty) {
-        _postalCodeController.text = '10110';
-      }
-      _errorMessage = '';
-    });
   }
 
   Future<void> _pickBirthDate() async {
@@ -453,7 +431,6 @@ class _SatuSehatPatientSyncPageState extends State<SatuSehatPatientSyncPage> {
 
       if (!mounted) return;
       setState(() {
-        _lastResult = result;
         _ihsNumber = result.ihsNumber;
         _satuSehatStatus = 'terhubung';
         _syncedAtIso = result.syncedAtIso;
@@ -541,8 +518,6 @@ class _SatuSehatPatientSyncPageState extends State<SatuSehatPatientSyncPage> {
   @override
   Widget build(BuildContext context) {
     final cfg = SatuSehatConfig.current;
-    final payloadPreview = const JsonEncoder.withIndent('  ')
-        .convert(SatuSehatService.buildFhirPatientPayload(_currentInput()));
 
     return PopScope(
       canPop: false,
@@ -585,26 +560,6 @@ class _SatuSehatPatientSyncPageState extends State<SatuSehatPatientSyncPage> {
                         ),
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF1E6),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFFED7AA)),
-                      ),
-                      child: Text(
-                        cfg.isSandbox ? 'SANDBOX' : 'PROD',
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFFC2410C),
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -626,12 +581,6 @@ class _SatuSehatPatientSyncPageState extends State<SatuSehatPatientSyncPage> {
                       const SizedBox(height: 14),
                     ],
                     _buildPatientFormCard(),
-                    const SizedBox(height: 14),
-                    _buildPayloadPreviewCard(payloadPreview),
-                    if (_lastResult != null) ...[
-                      const SizedBox(height: 14),
-                      _buildResponseCard(_lastResult!),
-                    ],
                     const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
@@ -1113,28 +1062,6 @@ class _SatuSehatPatientSyncPageState extends State<SatuSehatPatientSyncPage> {
                 ),
             ],
           ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: ActionChip(
-              avatar: const Icon(
-                LucideIcons.mapPin,
-                size: 14,
-                color: primaryMaroon,
-              ),
-              label: const Text(
-                'Isi Wilayah Contoh Jakarta (Sandbox)',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: primaryMaroon,
-                ),
-              ),
-              backgroundColor: const Color(0xFFFFF5F5),
-              side: const BorderSide(color: Color(0xFFFECDD3)),
-              onPressed: _applyJakartaSandboxPreset,
-            ),
-          ),
           const SizedBox(height: 10),
 
           _regionDropdown(
@@ -1263,152 +1190,6 @@ class _SatuSehatPatientSyncPageState extends State<SatuSehatPatientSyncPage> {
           },
         ),
       ],
-    );
-  }
-
-  Widget _buildPayloadPreviewCard(String jsonText) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: cardBorder),
-      ),
-      child: Column(
-        children: [
-          InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: () =>
-                setState(() => _showPayloadPreview = !_showPayloadPreview),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  const Icon(LucideIcons.code, size: 18, color: primaryMaroon),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Preview Payload FHIR R4 Patient',
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: darkText,
-                      ),
-                    ),
-                  ),
-                  Icon(
-                    _showPayloadPreview
-                        ? LucideIcons.chevronUp
-                        : LucideIcons.chevronDown,
-                    size: 18,
-                    color: subText,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (_showPayloadPreview)
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: SelectableText(
-                jsonText,
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 11,
-                  color: Color(0xFFE2E8F0),
-                  height: 1.4,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildResponseCard(SatuSehatPatientSyncResult result) {
-    final formatted =
-        const JsonEncoder.withIndent('  ').convert(result.responseJson);
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFBBF7D0)),
-      ),
-      child: Column(
-        children: [
-          InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: () => setState(() => _showResponseJson = !_showResponseJson),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  const Icon(
-                    LucideIcons.fileJson,
-                    size: 18,
-                    color: Color(0xFF15803D),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Respon SATUSEHAT (${result.action.toUpperCase()})',
-                          style: const TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF166534),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'IHS: ${result.ihsNumber}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: subText,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    _showResponseJson
-                        ? LucideIcons.chevronUp
-                        : LucideIcons.chevronDown,
-                    size: 18,
-                    color: subText,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (_showResponseJson)
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F172A),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: SelectableText(
-                formatted,
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 11,
-                  color: Color(0xFFBBF7D0),
-                  height: 1.4,
-                ),
-              ),
-            ),
-        ],
-      ),
     );
   }
 

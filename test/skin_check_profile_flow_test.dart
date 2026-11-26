@@ -146,6 +146,9 @@ void main() {
       );
       expect(find.text('Nanti Saja'), findsOneWidget);
       expect(find.text('Lengkapi Profil'), findsOneWidget);
+      final lengkapiText = tester.widget<Text>(find.text('Lengkapi Profil'));
+      expect(lengkapiText.textAlign, TextAlign.center);
+      expect(lengkapiText.maxLines, 1);
 
       // Tombol Nanti Saja menutup modal
       await tester.tap(find.text('Nanti Saja'));

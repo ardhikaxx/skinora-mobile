@@ -661,6 +661,7 @@ class _SkinCheckPageState extends State<SkinCheckPage> {
                           style: OutlinedButton.styleFrom(
                             backgroundColor: Colors.white,
                             foregroundColor: const Color(0xFF374151),
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
                             side: const BorderSide(
                               color: Color(0xFFE5E7EB),
                               width: 1.2,
@@ -670,11 +671,16 @@ class _SkinCheckPageState extends State<SkinCheckPage> {
                             ),
                             elevation: 0,
                           ),
-                          child: const Text(
-                            'Nanti Saja',
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w600,
+                          child: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              'Nanti Saja',
+                              maxLines: 1,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ),
@@ -704,16 +710,22 @@ class _SkinCheckPageState extends State<SkinCheckPage> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primaryMaroon,
                             foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
                             elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
                           ),
-                          child: const Text(
-                            'Lengkapi Profil',
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.bold,
+                          child: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              'Lengkapi Profil',
+                              maxLines: 1,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),

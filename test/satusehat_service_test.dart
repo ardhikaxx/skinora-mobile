@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:skinora_app/components/dialogs/admin_action_dialogs.dart';
 import 'package:skinora_app/models/admin_user_model.dart';
 import 'package:skinora_app/models/satusehat_models.dart';
 import 'package:skinora_app/models/user_profile.dart';
@@ -58,9 +59,12 @@ void main() {
       final cfg = SatuSehatConfig.current;
       expect(cfg.isSandbox, isTrue);
       expect(cfg.host, 'api-satusehat-stg.dto.kemkes.go.id');
-      expect(cfg.organizationId, '77fd9d28-df0f-4d94-b730-159fffaf1e94');
-      expect(cfg.clientId, 'b5hAzjWQk7DGaBeAdod91MSG8JoaoXwo62jQ6lhdLYHunoez');
-      expect(cfg.clientSecret, isNotEmpty);
+      expect(cfg.organizationId, '00e3b782-a631-43ab-9187-1971043abdd6');
+      expect(cfg.clientId, 'pKIu76lAgU9AqniYTFeBtIgPPvAcGzgOy2pLQpNG6wvVDKC3');
+      expect(
+        cfg.clientSecret,
+        'GmgwZGMJbUOnLY35r0xIgibFr6yG5uGk59KYATAc5w2GhwUltw939aQ32hBtP82F',
+      );
       expect(cfg.isConfigured, isTrue);
     });
   });
@@ -139,11 +143,11 @@ void main() {
             200,
           );
         }
-        if (req.url.path.endsWith('/Organization/77fd9d28-df0f-4d94-b730-159fffaf1e94')) {
+        if (req.url.path.endsWith('/Organization/00e3b782-a631-43ab-9187-1971043abdd6')) {
           return http.Response(
             jsonEncode({
               'resourceType': 'Organization',
-              'id': '77fd9d28-df0f-4d94-b730-159fffaf1e94',
+              'id': '00e3b782-a631-43ab-9187-1971043abdd6',
               'name': 'STAGING Skinora Clinic',
               'active': true,
               'telecom': [
@@ -158,7 +162,7 @@ void main() {
       }));
 
       final org = await SatuSehatService.verifyConnection();
-      expect(org.id, '77fd9d28-df0f-4d94-b730-159fffaf1e94');
+      expect(org.id, '00e3b782-a631-43ab-9187-1971043abdd6');
       expect(org.name, 'STAGING Skinora Clinic');
       expect(org.active, isTrue);
     });
@@ -449,11 +453,11 @@ void main() {
             200,
           );
         }
-        if (req.url.path.endsWith('/Organization/77fd9d28-df0f-4d94-b730-159fffaf1e94')) {
+        if (req.url.path.endsWith('/Organization/00e3b782-a631-43ab-9187-1971043abdd6')) {
           return http.Response(
             jsonEncode({
               'resourceType': 'Organization',
-              'id': '77fd9d28-df0f-4d94-b730-159fffaf1e94',
+              'id': '00e3b782-a631-43ab-9187-1971043abdd6',
               'name': 'STAGING Skinora',
               'active': true,
             }),
@@ -508,11 +512,32 @@ void main() {
         '3171011708970001',
       );
 
-      // Isi contoh wilayah Jakarta (Sandbox)
-      final presetChip = find.text('Isi Wilayah Contoh Jakarta (Sandbox)');
-      await tester.ensureVisible(presetChip);
-      await tester.tap(presetChip);
-      await tester.pumpAndSettle();
+      // Pastikan badge SANDBOX header, preset Jakarta, dan preview payload tidak tampil
+      expect(find.text('SANDBOX'), findsNothing);
+      expect(find.text('Isi Wilayah Contoh Jakarta (Sandbox)'), findsNothing);
+      expect(find.text('Preview Payload FHIR R4 Patient'), findsNothing);
+
+      // Pilih wilayah bertingkat dari dropdown Masterdata SATUSEHAT
+      Future<void> selectRegion(String hintText, String optionText) async {
+        final dropdown = find.ancestor(
+          of: find.text(hintText),
+          matching: find.byType(DropdownButton<String>),
+        );
+        await tester.ensureVisible(dropdown);
+        await tester.tap(dropdown);
+        await tester.pumpAndSettle();
+        final option = find.text(optionText).last;
+        await tester.tap(option);
+        await tester.pumpAndSettle();
+      }
+
+      await selectRegion('Pilih Provinsi', 'DKI Jakarta (31)');
+      await selectRegion(
+        'Pilih Kota / Kabupaten',
+        'Kota Adm. Jakarta Pusat (3171)',
+      );
+      await selectRegion('Pilih Kecamatan', 'Gambir (317101)');
+      await selectRegion('Pilih Kelurahan / Desa', 'Gambir (3171011001)');
 
       // Kirim pasien ke SATUSEHAT
       final sendBtn = find.text('Kirim Pasien ke SATUSEHAT');
@@ -522,6 +547,48 @@ void main() {
 
       expect(find.text('Pasien Terdaftar di SATUSEHAT'), findsOneWidget);
       expect(find.textContaining('P1234567890'), findsWidgets);
+      expect(find.textContaining('Respon SATUSEHAT'), findsNothing);
+    });
+
+    testWidgets('Modal sukses & konfirmasi tidak overflow di layar ponsel sempit (360px)', (tester) async {
+      tester.view.physicalSize = const Size(360, 780);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                AdminSuccessDialog(
+                  title: 'Pasien Terdaftar di SATUSEHAT',
+                  message: 'Sinkronisasi berhasil dengan IHS Number P1234567890.',
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Pasien Terdaftar di SATUSEHAT'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AdminConfirmDialog(
+              title: 'Konfirmasi Sinkronisasi SATUSEHAT Pasien',
+              message: 'Kirim data pasien ke SATUSEHAT sekarang?',
+              confirmLabel: 'Kirim',
+              onConfirm: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Konfirmasi Sinkronisasi SATUSEHAT Pasien'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('ProfilPenggunaPage, DetailPenggunaPage, dan PengaturanAdminPage menampilkan entry SATUSEHAT', (tester) async {

@@ -29,15 +29,15 @@ class SatuSehatConfig {
   );
   static const String _orgDefine = String.fromEnvironment(
     'SATUSEHAT_ORG_ID',
-    defaultValue: '77fd9d28-df0f-4d94-b730-159fffaf1e94',
+    defaultValue: '00e3b782-a631-43ab-9187-1971043abdd6',
   );
   static const String _clientIdDefine = String.fromEnvironment(
     'SATUSEHAT_CLIENT_ID',
-    defaultValue: 'b5hAzjWQk7DGaBeAdod91MSG8JoaoXwo62jQ6lhdLYHunoez',
+    defaultValue: 'pKIu76lAgU9AqniYTFeBtIgPPvAcGzgOy2pLQpNG6wvVDKC3',
   );
   static const String _clientSecretDefine = String.fromEnvironment(
     'SATUSEHAT_CLIENT_SECRET',
-    defaultValue: 'wysDMg2gZeXjFzXDt9ufI46h5WSfzFwSJr6jDpvGJyKM5Pz4BqW0bVAWpdbOJTqm',
+    defaultValue: 'GmgwZGMJbUOnLY35r0xIgibFr6yG5uGk59KYATAc5w2GhwUltw939aQ32hBtP82F',
   );
 
   static SatuSehatConfig? _override;
