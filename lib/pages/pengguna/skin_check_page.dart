@@ -5,6 +5,7 @@ import '../../models/user_profile.dart';
 import '../../services/auth_service.dart';
 import '../../services/backend.dart';
 import '../../services/location_service.dart';
+import '../../services/skin_svm_service.dart';
 import '../../services/user_service.dart';
 import '../../services/weather_service.dart';
 import '../../utils/app_dates.dart';
@@ -42,6 +43,8 @@ class _SkinCheckPageState extends State<SkinCheckPage> {
   void initState() {
     super.initState();
     _loadLocationWeather();
+    // Pre-train model RBF-SVM dari dataset agar prediksi instan saat kuesioner selesai.
+    SkinSvmService.ensureModel().catchError((_) => throw StateError('ignored'));
   }
 
   Future<void> _loadLocationWeather() async {

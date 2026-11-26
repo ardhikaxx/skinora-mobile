@@ -56,7 +56,6 @@ dependencies:
   # Geolokasi device: koordinat untuk cuaca & fitur lokasi lain.
   geolocator: ^14.0.0
   google_sign_in: ^7.2.0
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -82,6 +81,7 @@ flutter:
 
   assets:
     - assets/
+    - assets/dataset/skin-type.csv
 
   # To add assets to your application, add an assets section, like this:
   # assets:

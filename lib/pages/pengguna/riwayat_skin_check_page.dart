@@ -19,6 +19,7 @@ class SkinCheckHistoryModel {
   final IconData icon;
   final List<String> tags;
   final List<String> neutralTags;
+  final double? confidence;
 
   const SkinCheckHistoryModel({
     required this.id,
@@ -28,6 +29,7 @@ class SkinCheckHistoryModel {
     required this.icon,
     required this.tags,
     this.neutralTags = const [],
+    this.confidence,
   });
 }
 
@@ -115,6 +117,7 @@ class _RiwayatSkinCheckPageState extends State<RiwayatSkinCheckPage> {
                 if (nonSens) 'Non-Sensitif',
                 if (notRentan) 'Tidak Rentan',
               ],
+              confidence: (m['svmConfidence'] as num?)?.toDouble(),
             );
           }).toList();
         });
@@ -261,18 +264,21 @@ class _RiwayatSkinCheckPageState extends State<RiwayatSkinCheckPage> {
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: () {
+          final sensitivityTag = item.tags.firstWhere(
+            (t) => t.toLowerCase().contains('sensitif'),
+            orElse: () => 'Non-Sensitif',
+          );
           // Open Result page for this history item
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => SkinCheckResultPage(
                 skinType: item.skinType,
-                sensitivity: item.tags.contains('Sensitif')
-                    ? 'Sensitif'
-                    : 'Non-Sensitif',
+                sensitivity: sensitivityTag,
                 acneRisk: item.tags.contains('Rentan')
                     ? 'Rentan'
                     : 'Tidak Rentan',
+                confidence: item.confidence,
                 createdDisplay: item.date,
                 onNavigateTab: widget.onNavigateTab,
               ),

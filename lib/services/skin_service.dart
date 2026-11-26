@@ -43,6 +43,8 @@ class SkinService {
     required String resultSkinType,
     required String resultSensitivity,
     required String resultAcneRisk,
+    String? svmModel,
+    double? svmConfidence,
     String? createdDisplay,
     String? createdIso,
   }) async {
@@ -65,6 +67,8 @@ class SkinService {
       'resultSkinType': resultSkinType,
       'resultSensitivity': resultSensitivity,
       'resultAcneRisk': resultAcneRisk,
+      'svmModel': ?svmModel,
+      'svmConfidence': ?svmConfidence,
       'createdBy': uid,
     };
 

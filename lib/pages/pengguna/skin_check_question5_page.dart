@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../components/navbottom/pengguna_navbottom.dart';
 import '../../services/auth_service.dart';
 import '../../services/skin_service.dart';
+import '../../services/skin_svm_service.dart';
 import '../../services/weather_service.dart';
 import '../../services/location_service.dart';
 import '../../utils/app_dates.dart';
@@ -43,6 +44,7 @@ class _SkinCheckQuestion5PageState extends State<SkinCheckQuestion5Page> {
 
   late final TextEditingController _tempController;
   bool _checkingWeather = false;
+  bool _submitting = false;
   String _weatherInfo = '';
 
   @override
@@ -89,111 +91,98 @@ class _SkinCheckQuestion5PageState extends State<SkinCheckQuestion5Page> {
     }
   }
 
-  String get _sensitivityResult => widget.sensitivity
-          .toLowerCase()
-          .contains('sering')
-      ? 'Sangat Sensitif'
-      : 'Sensitif';
-
-  /// Skor hasil skin check dari jawaban (tanpa mengubah UI).
-  String get _skinTypeResult {
-    final oil = widget.oilCondition.toLowerCase();
-    if (oil.contains('berminyak') && oil.contains('kering')) {
-      return 'Kombinasi';
-    }
-    if (oil.contains('berminyak') || oil.contains('minyak')) {
-      return 'Berminyak';
-    }
-    if (oil.contains('kering')) return 'Kering';
-    final wash = widget.conditionAfterWash.toLowerCase();
-    if (wash.contains('kering')) return 'Kering';
-    if (wash.contains('berminyak') || wash.contains('minyak')) {
-      return 'Berminyak';
-    }
-    return 'Normal';
-  }
-
-  String get _acneRiskResult {
-    final oil = widget.oilCondition.toLowerCase();
-    final wash = widget.conditionAfterWash.toLowerCase();
-    final sens = widget.sensitivity.toLowerCase();
-    var score = 0;
-    if (oil.contains('berminyak') || oil.contains('minyak')) score += 2;
-    if (wash.contains('berminyak') || wash.contains('minyak')) score += 1;
-    if (sens.contains('sering')) score += 1;
-    if (sens.contains('kadang')) score += 1;
-    return score >= 3 ? 'Rentan' : 'Tidak Rentan';
-  }
-
-  /// Simpan jawaban skin check ke Firestore (bila sesi aktif) lalu buka hasil.
+  /// Jalankan klasifikasi RBF-SVM dari dataset, simpan ke Firestore, lalu buka hasil.
   Future<void> _submitSkinCheck() async {
-    final skinType = _skinTypeResult;
-    final sensitivity = _sensitivityResult;
-    final acneRisk = _acneRiskResult;
-    final now = AppDates.nowWib();
-    final createdDisplay = AppDates.fullDisplayWib(now);
-    final createdIso = AppDates.iso(now);
+    if (_submitting) return;
+    setState(() => _submitting = true);
 
-    final uid = AuthService.uid;
-    if (uid != null) {
-      try {
-        final profile = await AuthService.loadProfile();
-        final name = (profile?.name.isNotEmpty ?? false) ? profile!.name : 'Pengguna';
+    try {
+      final temperature = _tempController.text.trim();
+      final prediction = await SkinSvmService.predict(
+        age: widget.age,
+        gender: widget.gender,
+        conditionAfterWash: widget.conditionAfterWash,
+        oilCondition: widget.oilCondition,
+        sensitivity: widget.sensitivity,
+        humidity: widget.humidity,
+        temperature: temperature,
+      );
+
+      final skinType = prediction.skinType;
+      final sensitivity = prediction.sensitivity;
+      final acneRisk = prediction.acneRisk;
+      final now = AppDates.nowWib();
+      final createdDisplay = AppDates.fullDisplayWib(now);
+      final createdIso = AppDates.iso(now);
+
+      final answers = {
+        'age': widget.age,
+        'gender': widget.gender,
+        'conditionAfterWash': widget.conditionAfterWash,
+        'oilCondition': widget.oilCondition,
+        'sensitivity': widget.sensitivity,
+        'humidity': widget.humidity,
+        'temperature': temperature,
+      };
+
+      final uid = AuthService.uid;
+      if (uid != null) {
+        try {
+          final profile = await AuthService.loadProfile();
+          final name =
+              (profile?.name.isNotEmpty ?? false) ? profile!.name : 'Pengguna';
+          await SkinService.saveSkinCheck(
+            uid: uid,
+            name: name,
+            answers: answers,
+            resultSkinType: skinType,
+            resultSensitivity: sensitivity,
+            resultAcneRisk: acneRisk,
+            svmModel: 'RBF-SVM',
+            svmConfidence: prediction.confidence,
+            createdDisplay: createdDisplay,
+            createdIso: createdIso,
+          );
+        } catch (_) {
+          // hasil tetap ditampilkan bila penyimpanan gagal
+        }
+      } else {
+        // Offline / widget test mode fallback
         await SkinService.saveSkinCheck(
-          uid: uid,
-          name: name,
-          answers: {
-            'age': widget.age,
-            'gender': widget.gender,
-            'conditionAfterWash': widget.conditionAfterWash,
-            'oilCondition': widget.oilCondition,
-            'sensitivity': widget.sensitivity,
-            'humidity': widget.humidity,
-            'temperature': _tempController.text.trim(),
-          },
+          uid: 'demo_user',
+          name: 'Pengguna',
+          answers: answers,
           resultSkinType: skinType,
           resultSensitivity: sensitivity,
           resultAcneRisk: acneRisk,
+          svmModel: 'RBF-SVM',
+          svmConfidence: prediction.confidence,
           createdDisplay: createdDisplay,
           createdIso: createdIso,
         );
-      } catch (_) {
-        // hasil tetap ditampilkan bila penyimpanan gagal
       }
-    } else {
-      // Offline / widget test mode fallback
-      await SkinService.saveSkinCheck(
-        uid: 'demo_user',
-        name: 'Pengguna',
-        answers: {
-          'age': widget.age,
-          'gender': widget.gender,
-          'conditionAfterWash': widget.conditionAfterWash,
-          'oilCondition': widget.oilCondition,
-          'sensitivity': widget.sensitivity,
-          'humidity': widget.humidity,
-          'temperature': _tempController.text.trim(),
-        },
-        resultSkinType: skinType,
-        resultSensitivity: sensitivity,
-        resultAcneRisk: acneRisk,
-        createdDisplay: createdDisplay,
-        createdIso: createdIso,
-      );
-    }
-    if (!mounted) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => SkinCheckResultPage(
-          skinType: skinType,
-          sensitivity: sensitivity,
-          acneRisk: acneRisk,
-          createdDisplay: createdDisplay,
-          onNavigateTab: widget.onNavigateTab,
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SkinCheckResultPage(
+            skinType: skinType,
+            sensitivity: sensitivity,
+            acneRisk: acneRisk,
+            confidence: prediction.confidence,
+            createdDisplay: createdDisplay,
+            onNavigateTab: widget.onNavigateTab,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menganalisis dengan model SVM: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -499,7 +488,8 @@ class _SkinCheckQuestion5PageState extends State<SkinCheckQuestion5Page> {
                               : SizedBox(
                                   height: 48,
                                   child: ElevatedButton(
-                                    onPressed: _submitSkinCheck,
+                                    onPressed:
+                                        _submitting ? null : _submitSkinCheck,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: primaryMaroon,
                                       foregroundColor: Colors.white,
@@ -508,26 +498,35 @@ class _SkinCheckQuestion5PageState extends State<SkinCheckQuestion5Page> {
                                         borderRadius: BorderRadius.circular(14),
                                       ),
                                     ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: const [
-                                        Text(
-                                          'Lihat Hasil',
-                                          style: TextStyle(
-                                            fontSize: 14.0,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
+                                    child: _submitting
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2.2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: const [
+                                              Text(
+                                                'Lihat Hasil',
+                                                style: TextStyle(
+                                                  fontSize: 14.0,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                              SizedBox(width: 6),
+                                              Icon(
+                                                LucideIcons.chevronRight,
+                                                size: 16,
+                                                color: Colors.white,
+                                              ),
+                                            ],
                                           ),
-                                        ),
-                                        SizedBox(width: 6),
-                                        Icon(
-                                          LucideIcons.chevronRight,
-                                          size: 16,
-                                          color: Colors.white,
-                                        ),
-                                      ],
-                                    ),
                                   ),
                                 ),
                         ),

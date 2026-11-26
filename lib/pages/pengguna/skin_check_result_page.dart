@@ -9,6 +9,7 @@ class SkinCheckResultPage extends StatelessWidget {
   final String skinType;
   final String sensitivity;
   final String acneRisk;
+  final double? confidence;
   final String? createdDisplay;
   final ValueChanged<int>? onNavigateTab;
 
@@ -17,6 +18,7 @@ class SkinCheckResultPage extends StatelessWidget {
     this.skinType = '',
     this.sensitivity = '',
     this.acneRisk = '',
+    this.confidence,
     this.createdDisplay,
     this.onNavigateTab,
   });
@@ -324,6 +326,24 @@ class SkinCheckResultPage extends StatelessWidget {
               letterSpacing: -0.2,
             ),
           ),
+          if (confidence != null) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'Model RBF-SVM • Keyakinan ${(confidence! * 100).round()}%',
+                style: const TextStyle(
+                  fontSize: 11.0,
+                  fontWeight: FontWeight.w700,
+                  color: primaryMaroon,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
 
           // Two white info cards: SENSITIVITAS & RISIKO JERAWAT
@@ -417,25 +437,70 @@ class SkinCheckResultPage extends StatelessWidget {
     );
   }
 
-  Widget _buildTipsCard() {
-    final tips = [
-      const _TipItem(
-        icon: LucideIcons.clipboardCheck,
-        text: 'Pertahankan rutinitas skincare yang sudah berjalan',
-      ),
-      const _TipItem(
-        icon: LucideIcons.sun,
-        text: 'Gunakan sunscreen setiap hari',
-      ),
-      const _TipItem(
+  List<_TipItem> _buildDynamicTips() {
+    final normalizedType = skinType.trim().toLowerCase();
+    final isSensitive = sensitivity.toLowerCase().contains('sensitif') &&
+        !sensitivity.toLowerCase().contains('non');
+    final isAcneProne = acneRisk.trim().toLowerCase() == 'rentan';
+
+    final tips = <_TipItem>[];
+    switch (normalizedType) {
+      case 'kering':
+        tips.add(const _TipItem(
+          icon: LucideIcons.droplets,
+          text: 'Gunakan pelembap kaya ceramide atau hyaluronic acid pagi & malam',
+        ));
+        tips.add(const _TipItem(
+          icon: LucideIcons.sparkles,
+          text: 'Pilih pembersih wajah lembut tanpa sulfat agar tidak menarik kulit',
+        ));
+      case 'berminyak':
+        tips.add(const _TipItem(
+          icon: LucideIcons.droplets,
+          text: 'Gunakan pelembap bertekstur gel ringan (oil-free) dan niacinamide',
+        ));
+        tips.add(const _TipItem(
+          icon: LucideIcons.sparkles,
+          text: 'Bersihkan wajah 2x sehari dengan gentle cleanser untuk kontrol sebum',
+        ));
+      case 'kombinasi':
+        tips.add(const _TipItem(
+          icon: LucideIcons.droplets,
+          text: 'Gunakan pelembap ringan di area T-zone dan lebih lembap di area pipi',
+        ));
+        tips.add(const _TipItem(
+          icon: LucideIcons.clipboardCheck,
+          text: 'Seimbangkan hidrasi kulit dengan toner dan serum yang menghidrasi',
+        ));
+      default:
+        tips.add(const _TipItem(
+          icon: LucideIcons.clipboardCheck,
+          text: 'Pertahankan rutinitas skincare dasar yang sudah berjalan dengan baik',
+        ));
+    }
+
+    tips.add(const _TipItem(
+      icon: LucideIcons.sun,
+      text: 'Gunakan sunscreen minimal SPF 30 setiap hari di pagi/siang hari',
+    ));
+
+    if (isSensitive) {
+      tips.add(const _TipItem(
         icon: LucideIcons.shield,
-        text: 'Hindari produk dengan fragrance dan alkohol',
-      ),
-      const _TipItem(
+        text: 'Hindari produk dengan fragrance, alkohol tinggi, dan lakukan patch test',
+      ));
+    }
+    if (isAcneProne) {
+      tips.add(const _TipItem(
         icon: LucideIcons.triangleAlert,
-        text: 'Gunakan produk non-comedogenic',
-      ),
-    ];
+        text: 'Pilih produk berlabel non-comedogenic dan hindari memencet jerawat',
+      ));
+    }
+    return tips;
+  }
+
+  Widget _buildTipsCard() {
+    final tips = _buildDynamicTips();
 
     return Container(
       padding: const EdgeInsets.all(16.0),
